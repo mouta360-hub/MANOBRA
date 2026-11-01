@@ -1357,6 +1357,8 @@
       tourEmit('connected', { name: o.opp, role: o.side === 0 ? 'host' : 'guest' });
     } else if (o.k === 'relay') {
       if (o.m === app.tour.matchId && typeof o.d === 'string') tourEmit('message', { data: o.d });
+    } else if (o.k === 'autoSetup') {
+      if (o.m === app.tour.matchId) handleBtMessage(JSON.stringify({ k: 'autoSetup', p: o.p, opp: o.opp }));
     } else if (o.k === 'matchEnd') {
       onTourMatchEnd(o, 0);
     }
@@ -1366,7 +1368,13 @@
     if (o.m !== app.tour.matchId) return;
     // se ainda há jogadas chegando ou animando, espera terminarem para ver o fim da partida
     if ((app.btQueue.length || app.animating) && tries < 40) { setTimeout(() => onTourMatchEnd(o, tries + 1), 300); return; }
-    if (app.screen === 'game' && app.game && app.game.over) return; // vê o resultado e volta pelo botão
+    if (app.screen === 'game' && app.game && app.game.over) {
+      // Mesmo que uma animação antiga tenha ficado pendente, o resultado precisa aparecer
+      // para que o temporizador de retorno automático seja armado.
+      app.animating = false;
+      render();
+      return;
+    }
     toast((o.winner === app.tour.myId ? 'Você venceu' : 'Você perdeu') + ' (' + reasonText(o.reason) + ').');
     tourEndMatchLocal();
     app.screen = 'tour';

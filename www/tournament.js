@@ -197,7 +197,9 @@
           });
           missingSides.forEach(side => {
             const missing = side === 0 ? m.a : m.b;
-            this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify({ k: 'autoSetup', p: rt.setups[side], opp: rt.setups[side ^ 1] }) });
+            const payload = { k: 'autoSetup', m: m.id, p: rt.setups[side], opp: rt.setups[side ^ 1] };
+            this.send(missing, payload);
+            this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify(payload) });
           });
           this._startGameFromSetups(m, rt);
         }
