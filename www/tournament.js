@@ -186,7 +186,13 @@
         if (missingSides.length) {
           missingSides.forEach(side => {
             const missing = side === 0 ? m.a : m.b;
-            const list = this.E.presetSetup(side, this.rnd).map(o => [o.i, o.p]);
+            const partial = rt.progress[side] || [];
+            const used = new Set(partial.map(o => o[0]));
+            const list = partial.slice();
+            for (const o of this.E.presetSetup(side, this.rnd)) {
+              if (list.length >= this.E.PIECES || used.has(o.i)) continue;
+              list.push([o.i, o.p]); used.add(o.i);
+            }
             rt.setups[side] = list;
           });
           missingSides.forEach(side => {
@@ -366,7 +372,7 @@
       m.timer = null;
       m.status = 'playing';
       m.ready = [false, false];
-      const rt = { setups: [null, null], game: null, botSide: null, pending: false };
+      const rt = { setups: [null, null], progress: [[], []], game: null, botSide: null, pending: false };
       this.rt[m.id] = rt;
       this.send(m.a, { k: 'start', m: m.id, side: 0, opp: this._p(m.b).nick, oppAv: this._p(m.b).av || '' });
       this.send(m.b, { k: 'start', m: m.id, side: 1, opp: this._p(m.a).nick, oppAv: this._p(m.a).av || '' });
@@ -376,6 +382,7 @@
         rt.botSide = bs;
         const list = this.E.presetSetup(bs, this.rnd).map(o => [o.i, o.p]);
         rt.setups[bs] = list;
+        rt.progress[bs] = list.slice();
         const talk = d => this.send(human, { k: 'relay', m: m.id, d: JSON.stringify(d) });
         const bot = this._p(bs === 0 ? m.a : m.b);
         setTimeout(() => { if (this.rt[m.id] === rt) { talk({ k: 'hello', v: 1, nick: bot.nick, av: bot.av }); talk({ k: 'setup', p: list }); } }, Math.min(this.botDelay, 400));
@@ -506,7 +513,18 @@
         if (!E.isAttack(p)) def++;
         seen.add(i);
       }
-      return def <= E.MAX_DEF;
+      return def <= this.E.MAX_DEF;
+    }
+    _validPartial(list, side) {
+      if (!Array.isArray(list) || list.length > this.E.PIECES) return false;
+      const seen = new Set(), terr = new Set(this.E.territoryCells(side)); let def = 0;
+      for (const it of list) {
+        if (!Array.isArray(it) || it.length !== 2 || !Number.isInteger(it[0]) || seen.has(it[0]) || !terr.has(it[0])) return false;
+        if (!(it[1] === 1 || it[1] === 2 || it[1] === 3 || it[1] === 4) || this.E.sideOf(it[1]) !== side) return false;
+        if (!this.E.isAttack(it[1])) def++;
+        seen.add(it[0]);
+      }
+      return def <= this.E.MAX_DEF;
     }
     relay(id, mid, d) {
       const m = this._m(mid);
@@ -526,11 +544,16 @@
         if (!this._validSetup(o.p, side)) { this._forfeit(m, id, 'montagem inválida'); return; }
         if (rt.setups[side]) return;
         rt.setups[side] = o.p;
+        rt.progress[side] = o.p.slice();
         forward();
         this.broadcast();
         if (rt.setups[0] && rt.setups[1]) {
           this._startGameFromSetups(m, rt);
         }
+        return;
+      }
+      if (o.k === 'setupProgress') {
+        if (this._validPartial(o.p, side)) rt.progress[side] = o.p.slice();
         return;
       }
       if (o.k === 'move') {

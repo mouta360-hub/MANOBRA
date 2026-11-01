@@ -640,6 +640,12 @@
   /* ---------- Montagem ---------- */
   function clearSide(s) { for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === s) app.pieces[i] = 0; }
   function placeList(s, list) { clearSide(s); for (const o of list) app.pieces[o.i] = o.p; }
+  function sendSetupProgress() {
+    if (app.net !== 'tour' || !app.tour.matchId || !app.btLinked) return;
+    const list = [];
+    for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === app.setupSide) list.push([i, app.pieces[i]]);
+    btSend({ k: 'setupProgress', p: list });
+  }
   function placeAI(s) {
     placeList(s, app.level === 'easy' ? E.randomSetup(s) : E.presetSetup(s, Math.random));
   }
@@ -657,6 +663,7 @@
       if (c[1] >= MAX_DEF) { toast('No máximo ' + MAX_DEF + ' peças em defesa.'); app.pieces[i] = 0; }
       else app.pieces[i] = E.makePiece(s, false);
     } else app.pieces[i] = 0;
+    sendSetupProgress();
     render();
   }
 
@@ -1445,9 +1452,9 @@
       case 'again':
         if (app.mode === 'bt' && !app.btLinked) { toast('A conexão foi encerrada.'); app.screen = 'menu'; app.game = null; render(); break; }
         startSetup(app.mode); break;
-      case 'setupDefault': if (!(app.mode === 'bt' && app.btReady)) { placeList(app.setupSide, E.presetSetup(app.setupSide)); render(); } break;
-      case 'setupRandom': if (!(app.mode === 'bt' && app.btReady)) { placeList(app.setupSide, E.randomSetup(app.setupSide)); render(); } break;
-      case 'setupClear': if (!(app.mode === 'bt' && app.btReady)) { clearSide(app.setupSide); render(); } break;
+      case 'setupDefault': if (!(app.mode === 'bt' && app.btReady)) { placeList(app.setupSide, E.presetSetup(app.setupSide)); sendSetupProgress(); render(); } break;
+      case 'setupRandom': if (!(app.mode === 'bt' && app.btReady)) { placeList(app.setupSide, E.randomSetup(app.setupSide)); sendSetupProgress(); render(); } break;
+      case 'setupClear': if (!(app.mode === 'bt' && app.btReady)) { clearSide(app.setupSide); sendSetupProgress(); render(); } break;
       case 'setupDone': setupDone(); break;
       case 'flipMode': {
         const m = app.game.cur.moves.find(x => x.t === 'f' && x.from === app.sel);
