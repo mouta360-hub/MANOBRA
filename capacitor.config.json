@@ -1,0 +1,9 @@
+{
+  "appId": "com.manobra.game",
+  "appName": "Manobra",
+  "webDir": "www",
+  "backgroundColor": "#14171f",
+  "server": {
+    "androidScheme": "https"
+  }
+}
