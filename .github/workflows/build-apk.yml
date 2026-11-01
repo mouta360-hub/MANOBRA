@@ -39,11 +39,13 @@ jobs:
           from PIL import Image, ImageChops, ImageOps
           base = Image.open('assets/manobra-icon-base.png').convert('RGBA')
           expected = ImageOps.contain(base, (192, 192), Image.Resampling.LANCZOS)
-          actual = Image.open('android/app/src/main/res/mipmap-xxxhdpi-v4/ic_launcher.png').convert('RGBA')
+          res = Path('android/app/src/main/res')
+          folder = res / ('mipmap-xxxhdpi-v4' if (res / 'mipmap-xxxhdpi-v4').exists() else 'mipmap-xxxhdpi')
+          actual = Image.open(folder / 'ic_launcher.png').convert('RGBA')
           assert actual.size == (192, 192), actual.size
           assert ImageChops.difference(actual, expected).getbbox() is None, 'launcher icon was not applied'
           assert '@mipmap/ic_launcher_foreground' in Path('android/app/src/main/res/drawable-anydpi-v24/ic_launcher_foreground.xml').read_text()
-          print('Launcher Manobra verificado: mipmap-v4 + adaptive icon')
+          print('Launcher Manobra verificado:', folder, '+ adaptive icon')
           PY
 
       - name: Compilar APK (com Bluetooth)
@@ -68,10 +70,12 @@ jobs:
           from PIL import Image, ImageChops, ImageOps
           base = Image.open('assets/manobra-icon-base.png').convert('RGBA')
           expected = ImageOps.contain(base, (192, 192), Image.Resampling.LANCZOS)
-          actual = Image.open('android/app/src/main/res/mipmap-xxxhdpi-v4/ic_launcher.png').convert('RGBA')
+          res = Path('android/app/src/main/res')
+          folder = res / ('mipmap-xxxhdpi-v4' if (res / 'mipmap-xxxhdpi-v4').exists() else 'mipmap-xxxhdpi')
+          actual = Image.open(folder / 'ic_launcher.png').convert('RGBA')
           assert ImageChops.difference(actual, expected).getbbox() is None, 'launcher icon was not applied'
           assert '@mipmap/ic_launcher_foreground' in Path('android/app/src/main/res/drawable-anydpi-v24/ic_launcher_foreground.xml').read_text()
-          print('Launcher Manobra verificado: mipmap-v4 + adaptive icon')
+          print('Launcher Manobra verificado:', folder, '+ adaptive icon')
           PY
           cd android
           ./gradlew assembleDebug
