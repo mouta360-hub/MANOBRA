@@ -74,12 +74,12 @@ def generated_foreground(size):
 
 
 def icon_folders(dens):
-    # Capacitor/Android Studio podem criar mipmap-*-v4; essa pasta é mais
-    # específica e vence a pasta sem sufixo durante a resolução do recurso.
-    return [
-        os.path.join(RES, "mipmap-" + dens),
-        os.path.join(RES, "mipmap-" + dens + "-v4"),
-    ]
+    # Capacitor costuma criar mipmap-*-v4. Android considera a pasta -v4
+    # equivalente à pasta sem sufixo para este recurso; escrever nas duas
+    # provoca "Duplicate resources" no mergeDebugResources.
+    v4 = os.path.join(RES, "mipmap-" + dens + "-v4")
+    plain = os.path.join(RES, "mipmap-" + dens)
+    return [v4] if os.path.isdir(v4) else [plain]
 
 
 for dens, size in LEGACY.items():
