@@ -347,17 +347,6 @@
         '<button class="primary" data-act="choose" data-v="p">Empurrar</button><button class="primary" data-act="choose" data-v="s">Trocar de lugar</button></div></div>';
     }
     if (g.over && !app.animating) {
-      if (app.net === 'tour' && !app._tourResultTimer) {
-        const resultGame = g;
-        app._tourResultTimer = true;
-        const resultTimer = setTimeout(() => {
-          app._tourResultTimer = false;
-          if (app.screen === 'game' && app.game === resultGame && app.game.over) {
-            tourEndMatchLocal(); app.screen = 'tour'; render();
-          }
-        }, 8000);
-        if (resultTimer && resultTimer.unref) resultTimer.unref();
-      }
       const w = g.over.winner;
       const winner = playerForSide(w);
       let who = winner.nick + ' venceu!';
@@ -366,7 +355,7 @@
       if (app.mode === 'bt' && w !== app.humanSide) who = winner.nick + ' venceu.';
       h += '<div class="overlay center"><div class="sheet"><div class="result-winner">' + avHtml(winner.av) + '<div><h2>' + esc(who) + '</h2><p class="result-name">Vencedor: <b>' + esc(winner.nick) + '</b></p></div></div><p>Motivo: ' + REASONS[g.over.reason] + '.</p>' +
         (app.net === 'tour'
-          ? '<button class="primary" data-act="tourBack">Voltar ao campeonato</button><p class="muted" style="margin:8px 0 0">Voltando automaticamente em alguns segundos…</p>'
+          ? '<button class="primary" data-act="tourBack">Voltar ao campeonato</button>'
           : '<button class="primary" data-act="again">Jogar de novo</button><button data-act="menu">Menu</button>') +
         '</div></div>';
     }
@@ -1366,15 +1355,10 @@
   // O juiz encerrou a partida (vitória na mesa, W.O., decisão do organizador)
   function onTourMatchEnd(o, tries) {
     if (o.m !== app.tour.matchId) return;
-    // se ainda há jogadas chegando ou animando, espera terminarem para ver o fim da partida
-    if ((app.btQueue.length || app.animating) && tries < 40) { setTimeout(() => onTourMatchEnd(o, tries + 1), 300); return; }
-    if (app.screen === 'game' && app.game && app.game.over) {
-      // Mesmo que uma animação antiga tenha ficado pendente, o resultado precisa aparecer
-      // para que o temporizador de retorno automático seja armado.
-      app.animating = false;
-      render();
-      return;
-    }
+    // O juiz já encerrou a partida: não há contagem nem tela de espera.
+    // Descarta qualquer animação restante e libera imediatamente o próximo jogo.
+    app.btQueue.length = 0;
+    app.animating = false;
     toast((o.winner === app.tour.myId ? 'Você venceu' : 'Você perdeu') + ' (' + reasonText(o.reason) + ').');
     tourEndMatchLocal();
     app.screen = 'tour';

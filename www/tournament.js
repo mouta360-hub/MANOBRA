@@ -187,14 +187,12 @@
           missingSides.forEach(side => {
             const missing = side === 0 ? m.a : m.b;
             const partial = rt.progress[side] || [];
-            const used = new Set(partial.map(o => o[0]));
-            const list = partial.slice();
-            for (const o of this.E.presetSetup(side, this.rnd)) {
-              if (list.length >= this.E.PIECES || used.has(o.i)) continue;
-              list.push([o.i, o.p]); used.add(o.i);
+            rt.setups[side] = this._completeSetup(partial, side);
+            if (!this._validSetup(rt.setups[side], side)) {
+              this._forfeit(m, missing, 'não completou exatamente 13 peças dentro de 2 minutos');
             }
-            rt.setups[side] = list;
           });
+          if (m.status !== 'playing') return;
           missingSides.forEach(side => {
             const missing = side === 0 ? m.a : m.b;
             const payload = { k: 'autoSetup', m: m.id, p: rt.setups[side], opp: rt.setups[side ^ 1] };
@@ -205,6 +203,22 @@
         }
       }, this._setupTimeout);
       if (this._setupTimers[m.id] && this._setupTimers[m.id].unref) this._setupTimers[m.id].unref();
+    }
+    _completeSetup(partial, side) {
+      const list = Array.isArray(partial) ? partial.slice(0, this.E.PIECES) : [];
+      const used = new Set(list.map(o => o[0]));
+      let defs = list.reduce((n, o) => n + (this.E.isAttack(o[1]) ? 0 : 1), 0);
+      const add = o => {
+        if (list.length >= this.E.PIECES || used.has(o.i)) return;
+        const p = defs >= this.E.MAX_DEF ? this.E.makePiece(side, true) : o.p;
+        list.push([o.i, p]); used.add(o.i);
+        if (!this.E.isAttack(p)) defs++;
+      };
+      this.E.presetSetup(side, this.rnd).forEach(add);
+      if (list.length < this.E.PIECES) {
+        this.E.territoryCells(side).forEach(i => add({ i: i, p: this.E.makePiece(side, true) }));
+      }
+      return list;
     }
     _forfeitDisconnected() {
       if (this._forfeiting) return;
