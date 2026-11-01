@@ -402,7 +402,21 @@
     return best;
   }
 
+  // Partida simulada que não acaba (robôs repetindo lances): decide por peças.
+  // Menos peças perde; empate -> menos peças em ataque perde; empate total -> sorteio.
+  const SIM_MAX_PLIES = 240;
+  function adjudicate(st, rnd) {
+    const cnt = [0, 0], atk = [0, 0];
+    for (let i = 0; i < N; i++) { const p = st.b[i]; if (!p) continue; const sd = sideOf(p); cnt[sd]++; if (isAttack(p)) atk[sd]++; }
+    let winner;
+    if (cnt[0] !== cnt[1]) winner = cnt[0] > cnt[1] ? WHITE : BLACK;
+    else if (atk[0] !== atk[1]) winner = atk[0] > atk[1] ? WHITE : BLACK;
+    else winner = (rnd || Math.random)() < 0.5 ? WHITE : BLACK;
+    return { winner: winner, reason: 'limite_jogadas' };
+  }
+
   const api = {
+    SIM_MAX_PLIES, adjudicate,
     COLS, ROWS, N, EMPTY, WA, WD, BA, BD, WHITE, BLACK, MAX_DEF, PIECES, MAIN,
     idx, rowOf, colOf, isDarkCell, sideOf, isAttack, makePiece, isMain, terrainOwner,
     NB, createState, generate, apply, undo, winner, hashOf, loopLoser, Game,

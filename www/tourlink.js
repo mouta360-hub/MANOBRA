@@ -16,6 +16,7 @@
   let conns = {};       // id do jogador -> conexão (só no organizador)
   let client = null;    // { peer, conn } (só no convidado)
   let closing = false;
+  let simWorker = null;
   let localOnly = false; // campeonato offline: só robôs, sem PeerJS
 
   function emit(ev, data) {
@@ -35,6 +36,35 @@
     return out;
   }
 
+  // Worker que joga as partidas robô x robô sem travar a tela. Sem Worker (ou se falhar): null / plano B.
+  function makeSimWorker() {
+    if (!root.Worker || root.__manobraNoWorker) return null;
+    let w;
+    try { w = new root.Worker('engine-worker.js'); } catch (e) { return null; }
+    const jobs = {};
+    let broken = false;
+    const failAll = function () {
+      broken = true;
+      Object.keys(jobs).forEach(function (id) { const j = jobs[id]; delete jobs[id]; try { j.fail(); } catch (e) { /* ok */ } });
+    };
+    w.onmessage = function (ev) {
+      const d = ev.data || {}, j = jobs[d.id];
+      if (!j) return;
+      if (d.k === 'p') j.progress(d);
+      else if (d.k === 'done') { delete jobs[d.id]; j.done(d); }
+    };
+    w.onerror = failAll;
+    return {
+      run: function (job, progress, done, fail) {
+        if (broken) { fail(); return; }
+        jobs[job.id] = { progress: progress, done: done, fail: fail };
+        try { w.postMessage(Object.assign({ k: 'sim' }, job)); } catch (e) { delete jobs[job.id]; fail(); }
+      },
+      stop: function (id) { delete jobs[id]; try { w.postMessage({ k: 'stop', id: id }); } catch (e) { /* ok */ } },
+      terminate: function () { broken = true; try { w.terminate(); } catch (e) { /* ok */ } }
+    };
+  }
+
   function loadLib() {
     if (root.Peer) return Promise.resolve();
     if (root.ManobraOnline && root.ManobraOnline.loadLib) return root.ManobraOnline.loadLib();
@@ -45,6 +75,7 @@
     closing = true;
     const hp = hostPeer, cl = client, cs = conns;
     role = null; hub = null; hostPeer = null; client = null; conns = {}; localOnly = false;
+    if (simWorker) { simWorker.terminate(); simWorker = null; }
     Object.keys(cs).forEach(function (k) { try { cs[k].close(); } catch (e) { /* ok */ } });
     try { if (hp) hp.destroy(); } catch (e) { /* ok */ }
     if (cl) {
@@ -97,8 +128,10 @@
         closing = false;
         const E = root.ManobraEngine, T = root.ManobraTournament;
         if (!E || !T) throw new Error('O módulo de campeonato não está disponível.');
+        simWorker = makeSimWorker();
         const h = new T.Hub({
           engine: E,
+          simWorker: simWorker,
           botDelay: root.__manobraBotDelay, // só os testes mudam isso
           setupTimeout: root.__manobraSetupTimeout, // idem (indefinido = 2 minutos)
           moveGrace: root.__manobraMoveGrace,

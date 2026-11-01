@@ -77,9 +77,12 @@ O app gira nos dois sentidos (retrato e paisagem, seguindo o sensor do celular).
 - Sair no meio de uma partida, não aparecer na partida atual ou cair a internet dá W.O. automático ao adversário. O resultado não pode ser alterado e a partida não pode ser refeita manualmente.
 - Se o organizador sair ou ficar sem internet, o campeonato termina para todos (não há servidor guardando nada). Quem cair pode voltar entrando com o mesmo código, desde que não tenha começado outra partida.
 
-## Desempenho do juiz
-- As partidas **robô contra robô** são simuladas no celular do organizador, uma por vez, com busca limitada (120 ms por lance) e pausa entre os lances (mais longa ainda quando há partida humana em andamento). Isso reduziu o uso de processador de ~99% para ~17% num campeonato de 8 jogadores com robôs difíceis, e o celular não trava.
-- O robô que joga contra você pensa no máximo 0,9 s por lance. O botão **Pular** da simulação termina a partida em fatias curtas, sem congelar a tela.
+## Desempenho do juiz (partidas entre robôs)
+- As partidas **robô contra robô** rodam num **Web Worker** (`www/engine-worker.js`), fora da tela principal: o celular do organizador não trava e a rodada anda rápido (num campeonato de 8 jogadores com 7 robôs, as 21 partidas entre robôs terminam em poucos segundos; a tela principal nunca parou mais que alguns milissegundos).
+- Se o Worker não existir ou falhar (ou ficar mudo por 15 s), o juiz continua sozinho na tela principal, em fatias curtas com pausa (mais lento, mas sem travar).
+- Cada lance simulado usa busca curta (15 ms). Se uma partida entre robôs passar de **240 lances** sem acabar (robôs difíceis repetindo lances para sempre), ela é decidida por quem tem mais peças (depois mais peças em ataque; empate total, sorteio). Antes, essas partidas podiam não terminar nunca e a rodada ficava parada.
+- O robô que joga contra uma pessoa pensa no máximo 0,9 s por lance. O botão **Pular** da simulação termina a partida sem congelar a tela.
+- Ao voltar do segundo plano (ou de outro app), a tela e os contadores se atualizam na hora.
 
 ## Tempo por jogada (1 min 30 s)
 - Cada jogada humana tem no máximo **1 minuto e 30 segundos**. O contador (⏱) aparece no placar, fica vermelho nos últimos 10 s e **zera a cada jogada**, valendo para os dois jogadores.

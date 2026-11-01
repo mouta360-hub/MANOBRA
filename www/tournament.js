@@ -7,7 +7,7 @@
   'use strict';
 
   const WIN_POINTS = 3, MAX_PLAYERS = 8, MIN_PLAYERS = 2;
-  const SIM_LIMIT = { ms: 120, depth: 4 }, HUMAN_BOT_LIMIT = { ms: 900 }, ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000, MOVE_TIMEOUT = 90000, MOVE_GRACE = 3000;
+  const SIM_LIMIT = { ms: 15, depth: 3 }, HUMAN_BOT_LIMIT = { ms: 900 }, ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000, MOVE_TIMEOUT = 90000, MOVE_GRACE = 3000;
   // 60 nomes x 100 sobrenomes = 6.000 perfis fictícios. O nome parece humano,
   // mas continua sendo uma IA; o avatar é escolhido junto com o perfil.
   const BOT_FIRST = 'Ana Beatriz Bruno Camila Carlos Clara Daniel Davi Diego Eduarda Eduardo Elisa Fernanda Felipe Gabriel Gabriela Helena Henrique Igor Isabela João Joaquim Júlia Juliana Laura Larissa Leonardo Lívia Lucas Luana Manuel Manuela Marcelo Marcos Maria Mariana Mateus Melissa Miguel Murilo Natália Nicolas Otávio Patrícia Paulo Pedro Rafael Rafaela Raquel Renato Ricardo Rodrigo Sabrina Samuel Sofia Thiago Valentina Vicente Vinícius Vitória Yuri Alice Arthur Bianca Caio Cecília Enzo Gustavo'.split(' ');
@@ -143,6 +143,8 @@
       this._moveTimeout = opts.moveTimeout == null ? MOVE_TIMEOUT : opts.moveTimeout; // por jogada humana
       this._moveGrace = opts.moveGrace == null ? MOVE_GRACE : opts.moveGrace;
       this._moveTimers = {};
+      this._simWatchdog = opts.simWatchdog || 15000; // worker mudo por tanto tempo => o juiz assume
+      this._simWorker = opts.simWorker || null; // roda robô x robô fora da tela principal (se existir)
       this._simFast = opts.simFast == null ? opts.botDelay === 0 : !!opts.simFast; // só os testes (botDelay 0)
       this._auto = false;
     }
@@ -538,41 +540,69 @@
       this.rt[m.id] = rt;
       this._simSnapshot(m, g, 0);
       this.broadcast();
-      const step = () => {
-        if (this.rt[m.id] !== rt || m.status !== 'playing' || g.over) return;
-        const legal = g.cur.moves;
-        const t0 = Date.now();
-        const mv = this.E.chooseMove(g.st, legal, this.botLevel, SIM_LIMIT);
-        if (!mv) { this._finish(m, g.st.turn === 0 ? m.b : m.a, 'sem jogadas', [0, 0]); return; }
-        g.play(mv);
-        const moves = (m.sim ? m.sim.moves : 0) + 1;
-        this._simSnapshot(m, g, moves);
-        if (g.over) {
-          const c = m.sim.pieces, dA = c[0] - c[1];
-          this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
-          return;
-        }
-        // A simulação é invisível: não transmite o tabuleiro nem cada lance.
-        // Descansa 5x o tempo que gastou pensando (uso de CPU ~15%) e mais ainda se houver
-        // partida humana em andamento, para o celular do organizador não travar.
-        setTimeout(step, this._simPause(Date.now() - t0));
+      const startMain = () => { // plano B: na própria tela principal, em fatias com pausa
+        rt.worker = false;
+        const step = () => {
+          if (this.rt[m.id] !== rt || m.status !== 'playing' || g.over) return;
+          if ((m.sim ? m.sim.moves : 0) >= this.E.SIM_MAX_PLIES) g.over = this.E.adjudicate(g.st, this.rnd);
+          if (g.over) { const c = m.sim.pieces, dA = c[0] - c[1]; this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c); return; }
+          const legal = g.cur.moves;
+          const t0 = Date.now();
+          const mv = this.E.chooseMove(g.st, legal, this.botLevel, SIM_LIMIT);
+          if (!mv) { this._finish(m, g.st.turn === 0 ? m.b : m.a, 'sem jogadas', [0, 0]); return; }
+          g.play(mv);
+          const moves = (m.sim ? m.sim.moves : 0) + 1;
+          this._simSnapshot(m, g, moves);
+          if (g.over) {
+            const c = m.sim.pieces, dA = c[0] - c[1];
+            this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
+            return;
+          }
+          // A simulação é invisível: não transmite o tabuleiro nem cada lance.
+          // Descansa 5x o tempo que gastou pensando (uso de CPU ~15%) e mais ainda se houver
+          // partida humana em andamento, para o celular do organizador não travar.
+          setTimeout(step, this._simPause(Date.now() - t0));
+        };
+        setTimeout(step, 5);
       };
-      setTimeout(step, 5);
+      if (!this._simWorker) { startMain(); return; }
+      rt.worker = true;
+      rt.lastMsg = Date.now();
+      const live = () => this.rt[m.id] === rt && m.status === 'playing';
+      const takeOver = () => { if (live() && rt.worker) { rt.worker = false; try { this._simWorker.stop(m.id); } catch (e) { /* ok */ } if (!g.over) g.refresh(); startMain(); } };
+      const dog = setInterval(() => {
+        if (!live() || !rt.worker) { clearInterval(dog); return; }
+        if (Date.now() - rt.lastMsg > this._simWatchdog) { clearInterval(dog); takeOver(); }
+      }, Math.max(20, Math.min(1000, this._simWatchdog / 3)));
+      if (dog && dog.unref) dog.unref();
+      this._simWorker.run({ id: m.id, pieces: Array.from(g.st.b), level: this.botLevel, limit: SIM_LIMIT },
+        d => { if (!live()) return; rt.lastMsg = Date.now(); g.st.b.set(d.b); g.st.turn = d.turn; g.plies = d.moves; this._simSnapshot(m, g, d.moves); },
+        d => {
+          if (!live()) return;
+          if (d.noMove) { this._finish(m, d.loser === 0 ? m.b : m.a, 'sem jogadas', [0, 0]); return; }
+          g.st.b.set(d.b); g.st.turn = d.turn; g.plies = d.moves; g.over = { winner: d.winner, reason: d.reason };
+          this._simSnapshot(m, g, d.moves);
+          const c = d.pieces, dA = c[0] - c[1];
+          this._finish(m, d.winner === 0 ? m.a : m.b, d.reason, [dA, -dA], false, c);
+        },
+        () => { clearInterval(dog); takeOver(); }); // falhou: segue na tela principal do ponto em que parou
     }
 
     _simPause(elapsed) {
       if (this._simFast) return 5;
       const humanBusy = this.matches.some(x => x.status === 'playing' && !(this.rt[x.id] && this.rt[x.id].sim));
-      return Math.max(humanBusy ? 400 : 80, elapsed * 5);
+      return Math.max(humanBusy ? 400 : 15, elapsed * (humanBusy ? 5 : 1));
     }
     // O organizador pode terminar a simulação imediatamente, sem alterar o resultado.
     skipSimulation(mid) {
       const m = this._m(mid), rt = m && this.rt[mid];
       if (!m || !rt || !rt.sim || m.status !== 'playing') return false;
+      if (rt.worker) return true; // já roda em velocidade total fora da tela
       const t0 = Date.now();
       // Processa em blocos para não congelar a tela. Se ainda não terminou,
       // agenda o bloco seguinte; nunca corta nem sorteia o resultado.
       while (this.rt[mid] === rt && m.status === 'playing' && !rt.game.over && Date.now() - t0 < 40) {
+        if ((m.sim ? m.sim.moves : 0) >= this.E.SIM_MAX_PLIES) { rt.game.over = this.E.adjudicate(rt.game.st, this.rnd); break; }
         const g = rt.game, mv = this.E.chooseMove(g.st, g.cur.moves, this.botLevel, SIM_LIMIT);
         if (!mv) {
           this._finish(m, g.st.turn === 0 ? m.b : m.a, 'sem jogadas', [0, 0]);
@@ -675,7 +705,7 @@
       m.timer = null;
       m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.sim = null; m.ready = [false, false];
       delete this.rt[m.id];
-      if (wasSimulation) this._botSimulationActive = false;
+      if (wasSimulation) { this._botSimulationActive = false; if (this._simWorker) this._simWorker.stop(m.id); }
       if (!silent) [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'matchEnd', m: m.id, winner: winnerId, reason: reason }); });
       this._advance(m);
       this._forfeitDisconnected();

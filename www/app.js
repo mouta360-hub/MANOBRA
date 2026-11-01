@@ -10,7 +10,8 @@
     principal: 'alcançou a casa principal do oponente',
     eliminacao: 'eliminou todas as peças do oponente',
     isolamento: 'separou todas as peças de ataque do oponente, sem como reconectá-las',
-    sem_movimentos: 'o oponente ficou sem movimentos'
+    sem_movimentos: 'o oponente ficou sem movimentos',
+    limite_jogadas: 'partida longa demais: decidida pelo número de peças'
   };
 
   const app = {
@@ -329,7 +330,7 @@
   }
   // Sem juiz (IA, mesmo celular, Bluetooth, online): acabou o tempo, quem estava na vez perde a vez.
   // No campeonato quem joga é o juiz (vale mesmo se o celular estiver travado).
-  function moveClockTick() {
+  function moveClockWork() {
     const g = app.game;
     if (app.screen === 'game' && g && app.moveDeadline) {
       const text = clockText(), left = app.moveDeadline - Date.now();
@@ -344,6 +345,10 @@
         doPass();
       }
     }
+  }
+  // O relógio nunca para de contar: mesmo que algo dê erro num passo, o próximo é agendado.
+  function moveClockTick() {
+    try { moveClockWork(); } catch (e) { /* ok */ }
     const t = setTimeout(moveClockTick, 1000);
     if (t && t.unref) t.unref();
   }
@@ -1714,7 +1719,11 @@
     tryStartBt();
   }
 
-  if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => { if (!document.hidden) syncAwake(true); });
+  if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    syncAwake(true);
+    if (app.screen === 'tour' || app.screen === 'setup' || app.screen === 'game') { try { render(); } catch (e) { /* ok */ } }
+  });
 
   moveClockTick();
   loadProfile();
