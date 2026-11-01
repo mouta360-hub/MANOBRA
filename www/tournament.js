@@ -7,7 +7,7 @@
   'use strict';
 
   const WIN_POINTS = 3, MAX_PLAYERS = 8, MIN_PLAYERS = 2;
-  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000;
+  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000, SETUP_AUTOFILL_LEAD = 5000;
   // 60 nomes x 100 sobrenomes = 6.000 perfis fictícios. O nome parece humano,
   // mas continua sendo uma IA; o avatar é escolhido junto com o perfil.
   const BOT_FIRST = 'Ana Beatriz Bruno Camila Carlos Clara Daniel Davi Diego Eduarda Eduardo Elisa Fernanda Felipe Gabriel Gabriela Helena Henrique Igor Isabela João Joaquim Júlia Juliana Laura Larissa Leonardo Lívia Lucas Luana Manuel Manuela Marcelo Marcos Maria Mariana Mateus Melissa Miguel Murilo Natália Nicolas Otávio Patrícia Paulo Pedro Rafael Rafaela Raquel Renato Ricardo Rodrigo Sabrina Samuel Sofia Thiago Valentina Vicente Vinícius Vitória Yuri Alice Arthur Bianca Caio Cecília Enzo Gustavo'.split(' ');
@@ -201,7 +201,7 @@
           });
           this._startGameFromSetups(m, rt);
         }
-      }, this._setupTimeout);
+      }, Math.max(0, this._setupTimeout - SETUP_AUTOFILL_LEAD));
       if (this._setupTimers[m.id] && this._setupTimers[m.id].unref) this._setupTimers[m.id].unref();
     }
     _completeSetup(partial, side) {
@@ -253,6 +253,52 @@
           ready: m.ready.slice()
         }))
       };
+    }
+    // Estado persistente: usado somente para campeonatos locais do organizador com robôs.
+    exportState() {
+      const gameState = g => g ? {
+        b: Array.from(g.st.b), turn: g.st.turn, over: g.over, last: g.last,
+        plies: g.plies, hist: Array.from(g.hist.entries())
+      } : null;
+      return {
+        version: 1, status: this.status, format: this.format, rounds: this.rounds,
+        champion: this.champion, botLevel: this.botLevel, next: this._next, botN: this._botN,
+        usedBotProfiles: Array.from(this._usedBotProfiles), players: this.players,
+        matches: this.matches, rt: Object.keys(this.rt).reduce((out, id) => {
+          const r = this.rt[id];
+          out[id] = { setups: r.setups, progress: r.progress, botSide: r.botSide,
+            pending: false, sim: !!r.sim, game: gameState(r.game) };
+          return out;
+        }, {})
+      };
+    }
+    importState(data) {
+      if (!data || data.version !== 1 || !Array.isArray(data.players) || !Array.isArray(data.matches)) return false;
+      this.status = data.status; this.format = data.format; this.rounds = data.rounds;
+      this.champion = data.champion; this.botLevel = data.botLevel || 'medium';
+      this._next = data.next || 0; this._botN = data.botN || 0;
+      this._usedBotProfiles = new Set(data.usedBotProfiles || []);
+      this.players = data.players; this.matches = data.matches; this.rt = {};
+      const restoreGame = x => {
+        if (!x || !Array.isArray(x.b)) return null;
+        const g = new this.E.Game(Int8Array.from(x.b));
+        g.st.turn = x.turn | 0; g.over = x.over || null; g.last = x.last || null;
+        g.plies = x.plies | 0; g.hist = new Map(Array.isArray(x.hist) ? x.hist : []);
+        if (!g.over) g.refresh(); else g.cur = null;
+        return g;
+      };
+      Object.keys(data.rt || {}).forEach(id => {
+        const r = data.rt[id];
+        this.rt[id] = { setups: r.setups || [null, null], progress: r.progress || [[], []],
+          game: restoreGame(r.game), botSide: r.botSide == null ? null : r.botSide,
+          pending: false, sim: !!r.sim };
+      });
+      this.matches.forEach(m => {
+        if (m.status === 'pending') this._armEntryTimer(m);
+        else if (m.status === 'playing' && this.rt[m.id] && !this.rt[m.id].game) this._armSetupTimer(m);
+        else if (m.status === 'playing' && this.rt[m.id] && this.rt[m.id].game && this.rt[m.id].botSide != null) this._botMaybeMove(m);
+      });
+      return true;
     }
     broadcast() {
       const s = this.snapshot();

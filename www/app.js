@@ -269,7 +269,7 @@
     const dis = lock ? ' disabled' : '';
     const setupMatch = tourTimerMatch();
     if (setupMatch && setupMatch.timer) scheduleTourTimer();
-    if (setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup' && Number(setupMatch.timer.until) <= Date.now()) completeSetupLocally();
+    if (setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup' && Number(setupMatch.timer.until) - Date.now() <= 5000) completeSetupLocally();
     const setupClock = setupMatch && setupMatch.timer ? timerClock(setupMatch) : '';
     const setupMineReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide] : lock;
     const setupOppReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide ^ 1] : !!app.peerSetup;
@@ -278,7 +278,7 @@
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
-      (app.net === 'tour' ? ' Você tem 2 minutos para terminar; depois disso o computador monta automaticamente.' : '');
+      (app.net === 'tour' ? ' Você tem 2 minutos para terminar; 5 segundos antes do fim o computador completa a montagem e aperta Pronto automaticamente.' : '');
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
       '<div class="topbar"><b>Montagem: ' + NAMES[s] + '</b><span>' + total + '/' + PIECES + ' peças</span></div>' +
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
@@ -492,6 +492,32 @@
     return r; // "W.O.: ..."
   }
   function tourFormatName(f) { return f === 'knockout' ? 'Mata-mata' : 'Todos contra todos'; }
+  const TOUR_SAVE_KEY = 'manobra.tour.bot.save.v1';
+  function tourBotOnly(s) { return !!(s && s.players && s.players.length && s.players.every(p => p.id === 0 || p.bot)); }
+  function tourSaved() { try { return JSON.parse(localStorage.getItem(TOUR_SAVE_KEY) || 'null'); } catch (e) { return null; } }
+  function tourSaveLocal() {
+    const l = window.ManobraTourLink, s = app.tour.snap;
+    if (!l || app.tour.role !== 'host' || !tourBotOnly(s)) return;
+    const data = l.saveState && l.saveState();
+    if (!data) return toast('Não foi possível salvar este campeonato.');
+    const g = app.game;
+    const local = g && app.net === 'tour' ? { matchId: app.tour.matchId, humanSide: app.humanSide, peer: app.peer,
+      game: { b: Array.from(g.st.b), turn: g.st.turn, over: g.over, last: g.last, plies: g.plies, hist: Array.from(g.hist.entries()) } } : null;
+    try { localStorage.setItem(TOUR_SAVE_KEY, JSON.stringify({ data: data, local: local, savedAt: Date.now() })); toast('Campeonato salvo neste celular.'); }
+    catch (e) { toast('Não há espaço suficiente para salvar o campeonato.'); }
+  }
+  function tourClearSaved() { try { localStorage.removeItem(TOUR_SAVE_KEY); } catch (e) {} }
+  function tourRestoreLocal(saved) {
+    const x = saved && saved.local;
+    if (!x || !x.game || !x.matchId) return;
+    const g = new E.Game(Int8Array.from(x.game.b || []));
+    g.st.turn = x.game.turn | 0; g.over = x.game.over || null; g.last = x.game.last || null;
+    g.plies = x.game.plies | 0; g.hist = new Map(Array.isArray(x.game.hist) ? x.game.hist : []);
+    if (!g.over) g.refresh(); else g.cur = null;
+    app.mode = 'bt'; app.net = 'tour'; app.btLinked = true; app.btReady = false;
+    app.humanSide = x.humanSide == null ? WHITE : x.humanSide; app.peer = x.peer || app.peer;
+    app.tour.matchId = x.matchId; app.game = g; app.screen = 'game'; app.animating = false; render();
+  }
 
   function tourMatchRow(m, s, t) {
     const T = window.ManobraTournament;
@@ -530,7 +556,8 @@
       h += '<div class="card"><p style="margin:0">Juntem de 1 a 8 jogadores (robôs completam): todos contra todos (com pontos) ou mata-mata (chaveamento). ' +
         'O celular de quem cria vira o "juiz": confere as jogadas e decide quem venceu. Ele também joga. ' +
         'Sozinho? Dá para jogar contra robôs.</p></div>' + profileEditor() +
-        '<div class="card"><button class="primary" data-act="tourCreate">Criar campeonato</button></div>' +
+        '<div class="card"><button class="primary" data-act="tourCreate">Criar campeonato</button>' +
+        (tourSaved() ? '<button data-act="tourResume" style="margin-top:8px">Continuar campeonato salvo</button><button class="link" data-act="tourClearSaved">Apagar campeonato salvo</button>' : '') + '</div>' +
         '<div class="card"><h3>Entrar com código</h3>' +
         '<input id="tcode" class="codein" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="CÓDIGO" value="' + esc(app.tourCode) + '">' +
         '<button class="primary" data-act="tourJoin">Entrar</button></div>';
@@ -575,6 +602,7 @@
     if (s.status === 'finished' && s.champion != null) {
       h += '<div class="card" style="text-align:center"><h3 style="margin:0">🏆 Campeão</h3><div class="bigcode" style="font-size:30px;letter-spacing:2px;padding:10px 0 4px">' + avHtml((s.players.find(x => x.id === s.champion) || {}).av) + ' ' + esc(T.nickOf(s, s.champion)) + '</div></div>';
     }
+    if (isOrg && tourBotOnly(s)) h += '<div class="card"><button data-act="tourSave">Salvar campeonato neste celular</button><p class="muted" style="margin:6px 0 0">Disponível somente em campeonatos com robôs.</p></div>';
     const busyMe = s.players.some(p => p.id === t.myId && p.busy);
     const mine = s.matches.filter(m => (m.a === t.myId || m.b === t.myId));
     h += '<div class="card"><h3>Minhas partidas</h3>';
@@ -653,11 +681,13 @@
     for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === side) list.push([i, app.pieces[i]]);
     const used = new Set(list.map(o => o[0]));
     let def = list.reduce((n, o) => n + (E.isAttack(o[1]) ? 0 : 1), 0);
-    for (const o of E.presetSetup(side, Math.random)) {
-      if (list.length >= PIECES || used.has(o.i)) continue;
-      if (!E.isAttack(o.p) && def >= MAX_DEF) continue;
-      list.push([o.i, o.p]); used.add(o.i); if (!E.isAttack(o.p)) def++;
-    }
+    const add = o => {
+      if (list.length >= PIECES || used.has(o.i)) return;
+      const p = def >= MAX_DEF ? E.makePiece(side, true) : o.p;
+      list.push([o.i, p]); used.add(o.i); if (!E.isAttack(p)) def++;
+    };
+    E.presetSetup(side, Math.random).forEach(add);
+    if (list.length < PIECES) E.territoryCells(side).forEach(i => add({ i: i, p: E.makePiece(side, true) }));
     if (list.length !== PIECES) return;
     placeList(side, list.map(o => ({ i: o[0], p: o[1] })));
     btSend({ k: 'setup', p: list });
@@ -1323,6 +1353,20 @@
       render();
     } catch (e) { app.tour = freshTour(); app.tour.msg = errMsg(e); render(); }
   }
+  async function tourResume() {
+    const saved = tourSaved();
+    if (!saved || !saved.data) return toast('Nenhum campeonato salvo foi encontrado.');
+    try {
+      const l = tourEnsure();
+      app.tour = freshTour(); app.tour.connecting = true; render();
+      const r = await l.host({ restore: saved.data, nick: myNick(), pid: app.me.code, avatar: app.me.av });
+      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you;
+      app.tour.snap = l.snapshot();
+      toast('Campeonato retomado.');
+      tourRestoreLocal(saved);
+      if (app.screen !== 'game') render();
+    } catch (e) { app.tour = freshTour(); app.tour.msg = errMsg(e); render(); }
+  }
   async function tourJoin() {
     const code = String(app.tourCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length !== 4) { toast('Digite o código de 4 letras ou números.'); return; }
@@ -1493,6 +1537,9 @@
       case 'onOpen': app.net = 'online'; app.bt = { stage: 'idle', devices: [], msg: '', code: '' }; app.screen = 'online'; render(); break;
       case 'tourOpen': tourOpen(); break;
       case 'tourCreate': tourCreate(); break;
+      case 'tourResume': tourResume(); break;
+      case 'tourClearSaved': tourClearSaved(); render(); break;
+      case 'tourSave': tourSaveLocal(); break;
       case 'tourJoin': tourJoin(); break;
       case 'tourExit':
         if (app.tour.role) tourExit(); else { app.screen = 'menu'; render(); }

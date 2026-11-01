@@ -106,7 +106,13 @@
         });
         hub = h;
         role = 'host';
-        h.join(String(opts.pid), opts.nick, opts.avatar); // o organizador é sempre o jogador 0
+        if (opts.restore) {
+          if (!h.importState(opts.restore)) throw new Error('O campeonato salvo está inválido ou corrompido.');
+          const me = h.players.find(function (p) { return p.id === 0; });
+          if (me) { me.connected = true; me.pid = String(opts.pid); me.nick = opts.nick || me.nick; me.av = opts.avatar || me.av; }
+        } else {
+          h.join(String(opts.pid), opts.nick, opts.avatar); // o organizador é sempre o jogador 0
+        }
         return new Promise(function (resolve, reject) {
           let tries = 0, finished = false;
           const timer = setTimeout(function () {
@@ -200,6 +206,7 @@
       }
     },
     snapshot: function () { return hub ? hub.snapshot() : null; },
+    saveState: function () { return hub && role === 'host' && hub.exportState ? hub.exportState() : null; },
     role: function () { return role; },
     leave: function () { reset(); },
     addListener: function (ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return Promise.resolve({ remove: function () {} }); }
