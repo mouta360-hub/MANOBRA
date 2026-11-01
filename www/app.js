@@ -340,7 +340,9 @@
       '<button data-act="flipMode" ' + (canFlip ? '' : 'disabled') + '>' + flipLabel + '</button>' +
       (canPurge ? '<button class="warn" data-act="purge">' + (app.purge ? 'Cancelar' : 'Eliminar defesa (7ª)') + '</button>' : '') +
       '<button data-act="toggleSound">' + (snd.on ? '🔊 Som' : '🔇 Mudo') + '</button>' +
-      '<button data-act="turnBoard">Girar</button><button data-act="menu">Menu</button></div></div></div>';
+      '<button data-act="turnBoard">Girar</button>' +
+      (app.net === 'tour' && app.tour.role === 'host' && tourBotOnly(app.tour.snap) ? '<button data-act="tourSave">💾 Salvar</button>' : '') +
+      '<button data-act="menu">Menu</button></div></div></div>';
     if (app.choice) {
       h += '<div class="overlay" data-act="cancelChoice"><div class="sheet"><h2>Como mover?</h2><p>Escolha o que fazer com a peça inimiga.</p>' +
         '<button class="primary" data-act="choose" data-v="p">Empurrar</button><button class="primary" data-act="choose" data-v="s">Trocar de lugar</button></div></div>';
@@ -494,16 +496,22 @@
   const TOUR_SAVE_KEY = 'manobra.tour.bot.save.v1';
   function tourBotOnly(s) { return !!(s && s.players && s.players.length && s.players.every(p => p.id === 0 || p.bot)); }
   function tourSaved() { try { return JSON.parse(localStorage.getItem(TOUR_SAVE_KEY) || 'null'); } catch (e) { return null; } }
-  function tourSaveLocal() {
+  // Salvamento manual (botão). O estado do jogo vem do juiz (fonte única), então o celular e o juiz nunca divergem.
+  function tourSaveLocal(silent) {
     const l = window.ManobraTourLink, s = app.tour.snap;
-    if (!l || app.tour.role !== 'host' || !tourBotOnly(s)) return;
+    if (!l || app.tour.role !== 'host' || !tourBotOnly(s)) return false;
     const data = l.saveState && l.saveState();
-    if (!data) return toast('Não foi possível salvar este campeonato.');
-    const g = app.game;
-    const local = g && app.net === 'tour' ? { matchId: app.tour.matchId, humanSide: app.humanSide, peer: app.peer,
-      game: { b: Array.from(g.st.b), turn: g.st.turn, over: g.over, last: g.last, plies: g.plies, hist: Array.from(g.hist.entries()) } } : null;
-    try { localStorage.setItem(TOUR_SAVE_KEY, JSON.stringify({ data: data, local: local, savedAt: Date.now() })); toast('Campeonato salvo neste celular.'); }
-    catch (e) { toast('Não há espaço suficiente para salvar o campeonato.'); }
+    if (!data) { if (!silent) toast('Não foi possível salvar este campeonato.'); return false; }
+    let local = null;
+    const mine = s.matches.find(m => m.status === 'playing' && (m.a === 0 || m.b === 0));
+    if (mine) {
+      const gm = data.rt && data.rt[mine.id] && data.rt[mine.id].game;
+      if (!gm) return false; // montagem em andamento: mantém o último salvamento bom
+      const opp = s.players.find(p => p.id === (mine.a === 0 ? mine.b : mine.a)) || {};
+      local = { matchId: mine.id, humanSide: mine.a === 0 ? WHITE : BLACK, peer: { nick: opp.nick || 'Adversário', av: AV[opp.av] ? opp.av : 'robot' }, game: gm };
+    }
+    try { localStorage.setItem(TOUR_SAVE_KEY, JSON.stringify({ data: data, local: local, savedAt: Date.now() })); if (!silent) toast('Campeonato salvo neste celular.'); return true; }
+    catch (e) { if (!silent) toast('Não há espaço suficiente para salvar o campeonato.'); return false; }
   }
   function tourClearSaved() { try { localStorage.removeItem(TOUR_SAVE_KEY); } catch (e) {} }
   function tourRestoreLocal(saved) {
@@ -566,7 +574,8 @@
     if (!s) return h + '<div class="hint">Conectando…</div></div>';
     const isOrg = t.myId === 0;
     if (s.status === 'lobby') {
-      h += '<div class="card"><p style="margin:0;text-align:center">Código do campeonato</p><div class="bigcode">' + esc(t.code || '') + '</div>' +
+      if (t.local) h += '<div class="card"><p style="margin:0;text-align:center"><b>Campeonato offline</b></p><p style="text-align:center;font-size:13px;margin:6px 0 0">Sem internet: só dá para jogar contra robôs. Adicione robôs abaixo. Use o botão Salvar para continuar depois.</p></div>';
+      else h += '<div class="card"><p style="margin:0;text-align:center">Código do campeonato</p><div class="bigcode">' + esc(t.code || '') + '</div>' +
         '<p style="text-align:center;font-size:13px;margin:0">' + (isOrg ? 'Passe este código para os jogadores (de 1 a 8, contando com você e os robôs).' : 'Aguardando o organizador iniciar.') + '</p></div>';
       h += '<div class="card"><h3>Jogadores (' + s.players.length + '/' + T.MAX_PLAYERS + ')</h3>';
       s.players.forEach(p => {
@@ -601,7 +610,7 @@
     if (s.status === 'finished' && s.champion != null) {
       h += '<div class="card" style="text-align:center"><h3 style="margin:0">🏆 Campeão</h3><div class="bigcode" style="font-size:30px;letter-spacing:2px;padding:10px 0 4px">' + avHtml((s.players.find(x => x.id === s.champion) || {}).av) + ' ' + esc(T.nickOf(s, s.champion)) + '</div></div>';
     }
-    if (isOrg && tourBotOnly(s)) h += '<div class="card"><button data-act="tourSave">Salvar campeonato neste celular</button><p class="muted" style="margin:6px 0 0">Disponível somente em campeonatos com robôs.</p></div>';
+    if (isOrg && tourBotOnly(s)) h += '<div class="card"><button data-act="tourSave">Salvar campeonato neste celular</button><p class="muted" style="margin:6px 0 0">Toque para guardar o ponto em que está (também há o botão 💾 Salvar durante a partida). Para continuar depois: Campeonato &gt; Continuar campeonato salvo.</p></div>';
     const busyMe = s.players.some(p => p.id === t.myId && p.busy);
     const mine = s.matches.filter(m => (m.a === t.myId || m.b === t.myId));
     h += '<div class="card"><h3>Minhas partidas</h3>';
@@ -652,7 +661,34 @@
     return h + '</div>';
   }
 
+  /* ---------- Tela sempre acesa durante o jogo ---------- */
+  // Acesa na montagem, na partida e no campeonato; ao voltar ao menu, o celular volta ao comportamento normal.
+  const awake = { on: false, lock: null };
+  function nativeScreen() {
+    try {
+      const C = window.Capacitor;
+      if (!C) return null;
+      const native = C.isNativePlatform ? C.isNativePlatform() : (C.getPlatform ? C.getPlatform() !== 'web' : false);
+      if (!native) return null;
+      if (C.Plugins && C.Plugins.ManobraScreen) return C.Plugins.ManobraScreen;
+      if (C.registerPlugin) return C.registerPlugin('ManobraScreen');
+    } catch (e) { /* sem plugin */ }
+    return null;
+  }
+  function syncAwake(force) {
+    const want = app.screen === 'game' || app.screen === 'setup' || app.screen === 'tour';
+    if (want === awake.on && !force) return;
+    awake.on = want;
+    try { const p = nativeScreen(); if (p) Promise.resolve(p.keepAwake({ on: want })).catch(() => {}); } catch (e) { /* ok */ }
+    try { // navegador / WebView com Wake Lock
+      if (want && navigator.wakeLock && navigator.wakeLock.request && !awake.lock && !(document && document.hidden)) {
+        navigator.wakeLock.request('screen').then(l => { awake.lock = l; if (!awake.on) { l.release().catch(() => {}); awake.lock = null; } else l.addEventListener('release', () => { awake.lock = null; }); }).catch(() => {});
+      } else if (!want && awake.lock) { const l = awake.lock; awake.lock = null; l.release().catch(() => {}); }
+    } catch (e) { /* ok */ }
+  }
+
   function render() {
+    syncAwake();
     const root = $('#app');
     if (app.screen === 'menu') root.innerHTML = menuScreen();
     else if (app.screen === 'tour') root.innerHTML = tourScreen();
@@ -1303,12 +1339,12 @@
   };
   function tourEmit(ev, data) { (tourHandlers[ev] || []).slice().forEach(f => { try { f(data); } catch (e) { /* ok */ } }); }
   let tourWired = false;
-  const freshTour = () => ({ role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false });
+  const freshTour = () => ({ role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false, local: false });
 
-  function tourEnsure() {
+  function tourEnsure(allowOffline) {
     const l = window.ManobraTourLink;
     if (!l || !window.ManobraTournament) throw new Error('O campeonato não está disponível nesta versão.');
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('Sem internet. Conecte-se ao Wi-Fi ou aos dados móveis.');
+    if (!allowOffline && typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('Sem internet. Conecte-se ao Wi-Fi ou aos dados móveis.');
     app.net = 'tour';
     btAttach(tourTransport);
     if (!tourWired) {
@@ -1326,10 +1362,14 @@
   }
   async function tourCreate() {
     try {
-      const l = tourEnsure();
+      const l = tourEnsure(true);
       app.tour = freshTour(); app.tour.connecting = true; render();
-      const r = await l.host({ nick: myNick(), pid: app.me.code, avatar: app.me.av });
-      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you;
+      const base = { nick: myNick(), pid: app.me.code, avatar: app.me.av };
+      let local = typeof navigator !== 'undefined' && navigator.onLine === false, r;
+      try { r = await l.host(Object.assign({ local: local }, base)); }
+      catch (e) { if (local) throw e; local = true; r = await l.host(Object.assign({ local: true }, base)); } // sem conexão com o serviço: joga offline
+      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you; app.tour.local = local;
+      if (local) toast('Sem internet: campeonato offline, só contra robôs.');
       app.tour.snap = l.snapshot();
       render();
     } catch (e) { app.tour = freshTour(); app.tour.msg = errMsg(e); render(); }
@@ -1338,10 +1378,10 @@
     const saved = tourSaved();
     if (!saved || !saved.data) return toast('Nenhum campeonato salvo foi encontrado.');
     try {
-      const l = tourEnsure();
+      const l = tourEnsure(true);
       app.tour = freshTour(); app.tour.connecting = true; render();
-      const r = await l.host({ restore: saved.data, nick: myNick(), pid: app.me.code, avatar: app.me.av });
-      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you;
+      const r = await l.host({ restore: saved.data, local: true, nick: myNick(), pid: app.me.code, avatar: app.me.av });
+      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you; app.tour.local = true;
       app.tour.snap = l.snapshot();
       toast('Campeonato retomado.');
       tourRestoreLocal(saved);
@@ -1603,6 +1643,8 @@
     render();
     tryStartBt();
   }
+
+  if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => { if (!document.hidden) syncAwake(true); });
 
   loadProfile();
   render();
