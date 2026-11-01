@@ -7,7 +7,7 @@
   'use strict';
 
   const WIN_POINTS = 3, MAX_PLAYERS = 8, MIN_PLAYERS = 2;
-  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000, SETUP_AUTOFILL_LEAD = 10000;
+  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000;
   // 60 nomes x 100 sobrenomes = 6.000 perfis fictícios. O nome parece humano,
   // mas continua sendo uma IA; o avatar é escolhido junto com o perfil.
   const BOT_FIRST = 'Ana Beatriz Bruno Camila Carlos Clara Daniel Davi Diego Eduarda Eduardo Elisa Fernanda Felipe Gabriel Gabriela Helena Henrique Igor Isabela João Joaquim Júlia Juliana Laura Larissa Leonardo Lívia Lucas Luana Manuel Manuela Marcelo Marcos Maria Mariana Mateus Melissa Miguel Murilo Natália Nicolas Otávio Patrícia Paulo Pedro Rafael Rafaela Raquel Renato Ricardo Rodrigo Sabrina Samuel Sofia Thiago Valentina Vicente Vinícius Vitória Yuri Alice Arthur Bianca Caio Cecília Enzo Gustavo'.split(' ');
@@ -174,6 +174,8 @@
       if (round == null) return;
       this.matches.filter(m => m.status === 'pending' && m.round === round && m.a != null && m.b != null).forEach(m => this._armEntryTimer(m));
     }
+    // Fim do tempo de montagem: o juiz completa as peças que faltam ao acaso e
+    // começa a partida. Nunca dá W.O. por causa da montagem.
     _armSetupTimer(m) {
       this._clearTimer(this._setupTimers, m.id);
       m.timer = { kind: 'setup', until: Date.now() + this._setupTimeout };
@@ -181,42 +183,41 @@
         delete this._setupTimers[m.id];
         m.timer = null;
         const rt = this.rt[m.id];
-        if (!rt || m.status !== 'playing') return;
+        if (!rt || m.status !== 'playing' || rt.game) return;
         const missingSides = [0, 1].filter(side => !rt.setups[side]);
-        if (missingSides.length) {
-          missingSides.forEach(side => {
-            const missing = side === 0 ? m.a : m.b;
-            const partial = rt.progress[side] || [];
-            rt.setups[side] = this._completeSetup(partial, side);
-            if (!this._validSetup(rt.setups[side], side)) {
-              this._forfeit(m, missing, 'não completou exatamente 13 peças dentro de 2 minutos');
-            }
-          });
-          if (m.status !== 'playing') return;
-          missingSides.forEach(side => {
-            const missing = side === 0 ? m.a : m.b;
-            const payload = { k: 'autoSetup', m: m.id, p: rt.setups[side], opp: rt.setups[side ^ 1] };
-            this.send(missing, payload);
-            this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify(payload) });
-          });
-          this._startGameFromSetups(m, rt);
-        }
-      }, Math.max(0, this._setupTimeout - SETUP_AUTOFILL_LEAD));
+        missingSides.forEach(side => {
+          let list = this._completeSetup(rt.progress[side] || [], side);
+          if (!this._validSetup(list, side)) list = this.E.randomSetup(side, this.rnd).map(o => [o.i, o.p]); // segurança
+          rt.setups[side] = list;
+          rt.progress[side] = list.slice();
+        });
+        // quem não tinha terminado recebe a própria montagem + a do adversário;
+        // o adversário que já estava pronto recebe a montagem sorteada do outro
+        missingSides.forEach(side => {
+          const who = side === 0 ? m.a : m.b, other = side === 0 ? m.b : m.a;
+          const payload = { k: 'autoSetup', m: m.id, p: rt.setups[side], opp: rt.setups[side ^ 1] };
+          this.send(who, payload);
+          this.send(who, { k: 'relay', m: m.id, d: JSON.stringify(payload) });
+          if (missingSides.length === 1) this.send(other, { k: 'relay', m: m.id, d: JSON.stringify({ k: 'setup', p: rt.setups[side] }) });
+        });
+        this.broadcast();
+        this._startGameFromSetups(m, rt);
+      }, this._setupTimeout);
       if (this._setupTimers[m.id] && this._setupTimers[m.id].unref) this._setupTimers[m.id].unref();
     }
+    // Mantém as peças que o jogador já colocou e sorteia o resto (nada colocado = tudo ao acaso)
     _completeSetup(partial, side) {
-      const list = Array.isArray(partial) ? partial.slice(0, this.E.PIECES) : [];
+      const E = this.E, rnd = this.rnd;
+      const list = Array.isArray(partial) ? partial.slice(0, E.PIECES) : [];
+      if (!list.length) return E.randomSetup(side, rnd).map(o => [o.i, o.p]);
       const used = new Set(list.map(o => o[0]));
-      let defs = list.reduce((n, o) => n + (this.E.isAttack(o[1]) ? 0 : 1), 0);
-      const add = o => {
-        if (list.length >= this.E.PIECES || used.has(o.i)) return;
-        const p = defs >= this.E.MAX_DEF ? this.E.makePiece(side, true) : o.p;
-        list.push([o.i, p]); used.add(o.i);
-        if (!this.E.isAttack(p)) defs++;
-      };
-      this.E.presetSetup(side, this.rnd).forEach(add);
-      if (list.length < this.E.PIECES) {
-        this.E.territoryCells(side).forEach(i => add({ i: i, p: this.E.makePiece(side, true) }));
+      let defs = list.reduce((n, o) => n + (E.isAttack(o[1]) ? 0 : 1), 0);
+      const free = E.territoryCells(side).filter(i => !used.has(i));
+      while (list.length < E.PIECES && free.length) {
+        const i = free.splice(Math.floor(rnd() * free.length), 1)[0];
+        const attack = defs >= E.MAX_DEF || rnd() < 0.65;
+        list.push([i, E.makePiece(side, attack)]);
+        if (!attack) defs++;
       }
       return list;
     }
@@ -603,8 +604,8 @@
       if (o.k === 'hello') { forward(); return; }
       if (o.k === 'bye') { this._forfeit(m, id, 'saiu da partida'); return; }
       if (o.k === 'setup') {
+        if (rt.setups[side] || rt.game) return; // já definida (ex.: sorteada ao fim do tempo): ignora, sem punir
         if (!this._validSetup(o.p, side)) { this._forfeit(m, id, 'montagem inválida'); return; }
-        if (rt.setups[side]) return;
         rt.setups[side] = o.p;
         rt.progress[side] = o.p.slice();
         forward();

@@ -98,6 +98,7 @@
         const h = new T.Hub({
           engine: E,
           botDelay: root.__manobraBotDelay, // só os testes mudam isso
+          setupTimeout: root.__manobraSetupTimeout, // idem (indefinido = 2 minutos)
           send: function (id, obj) {
             if (id === 0) { later(function () { emit('msg', obj); }); return; }
             const c = conns[id];

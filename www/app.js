@@ -269,7 +269,6 @@
     const dis = lock ? ' disabled' : '';
     const setupMatch = tourTimerMatch();
     if (setupMatch && setupMatch.timer) scheduleTourTimer();
-    if (setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup' && Number(setupMatch.timer.until) - Date.now() <= 10000) completeSetupLocally();
     const setupClock = setupMatch && setupMatch.timer ? timerClock(setupMatch) : '';
     const setupMineReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide] : lock;
     const setupOppReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide ^ 1] : !!app.peerSetup;
@@ -278,7 +277,7 @@
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
-      (app.net === 'tour' ? ' Você tem 2 minutos para terminar; 10 segundos antes do fim o computador escolhe Padrão, completa a montagem e aperta Pronto automaticamente.' : '');
+      (app.net === 'tour' ? ' Você tem 2 minutos. Quando o tempo acabar, o computador completa as peças que faltam ao acaso e a partida começa — sem perder.' : '');
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
       '<div class="topbar"><b>Montagem: ' + NAMES[s] + '</b><span>' + total + '/' + PIECES + ' peças</span></div>' +
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
@@ -675,25 +674,6 @@
     for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === app.setupSide) list.push([i, app.pieces[i]]);
     btSend({ k: 'setupProgress', p: list });
   }
-  function completeSetupLocally() {
-    if (app.mode !== 'bt' || app.net !== 'tour' || app.screen !== 'setup' || app.btReady) return;
-    const side = app.setupSide, list = [];
-    for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === side) list.push([i, app.pieces[i]]);
-    const used = new Set(list.map(o => o[0]));
-    let def = list.reduce((n, o) => n + (E.isAttack(o[1]) ? 0 : 1), 0);
-    const add = o => {
-      if (list.length >= PIECES || used.has(o.i)) return;
-      const p = def >= MAX_DEF ? E.makePiece(side, true) : o.p;
-      list.push([o.i, p]); used.add(o.i); if (!E.isAttack(p)) def++;
-    };
-    E.presetSetup(side, Math.random).forEach(add);
-    if (list.length < PIECES) E.territoryCells(side).forEach(i => add({ i: i, p: E.makePiece(side, true) }));
-    if (list.length !== PIECES) return;
-    placeList(side, list.map(o => ({ i: o[0], p: o[1] })));
-    btSend({ k: 'setup', p: list });
-    app.btReady = true;
-    tryStartBt();
-  }
   function placeAI(s) {
     placeList(s, app.level === 'easy' ? E.randomSetup(s) : E.presetSetup(s, Math.random));
   }
@@ -1022,8 +1002,9 @@
       app.peerSetup = o.p;
       tryStartBt();
     } else if (o.k === 'autoSetup') {
-      if (app.mode !== 'bt' || !Array.isArray(o.p)) return;
-      placeList(app.humanSide, o.p);
+      // montagem sorteada pelo juiz ao fim do tempo; cópias repetidas ou tardias são ignoradas
+      if (app.mode !== 'bt' || app.screen !== 'setup' || !Array.isArray(o.p)) return;
+      placeList(app.humanSide, o.p.map(it => ({ i: it[0], p: it[1] }))); // o juiz manda pares [casa, peça]
       if (Array.isArray(o.opp)) app.peerSetup = o.opp;
       app.btReady = true;
       tryStartBt();
