@@ -134,6 +134,7 @@
       this.botDelay = opts.botDelay == null ? 900 : opts.botDelay; // "pensando" do robô (ms)
       this._botN = 0;
       this._usedBotProfiles = new Set();
+      this._botSimulationActive = false;
       this._auto = false;
     }
 
@@ -323,17 +324,14 @@
         this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
       } else this._botMaybeMove(m);
     }
-    // Partidas entre dois robôs: jogadas pelo motor, para que o saldo seja real.
+    // Partidas entre dois robôs: jogadas pelo motor, uma por vez, para que o
+    // organizador consiga acompanhar e pular apenas a simulação atual.
     _autoBots() {
-      if (this._auto) return;
+      if (this._auto || this._botSimulationActive) return;
       this._auto = true;
       try {
-        let again = true;
-        while (again) {
-          again = false;
-          const m = this.matches.find(x => x.status === 'pending' && x.a != null && x.b != null && this.isBot(x.a) && this.isBot(x.b));
-          if (m) { again = true; this._startBotSimulation(m); }
-        }
+        const m = this.matches.find(x => x.status === 'pending' && x.a != null && x.b != null && this.isBot(x.a) && this.isBot(x.b));
+        if (m) this._startBotSimulation(m);
       } finally { this._auto = false; }
     }
 
@@ -344,6 +342,7 @@
     }
 
     _startBotSimulation(m) {
+      this._botSimulationActive = true;
       m.status = 'playing';
       m.ready = [false, false];
       const pieces = new Int8Array(this.E.N);
@@ -453,8 +452,10 @@
 
     /* --- resultados --- */
     _finish(m, winnerId, reason, diff, silent, pieces) {
+      const wasSimulation = !!(this.rt[m.id] && this.rt[m.id].sim);
       m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.sim = null; m.ready = [false, false];
       delete this.rt[m.id];
+      if (wasSimulation) this._botSimulationActive = false;
       if (!silent) [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'matchEnd', m: m.id, winner: winnerId, reason: reason }); });
       this._advance(m);
       this._autoBots();
