@@ -583,6 +583,8 @@
     playable.forEach(m => {
       const meIdx = m.a === t.myId ? 0 : 1, opp = meIdx === 0 ? m.b : m.a;
       const isCurrent = m.round === openRound;
+      const oppP = s.players.find(p => p.id === opp);
+      const oppReady = m.ready[1 - meIdx] || !!(oppP && oppP.bot);
       const seconds = m.timer ? Math.max(0, Math.ceil((Number(m.timer.until) - Date.now()) / 1000)) : 0;
       const countdown = m.timer ? '<b class="countdown">' + String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0') + '</b>' : '';
       let right = '';
@@ -596,10 +598,9 @@
         ? '<span class="live">montagem das peças — tempo restante: ' + countdown + '</span>'
         : '<span class="live">em andamento</span>';
       else if (!isCurrent) status = '<span class="muted">aguardando a rodada anterior</span>';
-      else if (m.ready[meIdx]) status = 'Você: <b>entrou</b> · aguardando adversário ficar pronto — tempo: ' + countdown;
-      else if (m.ready[1 - meIdx]) status = '<span class="live">Adversário já está pronto!</span> Você: <b>não entrou</b> — ' + countdown;
+      else if (m.ready[meIdx]) status = 'Você: <b>entrou</b> · adversário: <b>' + (oppP && oppP.bot ? 'entrou automaticamente' : 'aguardando ficar pronto') + '</b> — tempo: ' + countdown;
+      else if (oppReady) status = '<span class="live">Adversário ' + (oppP && oppP.bot ? 'entrou automaticamente' : 'já está pronto') + '.</span> Você: <b>não entrou</b> — ' + countdown;
       else status = '<span class="muted">Você: ' + countdown + ' · adversário: ' + countdown + '</span>';
-      const oppP = s.players.find(p => p.id === opp);
       h += '<div class="mrow"><div>' + (T.roundLabel(s.format, s.rounds, m.round)) + ': contra <b>' + esc(T.nickOf(s, opp)) + '</b>' +
         (oppP && !oppP.connected ? ' <span class="muted">(fora)</span>' : '') + '<br>' + status + '</div><div class="btns">' + right + '</div></div>';
     });

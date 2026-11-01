@@ -163,7 +163,8 @@
         delete this._entryTimers[m.id];
         m.timer = null;
         if (m.status !== 'pending' || m.round !== this._currentRound()) return;
-        const missing = m.ready[0] === m.ready[1] ? null : (m.ready[0] ? m.b : m.a);
+        const readyA = m.ready[0] || this.isBot(m.a), readyB = m.ready[1] || this.isBot(m.b);
+        const missing = readyA === readyB ? null : (readyA ? m.b : m.a);
         if (missing != null) this._forfeit(m, missing, 'não entrou na partida dentro de 2 minutos');
       }, this._entryTimeout);
       if (this._entryTimers[m.id] && this._entryTimers[m.id].unref) this._entryTimers[m.id].unref();
@@ -181,12 +182,14 @@
         m.timer = null;
         const rt = this.rt[m.id];
         if (!rt || m.status !== 'playing') return;
-        const missing = rt.setups[0] === rt.setups[1] ? null : (rt.setups[0] ? m.b : m.a);
-        if (missing != null) {
-          const side = missing === m.a ? 0 : 1;
-          const list = this.E.presetSetup(side, this.rnd).map(o => [o.i, o.p]);
-          rt.setups[side] = list;
-          this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify({ k: 'autoSetup', p: list }) });
+        const missingSides = [0, 1].filter(side => !rt.setups[side]);
+        if (missingSides.length) {
+          missingSides.forEach(side => {
+            const missing = side === 0 ? m.a : m.b;
+            const list = this.E.presetSetup(side, this.rnd).map(o => [o.i, o.p]);
+            rt.setups[side] = list;
+            this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify({ k: 'autoSetup', p: list }) });
+          });
           this._startGameFromSetups(m, rt);
         }
       }, this._setupTimeout);
