@@ -967,8 +967,9 @@
       app.peerSetup = o.p;
       tryStartBt();
     } else if (o.k === 'autoSetup') {
-      if (app.mode !== 'bt' || app.screen !== 'setup' || !Array.isArray(o.p)) return;
+      if (app.mode !== 'bt' || !Array.isArray(o.p)) return;
       placeList(app.humanSide, o.p);
+      if (Array.isArray(o.opp)) app.peerSetup = o.opp;
       app.btReady = true;
       tryStartBt();
     } else if (o.k === 'move') {

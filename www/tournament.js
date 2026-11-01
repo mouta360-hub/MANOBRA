@@ -188,7 +188,10 @@
             const missing = side === 0 ? m.a : m.b;
             const list = this.E.presetSetup(side, this.rnd).map(o => [o.i, o.p]);
             rt.setups[side] = list;
-            this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify({ k: 'autoSetup', p: list }) });
+          });
+          missingSides.forEach(side => {
+            const missing = side === 0 ? m.a : m.b;
+            this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify({ k: 'autoSetup', p: rt.setups[side], opp: rt.setups[side ^ 1] }) });
           });
           this._startGameFromSetups(m, rt);
         }
