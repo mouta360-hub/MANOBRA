@@ -269,6 +269,7 @@
     const dis = lock ? ' disabled' : '';
     const setupMatch = tourTimerMatch();
     if (setupMatch && setupMatch.timer) scheduleTourTimer();
+    if (setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup' && Number(setupMatch.timer.until) <= Date.now()) completeSetupLocally();
     const setupClock = setupMatch && setupMatch.timer ? timerClock(setupMatch) : '';
     const setupMineReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide] : lock;
     const setupOppReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide ^ 1] : !!app.peerSetup;
@@ -346,6 +347,17 @@
         '<button class="primary" data-act="choose" data-v="p">Empurrar</button><button class="primary" data-act="choose" data-v="s">Trocar de lugar</button></div></div>';
     }
     if (g.over && !app.animating) {
+      if (app.net === 'tour' && !app._tourResultTimer) {
+        const resultGame = g;
+        app._tourResultTimer = true;
+        const resultTimer = setTimeout(() => {
+          app._tourResultTimer = false;
+          if (app.screen === 'game' && app.game === resultGame && app.game.over) {
+            tourEndMatchLocal(); app.screen = 'tour'; render();
+          }
+        }, 8000);
+        if (resultTimer && resultTimer.unref) resultTimer.unref();
+      }
       const w = g.over.winner;
       const winner = playerForSide(w);
       let who = winner.nick + ' venceu!';
@@ -354,7 +366,7 @@
       if (app.mode === 'bt' && w !== app.humanSide) who = winner.nick + ' venceu.';
       h += '<div class="overlay center"><div class="sheet"><div class="result-winner">' + avHtml(winner.av) + '<div><h2>' + esc(who) + '</h2><p class="result-name">Vencedor: <b>' + esc(winner.nick) + '</b></p></div></div><p>Motivo: ' + REASONS[g.over.reason] + '.</p>' +
         (app.net === 'tour'
-          ? '<button class="primary" data-act="tourBack">Voltar ao campeonato</button>'
+          ? '<button class="primary" data-act="tourBack">Voltar ao campeonato</button><p class="muted" style="margin:8px 0 0">Voltando automaticamente em alguns segundos…</p>'
           : '<button class="primary" data-act="again">Jogar de novo</button><button data-act="menu">Menu</button>') +
         '</div></div>';
     }
@@ -645,6 +657,23 @@
     const list = [];
     for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === app.setupSide) list.push([i, app.pieces[i]]);
     btSend({ k: 'setupProgress', p: list });
+  }
+  function completeSetupLocally() {
+    if (app.mode !== 'bt' || app.net !== 'tour' || app.screen !== 'setup' || app.btReady) return;
+    const side = app.setupSide, list = [];
+    for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === side) list.push([i, app.pieces[i]]);
+    const used = new Set(list.map(o => o[0]));
+    let def = list.reduce((n, o) => n + (E.isAttack(o[1]) ? 0 : 1), 0);
+    for (const o of E.presetSetup(side, Math.random)) {
+      if (list.length >= PIECES || used.has(o.i)) continue;
+      if (!E.isAttack(o.p) && def >= MAX_DEF) continue;
+      list.push([o.i, o.p]); used.add(o.i); if (!E.isAttack(o.p)) def++;
+    }
+    if (list.length !== PIECES) return;
+    placeList(side, list.map(o => ({ i: o[0], p: o[1] })));
+    btSend({ k: 'setup', p: list });
+    app.btReady = true;
+    tryStartBt();
   }
   function placeAI(s) {
     placeList(s, app.level === 'easy' ? E.randomSetup(s) : E.presetSetup(s, Math.random));
