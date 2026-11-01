@@ -67,6 +67,9 @@ test('desempate: confronto direto, depois saldo de peças', () => {
   const h = T.standings(snapOf(['A', 'B', 'C'], [[0, 1, 1, 1], [1, 2, 2, 1], [2, 0, 0, 1]]));
   // ciclo: todos com 3 pontos, cada um com 1 vitória e 1 derrota; saldo 0 => ordem de entrada
   assert.deepStrictEqual(h.map(r => r.nick), ['A', 'B', 'C']);
+  const byPieces = T.standings({ players: [{ id: 0, nick: 'A' }, { id: 1, nick: 'B' }], matches: [{ id: 'L0', a: 0, b: 1, status: 'done', winner: 0, reason: 'isolamento', diff: null, pieces: [8, 5], ready: [false, false] }] });
+  assert.strictEqual(byPieces[0].diff, 3, 'vencedor registra três peças a mais');
+  assert.strictEqual(byPieces[1].diff, -3, 'perdedor registra o saldo negativo');
 });
 
 // ---------- Hub: sala de espera ----------
@@ -227,35 +230,14 @@ test('queda de conexão durante a partida dá W.O. ao outro', () => {
   h.hub.leave(h.b);
   assert.strictEqual(h.hub.matches.find(x => x.id === h.m.id).winner, h.a);
 });
-test('organizador: dar vitória e refazer partida', () => {
+test('comandos manuais de resultado são ignorados', () => {
   const h = started2();
   const mid = h.m.id;
-  assert(!h.hub.award(mid, 999), 'vencedor tem que ser um dos dois');
-  const common = h.a !== 0 ? h.a : h.b; // um jogador que não é o organizador
-  h.hub.handle(common, { k: 'award', m: mid, w: h.a });
-  assert.strictEqual(h.hub.matches.find(x => x.id === mid).status, 'pending', 'jogador comum não decide resultado');
-  h.hub.handle(0, { k: 'award', m: mid, w: h.b });
+  h.hub.handle(0, { k: 'award', m: mid, w: h.a });
+  h.hub.handle(0, { k: 'reset', m: mid });
   const mm = h.hub.matches.find(x => x.id === mid);
-  assert.strictEqual(mm.winner, h.b);
-  const final = h.hub.matches.find(x => x.round === h.hub.rounds);
-  assert.strictEqual(h.hub.status, h.hub.rounds === 1 ? 'finished' : 'running');
-  assert(h.hub.reset(mid), 'refazer partida encerrada');
-  assert.strictEqual(h.hub.matches.find(x => x.id === mid).status, 'pending');
-  assert.strictEqual(h.hub.status, 'running'); assert.strictEqual(h.hub.champion, null);
-  assert(!h.hub.reset(mid), 'não refaz o que já está pendente');
-});
-test('refazer no mata-mata é bloqueado se a próxima fase já começou', () => {
-  const h = makeHub(() => 0.1);
-  for (let i = 1; i <= 2; i++) h.hub.join('P' + i, 'J' + i); // 3 jogadores: 1 bye + 1 semifinal real
-  h.hub.setFormat('knockout'); h.hub.start();
-  const semi = h.hub.matches.find(m => m.status === 'pending' && m.a != null && m.b != null);
-  h.hub.award(semi.id, semi.a);
-  const final = h.hub.matches.find(m => m.round === h.hub.rounds);
-  assert(final.a != null && final.b != null, 'final montada');
-  h.hub.ready(final.a, final.id);
-  assert(!h.hub.reset(semi.id), 'final já tem alguém pronto: não deixa refazer');
-  h.hub.unready(final.a);
-  assert(h.hub.reset(semi.id), 'sem ninguém pronto, pode refazer');
+  assert.strictEqual(mm.status, 'pending', 'resultado não pode ser alterado manualmente');
+  assert.strictEqual(mm.winner, null, 'partida não recebe vencedor manual');
 });
 test('"pronto" em uma partida só por vez e jogador ocupado não inicia outra', () => {
   const h = makeHub();
@@ -323,7 +305,6 @@ async function until(cond, ms) { const t = Date.now(); while (!cond()) { if (Dat
   assert(h2.start());
   const bb = h2.matches.filter(x => x.a !== 0 && x.b !== 0);
   assert(bb.length === 3 && bb.every(x => x.status === 'done' && /robôs/.test(x.reason)), 'robô x robô é resolvido na hora');
-  assert(!h2.reset(bb[0].id), 'não refaz partida entre robôs');
   console.log('ok - robô contra robô por sorteio; humano joga as suas 3 partidas');
 
   // 3) só o organizador mexe nos robôs, só no lobby; lotação conta robôs

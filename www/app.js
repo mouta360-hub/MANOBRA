@@ -457,7 +457,7 @@
   }
 
   /* ---------- Campeonato: telas ---------- */
-  const MATCH_REASONS = { bye: 'passou direto', 'decidido pelo organizador': 'decidido pelo organizador' };
+  const MATCH_REASONS = { bye: 'passou direto' };
   function reasonText(r) {
     if (!r) return '';
     if (MATCH_REASONS[r]) return MATCH_REASONS[r];
@@ -466,7 +466,7 @@
   }
   function tourFormatName(f) { return f === 'knockout' ? 'Mata-mata' : 'Todos contra todos'; }
 
-  function tourMatchRow(m, s, t, isOrg) {
+  function tourMatchRow(m, s, t) {
     const T = window.ManobraTournament;
     const nk = id => (id == null ? 'a definir' : esc(T.nickOf(s, id)));
     const ph = id => {
@@ -475,19 +475,14 @@
     };
     let status;
     if (m.status === 'done') {
+      const winnerDiff = m.winner === m.a ? (m.diff && m.diff[0]) : (m.diff && m.diff[1]);
+      const saldo = m.reason !== 'bye' && Number.isFinite(Number(winnerDiff)) ? ' · saldo de peças: ' + (winnerDiff > 0 ? '+' : '') + winnerDiff : '';
       status = m.reason === 'bye' ? esc(nk(m.winner)) + ' passa direto'
-        : '<b>' + nk(m.winner) + '</b> venceu <span class="muted">(' + esc(reasonText(m.reason)) + ')</span>';
+        : '<b>' + nk(m.winner) + '</b> venceu <span class="muted">(' + esc(reasonText(m.reason) + saldo) + ')</span>';
     } else if (m.status === 'playing') status = '<span class="live">em andamento</span>';
     else if (m.a == null || m.b == null) status = '<span class="muted">aguardando</span>';
     else status = '<span class="muted">' + ((m.ready[0] || m.ready[1]) ? 'alguém já está pronto' : 'pendente') + '</span>';
-    let btns = '';
-    if (isOrg && m.a != null && m.b != null) {
-      if (m.status === 'pending' || m.status === 'playing') {
-        btns = '<button data-act="tourAward" data-v="' + esc(m.id) + '|' + m.a + '">Vitória ' + nk(m.a) + '</button>' +
-          '<button data-act="tourAward" data-v="' + esc(m.id) + '|' + m.b + '">Vitória ' + nk(m.b) + '</button>';
-      } else if (m.reason !== 'bye') btns = '<button data-act="tourReset" data-v="' + esc(m.id) + '">Refazer</button>';
-    }
-    return '<div class="mrow"><div>' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + '</div><div class="btns">' + btns + '</div></div>';
+    return '<div class="mrow"><div>' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + '</div></div>';
   }
 
   function tourScreen() {
@@ -580,10 +575,9 @@
     h += '<div class="card"><h3>' + (s.format === 'knockout' ? 'Chaveamento' : 'Todas as partidas') + '</h3>';
     Object.keys(byRound).map(Number).sort((x, y) => x - y).forEach(r => {
       h += '<p class="muted" style="margin:10px 0 0"><b>' + T.roundLabel(s.format, s.rounds, r) + '</b></p>';
-      byRound[r].forEach(m => { h += tourMatchRow(m, s, t, isOrg); });
+      byRound[r].forEach(m => { h += tourMatchRow(m, s, t); });
     });
     h += '</div>';
-    if (isOrg) h += '<p class="muted" style="margin:0 0 10px">Organizador: use "Vitória" se uma partida travar e "Refazer" se uma queda de internet estragar um resultado.</p>';
     return h + '</div>';
   }
 
@@ -1434,8 +1428,6 @@
       case 'tourBotLevel': tourSend({ k: 'botlevel', v: v }); break;
       case 'tourPlay': tourSend({ k: 'ready', m: v }); break;
       case 'tourUnready': tourSend({ k: 'unready' }); break;
-      case 'tourAward': { const pr = String(v).split('|'); tourSend({ k: 'award', m: pr[0], w: +pr[1] }); break; }
-      case 'tourReset': tourSend({ k: 'reset', m: v }); break;
       case 'avatar':
         if (AV[v]) { app.me.av = v; saveMe(); syncPresenceStatus(); render(); }
         break;
@@ -1512,5 +1504,12 @@
   presenceStart();
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('online', () => { presenceStart(); });
+    window.addEventListener('offline', () => {
+      // Perder a internet durante uma partida é desistência. Se o aviso não
+      // chegar, o fechamento da conexão também aplica o W.O. no juiz.
+      if (app.net === 'tour' && app.tour.matchId && (app.screen === 'game' || app.screen === 'setup')) {
+        btSend({ k: 'bye' });
+      }
+    });
   }
 })();

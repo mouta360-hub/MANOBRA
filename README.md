@@ -67,11 +67,11 @@ O app gira nos dois sentidos (retrato e paisagem, seguindo o sensor do celular).
 - Menu > **Campeonato**. Um jogador toca em **Criar campeonato** e recebe um código de 4 letras; os outros tocam em **Entrar com código**.
 - **Jogando sozinho:** o organizador pode tocar em **+ Adicionar robô** (até completar 8) e escolher o nível (fácil/médio/difícil). Se iniciar sem ninguém, entra 1 robô automaticamente. Partidas entre dois robôs são decididas por sorteio.
 - O organizador escolhe o formato e toca em **Iniciar**:
-  - **Todos contra todos:** cada par joga uma vez. Vitória = 3 pontos. Desempate: confronto direto entre os empatados, depois saldo de peças, depois vitórias.
+  - **Todos contra todos:** cada par joga uma vez. Vitória = 3 pontos. O **saldo de peças** soma, em cada partida, as peças que o jogador vencedor tinha a mais que o adversário; numa derrota, a diferença entra negativa. Desempate: confronto direto entre os empatados, depois saldo de peças, depois vitórias.
   - **Mata-mata:** chaveamento sorteado (quem perde está fora). Se não fechar 4 ou 8 jogadores, alguns passam direto na 1ª fase.
 - Para jogar, cada um toca em **Jogar** ao lado da partida; quando os dois estiverem prontos ela começa (montagem em segredo, como sempre). Dá para jogar as partidas na ordem que quiserem.
 - O celular do organizador é o **juiz**: confere cada jogada com as regras e decide sozinho quem venceu. Ele também joga. Jogada inválida ou fora de hora = derrota por W.O.
-- Sair no meio de uma partida, ou cair a internet, dá W.O. ao adversário. O organizador pode **dar a vitória** a um jogador (partida travada) ou mandar **Refazer** uma partida já encerrada (no mata-mata, só se a fase seguinte ainda não começou).
+- Sair no meio de uma partida, ou cair a internet, dá W.O. automático ao adversário. O resultado não pode ser alterado e a partida não pode ser refeita manualmente.
 - Se o organizador sair ou ficar sem internet, o campeonato termina para todos (não há servidor guardando nada). Quem cair pode voltar entrando com o mesmo código, desde que não tenha começado outra partida.
 
 ## Sons

@@ -85,8 +85,9 @@
       if (!A || !B) return;
       A.played++; B.played++;
       if (m.winner === m.a) { A.wins++; B.losses++; A.points += WIN_POINTS; } else { B.wins++; A.losses++; B.points += WIN_POINTS; }
-      A.diff += (m.diff && m.diff[0]) || 0;
-      B.diff += (m.diff && m.diff[1]) || 0;
+      const d = Array.isArray(m.diff) ? m.diff : (Array.isArray(m.pieces) ? [m.pieces[0] - m.pieces[1], m.pieces[1] - m.pieces[0]] : [0, 0]);
+      A.diff += Number(d[0]) || 0;
+      B.diff += Number(d[1]) || 0;
     });
     const list = Object.keys(rows).map(k => rows[k]);
     const order = {};
@@ -145,7 +146,7 @@
         players: this.players.map(p => ({ id: p.id, nick: p.nick, av: p.av || '', bot: !!p.bot, connected: p.connected, busy: this.busy(p.id) })),
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
-          reason: m.reason, diff: m.diff.slice(), ready: m.ready.slice()
+          reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null, ready: m.ready.slice()
         }))
       };
     }
@@ -182,7 +183,7 @@
       this.players = this.players.filter(x => x.id !== id);
       return true;
     }
-    leave(id) {
+    leave(id, reason) {
       const p = this._p(id);
       if (!p || p.bot) return;
       if (this.status === 'lobby') {
@@ -194,7 +195,7 @@
           if (m.status === 'pending') { const i = m.a === id ? 0 : m.b === id ? 1 : -1; if (i >= 0) m.ready[i] = false; }
         });
         const live = this.matches.find(m => m.status === 'playing' && (m.a === id || m.b === id));
-        if (live) this._forfeit(live, id, 'saiu da partida');
+        if (live) this._forfeit(live, id, reason || 'saiu da partida');
       }
       this.broadcast();
     }
@@ -211,8 +212,6 @@
         case 'addbot': if (org && this._addBot()) this.broadcast(); break;
         case 'rmbot': if (org && this._removeBot(msg.id)) this.broadcast(); break;
         case 'botlevel': if (org && this.status === 'lobby' && this.E.LEVELS[msg.v]) { this.botLevel = msg.v; this.broadcast(); } break;
-        case 'award': if (org) this.award(msg.m, msg.w); break;
-        case 'reset': if (org) this.reset(msg.m); break;
       }
     }
 
@@ -237,7 +236,7 @@
         this.rounds = fx.matches.reduce((mx, m) => Math.max(mx, m.round), 0);
       }
       this.matches = fx.matches.map(m => ({
-        id: m.id, round: m.round, a: m.a, b: m.b, status: 'pending', winner: null, reason: null, diff: [0, 0], ready: [false, false]
+        id: m.id, round: m.round, a: m.a, b: m.b, status: 'pending', winner: null, reason: null, diff: [0, 0], pieces: null, ready: [false, false]
       }));
       this.status = 'running';
       this.matches.filter(m => m.round === 1 && (m.a == null || m.b == null) && this.format === 'knockout').forEach(m => {
@@ -311,7 +310,7 @@
         const E = this.E, c = [0, 0];
         for (let i = 0; i < E.N; i++) { const p = g.st.b[i]; if (p) c[E.sideOf(p)]++; }
         const dA = c[0] - c[1];
-        this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA]);
+        this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
       } else this._botMaybeMove(m);
     }
     // Partidas entre dois robôs: resolvidas por sorteio
@@ -390,8 +389,8 @@
     }
 
     /* --- resultados --- */
-    _finish(m, winnerId, reason, diff, silent) {
-      m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.ready = [false, false];
+    _finish(m, winnerId, reason, diff, silent, pieces) {
+      m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.ready = [false, false];
       delete this.rt[m.id];
       if (!silent) [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'matchEnd', m: m.id, winner: winnerId, reason: reason }); });
       this._advance(m);
@@ -419,29 +418,6 @@
         const last = this._m('K' + this.rounds + '-1');
         if (last && last.status === 'done') { this.status = 'finished'; this.champion = last.winner; }
       }
-    }
-    // O organizador dá a vitória (partida travada, jogador sumiu...)
-    award(mid, winnerId) {
-      const m = this._m(mid);
-      if (!m || this.status !== 'running' || m.status === 'done' || m.a == null || m.b == null) return false;
-      if (winnerId !== m.a && winnerId !== m.b) return false;
-      this._finish(m, winnerId, 'decidido pelo organizador', [0, 0]);
-      return true;
-    }
-    // O organizador manda refazer uma partida já encerrada (ex.: queda de internet)
-    reset(mid) {
-      const m = this._m(mid);
-      if (!m || m.status !== 'done' || m.reason === 'bye' || (this.isBot(m.a) && this.isBot(m.b)) || (this.status !== 'running' && this.status !== 'finished')) return false;
-      const pr = this._parent(m);
-      if (pr) {
-        const p = pr.parent;
-        if (p.status !== 'pending' || p.ready[0] || p.ready[1]) return false; // a próxima fase já começou
-        p[pr.slot] = null;
-      }
-      m.status = 'pending'; m.winner = null; m.reason = null; m.diff = [0, 0]; m.ready = [false, false];
-      this.status = 'running'; this.champion = null;
-      this.broadcast();
-      return true;
     }
   }
 
