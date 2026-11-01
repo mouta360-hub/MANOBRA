@@ -243,6 +243,23 @@
       '<h2>Efeito looping</h2><p>Se os dois repetem o mesmo movimento, quem tem menos peças leva vantagem; depois quem tem mais peças em ataque; depois o dono do terreno onde acontece. Quem perde o desempate é obrigado a fazer outro movimento.</p></div>';
   }
 
+  function tourTimerMatch() {
+    if (app.net !== 'tour' || !app.tour.snap || !app.tour.matchId) return null;
+    return app.tour.snap.matches.find(m => m.id === app.tour.matchId) || null;
+  }
+  function scheduleTourTimer() {
+    if (!app._tourTimerTick) {
+      app._tourTimerTick = true;
+      setTimeout(() => {
+        app._tourTimerTick = false;
+        if (app.screen === 'tour' || app.screen === 'setup') render();
+      }, 1000);
+    }
+  }
+  function timerClock(m) {
+    const seconds = m && m.timer ? Math.max(0, Math.ceil((Number(m.timer.until) - Date.now()) / 1000)) : 0;
+    return String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0');
+  }
   function setupScreen() {
     const s = app.setupSide;
     const c = counts(app.pieces)[s];
@@ -250,6 +267,13 @@
     const terr = new Set(E.territoryCells(s));
     const lock = app.mode === 'bt' && app.btReady;
     const dis = lock ? ' disabled' : '';
+    const setupMatch = tourTimerMatch();
+    if (setupMatch && setupMatch.timer) scheduleTourTimer();
+    const setupClock = setupMatch && setupMatch.timer ? timerClock(setupMatch) : '';
+    const setupMineReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide] : lock;
+    const setupOppReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide ^ 1] : !!app.peerSetup;
+    const tourTimerInfo = setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup'
+      ? '<div class="countdown-panel"><b>Montagem</b><br>Você: ' + (setupMineReady ? 'pronto' : setupClock) + ' · Adversário: ' + (setupOppReady ? 'pronto' : setupClock) + '</div>' : '';
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
@@ -257,7 +281,7 @@
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
       '<div class="topbar"><b>Montagem: ' + NAMES[s] + '</b><span>' + total + '/' + PIECES + ' peças</span></div>' +
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
-      '<div class="hint">' + hint + '</div>' +
+      tourTimerInfo + '<div class="hint">' + hint + '</div>' +
       '<div class="bar"><button data-act="setupDefault"' + dis + '>Padrão</button><button data-act="setupRandom"' + dis + '>Aleatório</button><button data-act="setupClear"' + dis + '>Limpar</button></div>' +
       '<div class="bar" style="margin-top:8px"><button data-act="menu">Menu</button><button class="hot" data-act="setupDone" ' + (total === PIECES && !lock ? '' : 'disabled') + '>Pronto</button></div></div></div>';
   }
@@ -497,6 +521,8 @@
   function tourScreen() {
     const t = app.tour, T = window.ManobraTournament;
     let h = '<div class="rules"><div class="topbar"><b>Campeonato</b><button data-act="tourExit">Voltar</button></div>';
+    const timerActive = t.snap && t.snap.matches && t.snap.matches.some(m => m.timer && m.status !== 'done');
+    if (timerActive) scheduleTourTimer();
     if (t.msg) h += '<div class="hint">' + esc(t.msg) + '</div>';
     if (!t.role) {
       if (t.connecting) return h + '<div class="hint">Conectando…</div></div>';
@@ -557,6 +583,8 @@
     playable.forEach(m => {
       const meIdx = m.a === t.myId ? 0 : 1, opp = meIdx === 0 ? m.b : m.a;
       const isCurrent = m.round === openRound;
+      const seconds = m.timer ? Math.max(0, Math.ceil((Number(m.timer.until) - Date.now()) / 1000)) : 0;
+      const countdown = m.timer ? '<b class="countdown">' + String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(seconds % 60).padStart(2, '0') + '</b>' : '';
       let right = '';
       if (m.status === 'pending' && isCurrent) {
         if (m.ready[meIdx]) right = '<button data-act="tourUnready">Cancelar</button>';
@@ -564,11 +592,13 @@
       }
       let status;
       if (m.status === 'done') status = m.winner === t.myId ? '<b>Você venceu</b>' : 'Você perdeu';
-      else if (m.status === 'playing') status = '<span class="live">em andamento</span>';
+      else if (m.status === 'playing') status = m.timer && m.timer.kind === 'setup'
+        ? '<span class="live">montagem das peças — tempo restante: ' + countdown + '</span>'
+        : '<span class="live">em andamento</span>';
       else if (!isCurrent) status = '<span class="muted">aguardando a rodada anterior</span>';
-      else if (m.ready[meIdx]) status = 'esperando ' + esc(T.nickOf(s, opp)) + ' ficar pronto…';
-      else if (m.ready[1 - meIdx]) status = '<span class="live">' + esc(T.nickOf(s, opp)) + ' já está pronto!</span>';
-      else status = '<span class="muted">pendente — você tem 2 minutos para entrar</span>';
+      else if (m.ready[meIdx]) status = 'Você: <b>entrou</b> · aguardando adversário ficar pronto — tempo: ' + countdown;
+      else if (m.ready[1 - meIdx]) status = '<span class="live">Adversário já está pronto!</span> Você: <b>não entrou</b> — ' + countdown;
+      else status = '<span class="muted">Você: ' + countdown + ' · adversário: ' + countdown + '</span>';
       const oppP = s.players.find(p => p.id === opp);
       h += '<div class="mrow"><div>' + (T.roundLabel(s.format, s.rounds, m.round)) + ': contra <b>' + esc(T.nickOf(s, opp)) + '</b>' +
         (oppP && !oppP.connected ? ' <span class="muted">(fora)</span>' : '') + '<br>' + status + '</div><div class="btns">' + right + '</div></div>';

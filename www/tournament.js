@@ -158,8 +158,10 @@
     }
     _armEntryTimer(m) {
       if (!m || m.status !== 'pending' || m.round !== this._currentRound() || this._entryTimers[m.id]) return;
+      m.timer = { kind: 'entry', until: Date.now() + this._entryTimeout };
       this._entryTimers[m.id] = setTimeout(() => {
         delete this._entryTimers[m.id];
+        m.timer = null;
         if (m.status !== 'pending' || m.round !== this._currentRound()) return;
         const missing = m.ready[0] === m.ready[1] ? null : (m.ready[0] ? m.b : m.a);
         if (missing != null) this._forfeit(m, missing, 'não entrou na partida dentro de 2 minutos');
@@ -173,8 +175,10 @@
     }
     _armSetupTimer(m) {
       this._clearTimer(this._setupTimers, m.id);
+      m.timer = { kind: 'setup', until: Date.now() + this._setupTimeout };
       this._setupTimers[m.id] = setTimeout(() => {
         delete this._setupTimers[m.id];
+        m.timer = null;
         const rt = this.rt[m.id];
         if (!rt || m.status !== 'playing') return;
         const missing = rt.setups[0] === rt.setups[1] ? null : (rt.setups[0] ? m.b : m.a);
@@ -216,6 +220,8 @@
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
           reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null,
           sim: m.sim ? { moves: m.sim.moves, turn: m.sim.turn, pieces: m.sim.pieces.slice() } : null,
+          timer: m.timer ? { kind: m.timer.kind, until: m.timer.until } : null,
+          setupReady: this.rt[m.id] ? this.rt[m.id].setups.map(x => !!x) : null,
           ready: m.ready.slice()
         }))
       };
@@ -312,7 +318,7 @@
         this.rounds = fx.matches.reduce((mx, m) => Math.max(mx, m.round), 0);
       }
       this.matches = fx.matches.map(m => ({
-        id: m.id, round: m.round, a: m.a, b: m.b, status: 'pending', winner: null, reason: null, diff: [0, 0], pieces: null, sim: null, ready: [false, false]
+        id: m.id, round: m.round, a: m.a, b: m.b, status: 'pending', winner: null, reason: null, diff: [0, 0], pieces: null, sim: null, timer: null, ready: [false, false]
       }));
       this.status = 'running';
       this.matches.filter(m => m.round === 1 && (m.a == null || m.b == null) && this.format === 'knockout').forEach(m => {
@@ -351,6 +357,7 @@
     }
     _startMatch(m) {
       this._clearTimer(this._entryTimers, m.id);
+      m.timer = null;
       m.status = 'playing';
       m.ready = [false, false];
       const rt = { setups: [null, null], game: null, botSide: null, pending: false };
@@ -368,10 +375,12 @@
         setTimeout(() => { if (this.rt[m.id] === rt) { talk({ k: 'hello', v: 1, nick: bot.nick, av: bot.av }); talk({ k: 'setup', p: list }); } }, Math.min(this.botDelay, 400));
       }
       this._armSetupTimer(m);
+      this.broadcast();
     }
     _startGameFromSetups(m, rt) {
       if (!rt || rt.game || !rt.setups[0] || !rt.setups[1]) return;
       this._clearTimer(this._setupTimers, m.id);
+      m.timer = null;
       const E = this.E, pieces = new Int8Array(E.N);
       rt.setups.forEach(list => list.forEach(it => { pieces[it[0]] = it[1]; }));
       rt.game = new E.Game(pieces);
@@ -512,6 +521,7 @@
         if (rt.setups[side]) return;
         rt.setups[side] = o.p;
         forward();
+        this.broadcast();
         if (rt.setups[0] && rt.setups[1]) {
           this._startGameFromSetups(m, rt);
         }
@@ -536,6 +546,9 @@
     /* --- resultados --- */
     _finish(m, winnerId, reason, diff, silent, pieces) {
       const wasSimulation = !!(this.rt[m.id] && this.rt[m.id].sim);
+      this._clearTimer(this._entryTimers, m.id);
+      this._clearTimer(this._setupTimers, m.id);
+      m.timer = null;
       m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.sim = null; m.ready = [false, false];
       delete this.rt[m.id];
       if (wasSimulation) this._botSimulationActive = false;
