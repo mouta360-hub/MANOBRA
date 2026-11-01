@@ -376,15 +376,23 @@
       const m = this._m(mid), rt = m && this.rt[mid];
       if (!m || !rt || !rt.sim || m.status !== 'playing') return false;
       let guard = 0;
-      while (this.rt[mid] === rt && m.status === 'playing' && !rt.game.over && guard++ < 2000) {
+      // Processa em blocos para não congelar a tela. Se ainda não terminou,
+      // agenda o bloco seguinte; nunca corta nem sorteia o resultado.
+      while (this.rt[mid] === rt && m.status === 'playing' && !rt.game.over && guard++ < 500) {
         const g = rt.game, mv = this.E.chooseMove(g.st, g.cur.moves, this.botLevel);
-        if (!mv) break;
+        if (!mv) {
+          this._finish(m, g.st.turn === 0 ? m.b : m.a, 'sem jogadas', [0, 0]);
+          return true;
+        }
         g.play(mv);
         this._simSnapshot(m, g, (m.sim ? m.sim.moves : 0) + 1);
       }
       if (m.status === 'playing' && rt.game.over) {
         const c = m.sim.pieces, dA = c[0] - c[1];
         this._finish(m, rt.game.over.winner === 0 ? m.a : m.b, rt.game.over.reason, [dA, -dA], false, c);
+      } else if (m.status === 'playing' && this.rt[mid] === rt) {
+        this.broadcast();
+        setTimeout(() => this.skipSimulation(mid), 0);
       }
       return true;
     }
