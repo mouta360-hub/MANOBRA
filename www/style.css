@@ -97,6 +97,13 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 .mrow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid #2c3342; font-size: 14px; line-height: 1.35; }
 .mrow .btns { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .mrow .btns button { padding: 7px 10px; font-size: 13px; }
+.simrow { align-items: flex-start; }
+.siminfo { min-width: 0; flex: 1 1 auto; }
+.simview { margin-top: 8px; overflow-x: auto; }
+.simboard { display: grid; grid-template-columns: repeat(13, var(--simcs)); width: max-content; border: 2px solid #2a4170; border-radius: 5px; overflow: hidden; user-select: none; --simcs: min(22px, calc((100vw - 80px) / 13)); }
+.simboard .cell { width: var(--simcs); height: var(--simcs); }
+.simboard .cell .pc { width: 82%; height: 82%; }
+.simboard .mainsq { border-width: 2px; outline-width: 1px; }
 .live { color: var(--ok); }
 .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tbl th, .tbl td { padding: 7px 4px; text-align: center; border-top: 1px solid #2c3342; }

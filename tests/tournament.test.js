@@ -304,8 +304,10 @@ async function until(cond, ms) { const t = Date.now(); while (!cond()) { if (Dat
   assert.strictEqual(h2.players.length, 4);
   assert(h2.start());
   const bb = h2.matches.filter(x => x.a !== 0 && x.b !== 0);
-  assert(bb.length === 3 && bb.every(x => x.status === 'done' && /robôs/.test(x.reason)), 'robô x robô é resolvido na hora');
-  console.log('ok - robô contra robô por sorteio; humano joga as suas 3 partidas');
+  assert(bb.length === 3 && bb.every(x => x.status === 'playing' && x.sim), 'robô x robô começa a simular');
+  bb.forEach(x => h2.handle(0, { k: 'skip', m: x.id }));
+  assert(bb.every(x => x.status === 'done' && Array.isArray(x.pieces) && Array.isArray(x.diff)), 'pular mantém resultado e saldo de peças');
+  console.log('ok - robô contra robô simula jogadas e pode ser pulado; saldo é calculado');
 
   // 3) só o organizador mexe nos robôs, só no lobby; lotação conta robôs
   const h3 = new T.Hub({ engine: E, send() {} });

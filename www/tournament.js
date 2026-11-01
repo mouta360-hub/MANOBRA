@@ -7,12 +7,14 @@
   'use strict';
 
   const WIN_POINTS = 3, MAX_PLAYERS = 8, MIN_PLAYERS = 2;
-  const BOT_PROFILES = [
-    { nick: 'Rafael', av: 'eagle' }, { nick: 'Camila', av: 'owl' },
-    { nick: 'Bruno', av: 'bear' }, { nick: 'Juliana', av: 'cat' },
-    { nick: 'Diego', av: 'wolf' }, { nick: 'Larissa', av: 'fox' },
-    { nick: 'Mateus', av: 'panda' }, { nick: 'Beatriz', av: 'tiger' }
-  ];
+  // 60 nomes x 100 sobrenomes = 6.000 perfis fictícios. O nome parece humano,
+  // mas continua sendo uma IA; o avatar é escolhido junto com o perfil.
+  const BOT_FIRST = 'Ana Beatriz Bruno Camila Carlos Clara Daniel Davi Diego Eduarda Eduardo Elisa Fernanda Felipe Gabriel Gabriela Helena Henrique Igor Isabela João Joaquim Júlia Juliana Laura Larissa Leonardo Lívia Lucas Luana Manuel Manuela Marcelo Marcos Maria Mariana Mateus Melissa Miguel Murilo Natália Nicolas Otávio Patrícia Paulo Pedro Rafael Rafaela Raquel Renato Ricardo Rodrigo Sabrina Samuel Sofia Thiago Valentina Vicente Vinícius Vitória Yuri Alice Arthur Bianca Caio Cecília Enzo Gustavo'.split(' ');
+  const BOT_LAST = 'Almeida Alves Amaral Andrade Araújo Assis Azevedo Barbosa Barros Batista Borges Braga Brandão Brito Bueno Cabral Campos Cardoso Carvalho Castro Coelho Correia Costa Coutinho Cruz Cunha Dias Diniz Duarte Esteves Farias Fernandes Ferreira Figueiredo Fonseca Freitas Garcia Gouveia Guimarães Guerra Leal Leite Lima Lobato Lopes Machado Macedo Maia Martins Medeiros Melo Mendes Miranda Monteiro Moraes Moreira Moura Nascimento Navarro Neves Nogueira Nunes Oliveira Paiva Pacheco Padilha Paredes Passos Peixoto Pereira Pinheiro Pires Pontes Prado Queiroz Ramos Reis Rezende Ribeiro Rocha Rodrigues Rosa Sampaio Santana Santos Saraiva Siqueira Soares Sousa Souza Tavares Teixeira Toledo Torres Valente Varela Vaz Veloso Vieira Xavier'.split(' ');
+  const BOT_AVATARS = ['fox', 'bear', 'lion', 'tiger', 'wolf', 'panda', 'cat', 'dog', 'owl', 'eagle', 'shark', 'dragon', 'unicorn', 'robot', 'ninja', 'king', 'knight', 'rocket', 'fire', 'star'];
+  const BOT_PROFILES = [];
+  BOT_FIRST.forEach(first => BOT_LAST.forEach(last => BOT_PROFILES.push({ nick: first + ' ' + last, av: BOT_AVATARS[BOT_PROFILES.length % BOT_AVATARS.length] })));
+  if (root) root.ManobraBotProfiles = BOT_PROFILES;
 
   const cleanAv = s => String(s == null ? '' : s).replace(/[^a-z0-9]/gi, '').slice(0, 12);
   const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16);
@@ -131,6 +133,7 @@
       this.botLevel = 'medium';
       this.botDelay = opts.botDelay == null ? 900 : opts.botDelay; // "pensando" do robô (ms)
       this._botN = 0;
+      this._usedBotProfiles = new Set();
       this._auto = false;
     }
 
@@ -146,7 +149,9 @@
         players: this.players.map(p => ({ id: p.id, nick: p.nick, av: p.av || '', bot: !!p.bot, connected: p.connected, busy: this.busy(p.id) })),
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
-          reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null, ready: m.ready.slice()
+          reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null,
+          sim: m.sim ? { moves: m.sim.moves, turn: m.sim.turn, pieces: m.sim.pieces.slice(), board: Array.from(m.sim.board) } : null,
+          ready: m.ready.slice()
         }))
       };
     }
@@ -173,7 +178,11 @@
     _addBot() {
       if (this.status !== 'lobby' || this.players.length >= MAX_PLAYERS) return false;
       const n = ++this._botN;
-      const profile = BOT_PROFILES[(n - 1) % BOT_PROFILES.length];
+      const available = [];
+      for (let i = 0; i < BOT_PROFILES.length; i++) if (!this._usedBotProfiles.has(i)) available.push(i);
+      const pi = available[Math.floor(this.rnd() * available.length) % available.length];
+      this._usedBotProfiles.add(pi);
+      const profile = BOT_PROFILES[pi];
       this.players.push({ id: this._next++, pid: 'bot-' + n, nick: profile.nick, av: profile.av, connected: true, bot: true });
       return true;
     }
@@ -212,6 +221,7 @@
         case 'addbot': if (org && this._addBot()) this.broadcast(); break;
         case 'rmbot': if (org && this._removeBot(msg.id)) this.broadcast(); break;
         case 'botlevel': if (org && this.status === 'lobby' && this.E.LEVELS[msg.v]) { this.botLevel = msg.v; this.broadcast(); } break;
+        case 'skip': if (org) this.skipSimulation(msg.m); break;
       }
     }
 
@@ -236,7 +246,7 @@
         this.rounds = fx.matches.reduce((mx, m) => Math.max(mx, m.round), 0);
       }
       this.matches = fx.matches.map(m => ({
-        id: m.id, round: m.round, a: m.a, b: m.b, status: 'pending', winner: null, reason: null, diff: [0, 0], pieces: null, ready: [false, false]
+        id: m.id, round: m.round, a: m.a, b: m.b, status: 'pending', winner: null, reason: null, diff: [0, 0], pieces: null, sim: null, ready: [false, false]
       }));
       this.status = 'running';
       this.matches.filter(m => m.round === 1 && (m.a == null || m.b == null) && this.format === 'knockout').forEach(m => {
@@ -313,7 +323,7 @@
         this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
       } else this._botMaybeMove(m);
     }
-    // Partidas entre dois robôs: resolvidas por sorteio
+    // Partidas entre dois robôs: jogadas pelo motor, para que o saldo seja real.
     _autoBots() {
       if (this._auto) return;
       this._auto = true;
@@ -322,9 +332,62 @@
         while (again) {
           again = false;
           const m = this.matches.find(x => x.status === 'pending' && x.a != null && x.b != null && this.isBot(x.a) && this.isBot(x.b));
-          if (m) { again = true; this._finish(m, this.rnd() < 0.5 ? m.a : m.b, 'sorteio entre robôs', [0, 0], true); }
+          if (m) { again = true; this._startBotSimulation(m); }
         }
       } finally { this._auto = false; }
+    }
+
+    _simSnapshot(m, g, moves) {
+      const c = [0, 0];
+      for (let i = 0; i < this.E.N; i++) { const p = g.st.b[i]; if (p) c[this.E.sideOf(p)]++; }
+      m.sim = { moves: moves, turn: g.st.turn, pieces: c, board: Array.from(g.st.b) };
+    }
+
+    _startBotSimulation(m) {
+      m.status = 'playing';
+      m.ready = [false, false];
+      const pieces = new Int8Array(this.E.N);
+      [0, 1].forEach(side => this.E.presetSetup(side, this.rnd).forEach(o => { pieces[o.i] = o.p; }));
+      const g = new this.E.Game(pieces);
+      const rt = { setups: [true, true], game: g, botSide: null, pending: false, sim: true };
+      this.rt[m.id] = rt;
+      this._simSnapshot(m, g, 0);
+      this.broadcast();
+      const step = () => {
+        if (this.rt[m.id] !== rt || m.status !== 'playing' || g.over) return;
+        const legal = g.cur.moves;
+        const mv = this.E.chooseMove(g.st, legal, this.botLevel);
+        if (!mv) { this._finish(m, g.st.turn === 0 ? m.b : m.a, 'sem jogadas', [0, 0]); return; }
+        g.play(mv);
+        const moves = (m.sim ? m.sim.moves : 0) + 1;
+        this._simSnapshot(m, g, moves);
+        if (g.over) {
+          const c = m.sim.pieces, dA = c[0] - c[1];
+          this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
+          return;
+        }
+        this.broadcast();
+        setTimeout(step, Math.min(350, Math.max(80, this.botDelay)));
+      };
+      setTimeout(step, Math.min(350, Math.max(80, this.botDelay)));
+    }
+
+    // O organizador pode terminar a simulação imediatamente, sem alterar o resultado.
+    skipSimulation(mid) {
+      const m = this._m(mid), rt = m && this.rt[mid];
+      if (!m || !rt || !rt.sim || m.status !== 'playing') return false;
+      let guard = 0;
+      while (this.rt[mid] === rt && m.status === 'playing' && !rt.game.over && guard++ < 2000) {
+        const g = rt.game, mv = this.E.chooseMove(g.st, g.cur.moves, this.botLevel);
+        if (!mv) break;
+        g.play(mv);
+        this._simSnapshot(m, g, (m.sim ? m.sim.moves : 0) + 1);
+      }
+      if (m.status === 'playing' && rt.game.over) {
+        const c = m.sim.pieces, dA = c[0] - c[1];
+        this._finish(m, rt.game.over.winner === 0 ? m.a : m.b, rt.game.over.reason, [dA, -dA], false, c);
+      }
+      return true;
     }
 
     /* --- o juiz: confere cada mensagem da partida --- */
@@ -390,7 +453,7 @@
 
     /* --- resultados --- */
     _finish(m, winnerId, reason, diff, silent, pieces) {
-      m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.ready = [false, false];
+      m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.sim = null; m.ready = [false, false];
       delete this.rt[m.id];
       if (!silent) [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'matchEnd', m: m.id, winner: winnerId, reason: reason }); });
       this._advance(m);

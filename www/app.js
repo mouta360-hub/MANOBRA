@@ -4,12 +4,8 @@
   const { COLS, ROWS, N, WA, WD, BA, BD, WHITE, BLACK, MAX_DEF, PIECES } = E;
   const NAMES = ['Brancas', 'Pretas'];
   // Perfis fictícios: parecem jogadores, mas continuam sendo IA internamente.
-  const BOT_PROFILES = [
-    { nick: 'Rafael', av: 'eagle' }, { nick: 'Camila', av: 'owl' },
-    { nick: 'Bruno', av: 'bear' }, { nick: 'Juliana', av: 'cat' },
-    { nick: 'Diego', av: 'wolf' }, { nick: 'Larissa', av: 'fox' },
-    { nick: 'Mateus', av: 'panda' }, { nick: 'Beatriz', av: 'tiger' }
-  ];
+  // O catálogo é criado pelo módulo do campeonato (mais de 6.000 combinações).
+  const BOT_PROFILES = window.ManobraBotProfiles || [{ nick: 'Rafael', av: 'eagle' }];
   const REASONS = {
     principal: 'alcançou a casa principal do oponente',
     eliminacao: 'eliminou todas as peças do oponente',
@@ -171,10 +167,15 @@
   ];
   const AV = {};
   AVATARS.forEach(a => { AV[a[0]] = a[1]; });
+  const usedAiBots = new Set();
   const avOf = id => AV[id] || '🙂';
   const avHtml = id => '<span class="av">' + avOf(id) + '</span>';
   function pickBot() {
-    return BOT_PROFILES[Math.floor(Math.random() * BOT_PROFILES.length)];
+    if (usedAiBots.size >= BOT_PROFILES.length) usedAiBots.clear();
+    let i;
+    do { i = Math.floor(Math.random() * BOT_PROFILES.length); } while (usedAiBots.has(i));
+    usedAiBots.add(i);
+    return BOT_PROFILES[i];
   }
   function playerForSide(side) {
     if (app.mode === 'ai') {
@@ -469,6 +470,9 @@
   function tourMatchRow(m, s, t) {
     const T = window.ManobraTournament;
     const nk = id => (id == null ? 'a definir' : esc(T.nickOf(s, id)));
+    const pa = m.a == null ? null : s.players.find(x => x.id === m.a);
+    const pb = m.b == null ? null : s.players.find(x => x.id === m.b);
+    const bots = !!(pa && pb && pa.bot && pb.bot);
     const ph = id => {
       const p = id == null ? null : s.players.find(x => x.id === id);
       return p ? '<span class="fwho">' + avHtml(p.av) + '<b>' + esc(p.nick) + '</b></span>' : 'a definir';
@@ -479,10 +483,17 @@
       const saldo = m.reason !== 'bye' && Number.isFinite(Number(winnerDiff)) ? ' · saldo de peças: ' + (winnerDiff > 0 ? '+' : '') + winnerDiff : '';
       status = m.reason === 'bye' ? esc(nk(m.winner)) + ' passa direto'
         : '<b>' + nk(m.winner) + '</b> venceu <span class="muted">(' + esc(reasonText(m.reason) + saldo) + ')</span>';
-    } else if (m.status === 'playing') status = '<span class="live">em andamento</span>';
+    } else if (m.status === 'playing') {
+      status = bots
+        ? '<span class="live">robôs jogando · ' + ((m.sim && m.sim.moves) || 0) + ' lances</span>'
+        : '<span class="live">em andamento</span>';
+    }
     else if (m.a == null || m.b == null) status = '<span class="muted">aguardando</span>';
     else status = '<span class="muted">' + ((m.ready[0] || m.ready[1]) ? 'alguém já está pronto' : 'pendente') + '</span>';
-    return '<div class="mrow"><div>' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + '</div></div>';
+    const skip = bots && m.status === 'playing' && t.myId === 0 ? '<button data-act="tourSkip" data-v="' + esc(m.id) + '">Pular simulação</button>' : '';
+    const simBoard = bots && m.status === 'playing' && m.sim && Array.isArray(m.sim.board)
+      ? '<div class="simview">' + boardHtml(m.sim.board).replace('id="board"', 'class="simboard"') + '</div>' : '';
+    return '<div class="mrow simrow"><div class="siminfo">' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + simBoard + '</div><div class="btns">' + skip + '</div></div>';
   }
 
   function tourScreen() {
@@ -1428,6 +1439,7 @@
       case 'tourBotLevel': tourSend({ k: 'botlevel', v: v }); break;
       case 'tourPlay': tourSend({ k: 'ready', m: v }); break;
       case 'tourUnready': tourSend({ k: 'unready' }); break;
+      case 'tourSkip': tourSend({ k: 'skip', m: v }); break;
       case 'avatar':
         if (AV[v]) { app.me.av = v; saveMe(); syncPresenceStatus(); render(); }
         break;
