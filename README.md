@@ -69,10 +69,11 @@ O app gira nos dois sentidos (retrato e paisagem, seguindo o sensor do celular).
 - O organizador escolhe o formato e toca em **Iniciar**:
   - **Todos contra todos:** cada par joga uma vez. Vitória = 3 pontos. O **saldo de peças** soma, em cada partida, as peças que o jogador vencedor tinha a mais que o adversário; numa derrota, a diferença entra negativa. Desempate: confronto direto entre os empatados, depois saldo de peças, depois vitórias.
   - **Mata-mata:** chaveamento sorteado (quem perde está fora). Se não fechar 4 ou 8 jogadores, alguns passam direto na 1ª fase.
-- Para jogar, cada um toca em **Jogar** ao lado da partida; quando os dois estiverem prontos ela começa (montagem em segredo, como sempre). Dá para jogar as partidas na ordem que quiserem.
-- Partidas entre dois robôs não são mais decididas por sorteio: os dois jogam lance a lance pelo mesmo motor do jogo, **uma partida por vez**, em segundo plano. A simulação não exibe o tabuleiro nem atrapalha quem está jogando uma partida humana. O organizador pode usar **Pular simulação** para executar rapidamente todos os lances da partida atual até o fim; então a próxima começa. A contagem final de peças e o saldo são preservados normalmente.
+- Para jogar, cada um toca em **Jogar** na partida da rodada atual; não é possível escolher uma rodada futura. Quando os dois estiverem prontos ela começa (montagem em segredo, como sempre). Depois que todas as partidas da rodada terminarem, a próxima é liberada.
+- Quando uma partida da rodada chega à vez, cada jogador tem 2 minutos para tocar em **Jogar**. Quem não entrar nesse prazo perde por W.O. Depois de entrar, cada jogador tem mais 2 minutos para terminar a montagem; se não terminar, o computador escolhe uma montagem válida automaticamente para ele.
+- Partidas entre dois robôs não são mais decididas por sorteio: os dois jogam lance a lance pelo mesmo motor do jogo, **uma partida por vez**, em segundo plano. A simulação não exibe o tabuleiro nem atrapalha quem está jogando uma partida humana. Quando uma termina, a próxima começa automaticamente. A contagem final de peças e o saldo são preservados normalmente.
 - O celular do organizador é o **juiz**: confere cada jogada com as regras e decide sozinho quem venceu. Ele também joga. Jogada inválida ou fora de hora = derrota por W.O.
-- Sair no meio de uma partida, ou cair a internet, dá W.O. automático ao adversário. O resultado não pode ser alterado e a partida não pode ser refeita manualmente.
+- Sair no meio de uma partida, não aparecer na partida atual ou cair a internet dá W.O. automático ao adversário. O resultado não pode ser alterado e a partida não pode ser refeita manualmente.
 - Se o organizador sair ou ficar sem internet, o campeonato termina para todos (não há servidor guardando nada). Quem cair pode voltar entrando com o mesmo código, desde que não tenha começado outra partida.
 
 ## Sons

@@ -252,7 +252,8 @@
     const dis = lock ? ' disabled' : '';
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
-      (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '');
+      (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
+      (app.net === 'tour' ? ' Você tem 2 minutos para terminar; depois disso o computador monta automaticamente.' : '');
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
       '<div class="topbar"><b>Montagem: ' + NAMES[s] + '</b><span>' + total + '/' + PIECES + ' peças</span></div>' +
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
@@ -490,8 +491,7 @@
     }
     else if (m.a == null || m.b == null) status = '<span class="muted">aguardando</span>';
     else status = '<span class="muted">' + ((m.ready[0] || m.ready[1]) ? 'alguém já está pronto' : 'pendente') + '</span>';
-    const skip = bots && m.status === 'playing' && t.myId === 0 ? '<button data-act="tourSkip" data-v="' + esc(m.id) + '">Pular simulação</button>' : '';
-    return '<div class="mrow"><div>' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + '</div><div class="btns">' + skip + '</div></div>';
+    return '<div class="mrow"><div>' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + '</div></div>';
   }
 
   function tourScreen() {
@@ -552,20 +552,23 @@
     const mine = s.matches.filter(m => (m.a === t.myId || m.b === t.myId));
     h += '<div class="card"><h3>Minhas partidas</h3>';
     const playable = mine.filter(m => m.a != null && m.b != null);
+    const openRound = playable.filter(m => m.status !== 'done').reduce((min, m) => Math.min(min, m.round), Infinity);
     if (!playable.length) h += '<p style="margin:0">Nenhuma partida disponível agora.</p>';
     playable.forEach(m => {
       const meIdx = m.a === t.myId ? 0 : 1, opp = meIdx === 0 ? m.b : m.a;
+      const isCurrent = m.round === openRound;
       let right = '';
-      if (m.status === 'pending') {
+      if (m.status === 'pending' && isCurrent) {
         if (m.ready[meIdx]) right = '<button data-act="tourUnready">Cancelar</button>';
         else right = '<button class="hot" data-act="tourPlay" data-v="' + esc(m.id) + '"' + (busyMe ? ' disabled' : '') + '>Jogar</button>';
       }
       let status;
       if (m.status === 'done') status = m.winner === t.myId ? '<b>Você venceu</b>' : 'Você perdeu';
       else if (m.status === 'playing') status = '<span class="live">em andamento</span>';
+      else if (!isCurrent) status = '<span class="muted">aguardando a rodada anterior</span>';
       else if (m.ready[meIdx]) status = 'esperando ' + esc(T.nickOf(s, opp)) + ' ficar pronto…';
       else if (m.ready[1 - meIdx]) status = '<span class="live">' + esc(T.nickOf(s, opp)) + ' já está pronto!</span>';
-      else status = '<span class="muted">pendente</span>';
+      else status = '<span class="muted">pendente — você tem 2 minutos para entrar</span>';
       const oppP = s.players.find(p => p.id === opp);
       h += '<div class="mrow"><div>' + (T.roundLabel(s.format, s.rounds, m.round)) + ': contra <b>' + esc(T.nickOf(s, opp)) + '</b>' +
         (oppP && !oppP.connected ? ' <span class="muted">(fora)</span>' : '') + '<br>' + status + '</div><div class="btns">' + right + '</div></div>';
@@ -931,6 +934,11 @@
     } else if (o.k === 'setup') {
       if (!validPeerSetup(o.p)) { btError('O adversário enviou uma montagem inválida.'); return; }
       app.peerSetup = o.p;
+      tryStartBt();
+    } else if (o.k === 'autoSetup') {
+      if (app.mode !== 'bt' || app.screen !== 'setup' || !Array.isArray(o.p)) return;
+      placeList(app.humanSide, o.p);
+      app.btReady = true;
       tryStartBt();
     } else if (o.k === 'move') {
       app.btQueue.push(o.m);
@@ -1437,7 +1445,6 @@
       case 'tourBotLevel': tourSend({ k: 'botlevel', v: v }); break;
       case 'tourPlay': tourSend({ k: 'ready', m: v }); break;
       case 'tourUnready': tourSend({ k: 'unready' }); break;
-      case 'tourSkip': tourSend({ k: 'skip', m: v }); break;
       case 'avatar':
         if (AV[v]) { app.me.av = v; saveMe(); syncPresenceStatus(); render(); }
         break;

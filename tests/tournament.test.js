@@ -207,22 +207,15 @@ test('montagem inválida e mensagens quebradas', () => {
   raw(h.b, JSON.stringify({ k: 'setup', p: setupFor(0) })); // pretas mandando peças brancas
   assert.strictEqual(h.hub.matches.find(x => x.id === h.m.id).winner, h.a);
 });
-test('sair no meio da partida = W.O.; sair antes de começar só limpa o "pronto"', () => {
+test('sair da partida atual, antes ou depois de começar, dá W.O.', () => {
   const h = started2();
   h.hub.ready(h.a, h.m.id);
   const r0 = h.hub.matches.find(x => x.id === h.m.id);
   assert.strictEqual(r0.ready[r0.a === h.a ? 0 : 1], true, 'ficou pronto');
   h.hub.leave(h.a);
-  assert.deepStrictEqual(h.hub.matches.find(x => x.id === h.m.id).ready, [false, false]);
-  assert.strictEqual(h.hub.matches.find(x => x.id === h.m.id).status, 'pending');
-  const pidA = h.hub.players.find(p => p.id === h.a).pid;
-  assert.strictEqual(h.hub.join(pidA, 'Ana').id, h.a, 'volta pela mesma vaga');
-  h.hub.ready(h.a, h.m.id); h.hub.ready(h.b, h.m.id);
-  const relay = (id, o) => h.hub.handle(id, { k: 'relay', m: h.m.id, d: JSON.stringify(o) });
-  relay(h.b, { k: 'bye' });
   const mm = h.hub.matches.find(x => x.id === h.m.id);
-  assert.strictEqual(mm.winner, h.a); assert.strictEqual(mm.status, 'done');
-  assert(h.to(h.a, 'matchEnd').length >= 1);
+  assert.strictEqual(mm.winner, h.b); assert.strictEqual(mm.status, 'done');
+  assert(/W\.O\./.test(mm.reason));
 });
 test('queda de conexão durante a partida dá W.O. ao outro', () => {
   const h = started2();
@@ -246,7 +239,8 @@ test('"pronto" em uma partida só por vez e jogador ocupado não inicia outra', 
   const mine = h.hub.matches.filter(m => m.a === 1 || m.b === 1);
   assert.strictEqual(mine.length, 2);
   h.hub.ready(1, mine[0].id); h.hub.ready(1, mine[1].id);
-  assert(!mine[0].ready.includes(true), 'ficar pronto na segunda tira da primeira');
+  assert(mine[0].ready.includes(true), 'a partida atual continua pronta');
+  assert(!mine[1].ready.includes(true), 'a partida futura ainda não pode ser escolhida');
   const snap = h.hub.snapshot();
   assert(snap.matches.every(m => Array.isArray(m.ready)) && !JSON.stringify(snap).includes('"pid"'), 'o código pessoal não vaza no estado público');
 });

@@ -7,6 +7,7 @@
   'use strict';
 
   const WIN_POINTS = 3, MAX_PLAYERS = 8, MIN_PLAYERS = 2;
+  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000;
   // 60 nomes x 100 sobrenomes = 6.000 perfis fictícios. O nome parece humano,
   // mas continua sendo uma IA; o avatar é escolhido junto com o perfil.
   const BOT_FIRST = 'Ana Beatriz Bruno Camila Carlos Clara Daniel Davi Diego Eduarda Eduardo Elisa Fernanda Felipe Gabriel Gabriela Helena Henrique Igor Isabela João Joaquim Júlia Juliana Laura Larissa Leonardo Lívia Lucas Luana Manuel Manuela Marcelo Marcos Maria Mariana Mateus Melissa Miguel Murilo Natália Nicolas Otávio Patrícia Paulo Pedro Rafael Rafaela Raquel Renato Ricardo Rodrigo Sabrina Samuel Sofia Thiago Valentina Vicente Vinícius Vitória Yuri Alice Arthur Bianca Caio Cecília Enzo Gustavo'.split(' ');
@@ -135,6 +136,10 @@
       this._botN = 0;
       this._usedBotProfiles = new Set();
       this._botSimulationActive = false;
+      this._entryTimeout = opts.entryTimeout == null ? ENTRY_TIMEOUT : opts.entryTimeout;
+      this._setupTimeout = opts.setupTimeout == null ? SETUP_TIMEOUT : opts.setupTimeout;
+      this._entryTimers = {};
+      this._setupTimers = {};
       this._auto = false;
     }
 
@@ -143,6 +148,65 @@
     send(id, obj) { const p = this._p(id); if (p && p.connected && !p.bot) this._send(id, obj); }
     busy(id) { return this.matches.some(m => m.status === 'playing' && (m.a === id || m.b === id)); }
     isBot(id) { const p = id == null ? null : this._p(id); return !!(p && p.bot); }
+    _currentRound() {
+      let round = Infinity;
+      this.matches.forEach(m => { if (m.status !== 'done' && m.a != null && m.b != null) round = Math.min(round, m.round); });
+      return round === Infinity ? null : round;
+    }
+    _clearTimer(map, mid) {
+      if (map[mid]) { clearTimeout(map[mid]); delete map[mid]; }
+    }
+    _armEntryTimer(m) {
+      if (!m || m.status !== 'pending' || m.round !== this._currentRound() || this._entryTimers[m.id]) return;
+      this._entryTimers[m.id] = setTimeout(() => {
+        delete this._entryTimers[m.id];
+        if (m.status !== 'pending' || m.round !== this._currentRound()) return;
+        const missing = m.ready[0] === m.ready[1] ? null : (m.ready[0] ? m.b : m.a);
+        if (missing != null) this._forfeit(m, missing, 'não entrou na partida dentro de 2 minutos');
+      }, this._entryTimeout);
+      if (this._entryTimers[m.id] && this._entryTimers[m.id].unref) this._entryTimers[m.id].unref();
+    }
+    _armCurrentEntryTimers() {
+      const round = this._currentRound();
+      if (round == null) return;
+      this.matches.filter(m => m.status === 'pending' && m.round === round && m.a != null && m.b != null).forEach(m => this._armEntryTimer(m));
+    }
+    _armSetupTimer(m) {
+      this._clearTimer(this._setupTimers, m.id);
+      this._setupTimers[m.id] = setTimeout(() => {
+        delete this._setupTimers[m.id];
+        const rt = this.rt[m.id];
+        if (!rt || m.status !== 'playing') return;
+        const missing = rt.setups[0] === rt.setups[1] ? null : (rt.setups[0] ? m.b : m.a);
+        if (missing != null) {
+          const side = missing === m.a ? 0 : 1;
+          const list = this.E.presetSetup(side, this.rnd).map(o => [o.i, o.p]);
+          rt.setups[side] = list;
+          this.send(missing, { k: 'relay', m: m.id, d: JSON.stringify({ k: 'autoSetup', p: list }) });
+          this._startGameFromSetups(m, rt);
+        }
+      }, this._setupTimeout);
+      if (this._setupTimers[m.id] && this._setupTimers[m.id].unref) this._setupTimers[m.id].unref();
+    }
+    _forfeitDisconnected() {
+      if (this._forfeiting) return;
+      const round = this._currentRound();
+      if (round == null) return;
+      this._forfeiting = true;
+      try {
+        let changed = true;
+        while (changed) {
+          changed = false;
+          this.matches.filter(m => m.status === 'pending' && m.round === round && m.a != null && m.b != null).some(m => {
+            const a = this._p(m.a), b = this._p(m.b);
+            if (!a || !b || a.connected === b.connected) return false;
+            this._finish(m, a.connected ? m.a : m.b, 'W.O.: jogador ausente', [0, 0]);
+            changed = true;
+            return true;
+          });
+        }
+      } finally { this._forfeiting = false; }
+    }
 
     snapshot() {
       return {
@@ -206,6 +270,7 @@
         });
         const live = this.matches.find(m => m.status === 'playing' && (m.a === id || m.b === id));
         if (live) this._forfeit(live, id, reason || 'saiu da partida');
+        this._forfeitDisconnected();
       }
       this.broadcast();
     }
@@ -253,6 +318,8 @@
       this.matches.filter(m => m.round === 1 && (m.a == null || m.b == null) && this.format === 'knockout').forEach(m => {
         this._finish(m, m.a != null ? m.a : m.b, 'bye', [0, 0], true);
       });
+      this._forfeitDisconnected();
+      this._armCurrentEntryTimers();
       this._autoBots();
       this._checkFinished();
       this.broadcast();
@@ -263,6 +330,7 @@
     ready(id, mid) {
       const m = this._m(mid), p = this._p(id);
       if (!m || !p || this.status !== 'running' || m.status !== 'pending' || m.a == null || m.b == null) return false;
+      if (m.round !== this._currentRound()) return false;
       const i = m.a === id ? 0 : m.b === id ? 1 : -1;
       if (i < 0 || this.busy(id)) return false;
       this.matches.forEach(x => { // só dá para estar "pronto" em uma partida por vez
@@ -282,6 +350,7 @@
       this.broadcast();
     }
     _startMatch(m) {
+      this._clearTimer(this._entryTimers, m.id);
       m.status = 'playing';
       m.ready = [false, false];
       const rt = { setups: [null, null], game: null, botSide: null, pending: false };
@@ -298,6 +367,15 @@
         const bot = this._p(bs === 0 ? m.a : m.b);
         setTimeout(() => { if (this.rt[m.id] === rt) { talk({ k: 'hello', v: 1, nick: bot.nick, av: bot.av }); talk({ k: 'setup', p: list }); } }, Math.min(this.botDelay, 400));
       }
+      this._armSetupTimer(m);
+    }
+    _startGameFromSetups(m, rt) {
+      if (!rt || rt.game || !rt.setups[0] || !rt.setups[1]) return;
+      this._clearTimer(this._setupTimers, m.id);
+      const E = this.E, pieces = new Int8Array(E.N);
+      rt.setups.forEach(list => list.forEach(it => { pieces[it[0]] = it[1]; }));
+      rt.game = new E.Game(pieces);
+      this._botMaybeMove(m);
     }
     // Vez do robô: pensa um pouco e joga
     _botMaybeMove(m) {
@@ -435,10 +513,7 @@
         rt.setups[side] = o.p;
         forward();
         if (rt.setups[0] && rt.setups[1]) {
-          const E = this.E, pieces = new Int8Array(E.N);
-          rt.setups.forEach(list => list.forEach(it => { pieces[it[0]] = it[1]; }));
-          rt.game = new E.Game(pieces);
-          this._botMaybeMove(m);
+          this._startGameFromSetups(m, rt);
         }
         return;
       }
@@ -454,7 +529,7 @@
       }
     }
     _forfeit(m, loserId, reason) {
-      if (m.status !== 'playing') return;
+      if (m.status !== 'pending' && m.status !== 'playing') return;
       this._finish(m, m.a === loserId ? m.b : m.a, 'W.O.: ' + reason, [0, 0]);
     }
 
@@ -466,7 +541,9 @@
       if (wasSimulation) this._botSimulationActive = false;
       if (!silent) [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'matchEnd', m: m.id, winner: winnerId, reason: reason }); });
       this._advance(m);
+      this._forfeitDisconnected();
       this._autoBots();
+      this._armCurrentEntryTimers();
       if (!silent) { this._checkFinished(); this.broadcast(); }
     }
     _parent(m) {
