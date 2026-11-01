@@ -141,7 +141,7 @@ async function runAll(T) {
   T.phones.forEach(P => assert(P.html().includes('Campeão')));
   console.log('ok - mata-mata: ' + n2 + ' partidas jogadas, campeão ' + T.byId[k1.champion].app.me.nick + ' (' + T.org.sandbox.ManobraTournament.nickOf(k1, k1.champion) + ')');
 
-  // 3) sair no meio da partida = W.O.; organizador refaz
+  // 3) sair no meio da partida = W.O. automático; resultado não é editável
   T = await create(3, 'league');
   T.org.click({ act: 'tourStart' }); await sleep(30);
   const m = hubSnap(T.org).matches.find(x => x.a != null && x.b != null);
@@ -155,12 +155,8 @@ async function runAll(T) {
   const hm = hubSnap(T.org).matches.find(x => x.id === m.id);
   assert.strictEqual(hm.winner, m.b); assert(/W\.O\./.test(hm.reason));
   assert(B.html().includes('Você venceu'));
-  T.org.click({ act: 'tourReset', v: m.id }); await sleep(30);
-  assert.strictEqual(hubSnap(T.org).matches.find(x => x.id === m.id).status, 'pending', 'organizador refez a partida');
-  assert.strictEqual(A.app.tour.snap.matches.find(x => x.id === m.id).status, 'pending', 'todos veem');
-  T.org.click({ act: 'tourAward', v: m.id + '|' + m.a }); await sleep(30);
-  assert.strictEqual(hubSnap(T.org).matches.find(x => x.id === m.id).winner, m.a, 'organizador deu a vitória');
-  console.log('ok - sair da partida dá W.O., organizador refaz e decide na mesa');
+  assert(!/Refazer|tourAward|Vitória /.test(T.org.html()), 'não há alteração manual do resultado');
+  console.log('ok - sair da partida dá W.O. automático, sem refazer ou decisão manual');
 
   // 4) queda de internet de um jogador no meio da partida
   T = await create(3, 'league');
@@ -208,7 +204,6 @@ async function runAll(T) {
       await sleep(15);
     }
     console.log('ok - sozinho no campeonato: robô montou e jogou (' + plies + ' jogadas minhas)');
-    if (!(S.app.game && S.app.game.over)) { S.click({ act: 'tourAward', v: m.id + '|0' }); }
     await waitFor(() => S.app.tour.snap.status === 'finished' || (S.app.game && S.app.game.over), 'fim');
     console.log('ok - campeonato solo chegou ao fim');
   }

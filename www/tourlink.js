@@ -58,7 +58,7 @@
     const timer = setTimeout(function () { if (id === null) { try { c.close(); } catch (e) { /* ok */ } } }, 10000);
     const gone = function () {
       clearTimeout(timer);
-      if (id !== null && conns[id] === c) { delete conns[id]; if (hub === h) h.leave(id); }
+      if (id !== null && conns[id] === c) { delete conns[id]; if (hub === h) h.leave(id, 'queda de internet'); }
     };
     c.on('data', function (d) {
       let o;
