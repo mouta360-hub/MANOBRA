@@ -485,15 +485,13 @@
         : '<b>' + nk(m.winner) + '</b> venceu <span class="muted">(' + esc(reasonText(m.reason) + saldo) + ')</span>';
     } else if (m.status === 'playing') {
       status = bots
-        ? '<span class="live">robôs jogando · ' + ((m.sim && m.sim.moves) || 0) + ' lances</span>'
+        ? '<span class="live">simulação dos robôs em andamento</span>'
         : '<span class="live">em andamento</span>';
     }
     else if (m.a == null || m.b == null) status = '<span class="muted">aguardando</span>';
     else status = '<span class="muted">' + ((m.ready[0] || m.ready[1]) ? 'alguém já está pronto' : 'pendente') + '</span>';
     const skip = bots && m.status === 'playing' && t.myId === 0 ? '<button data-act="tourSkip" data-v="' + esc(m.id) + '">Pular simulação</button>' : '';
-    const simBoard = bots && m.status === 'playing' && m.sim && Array.isArray(m.sim.board)
-      ? '<div class="simview">' + boardHtml(m.sim.board).replace('id="board"', 'class="simboard"') + '</div>' : '';
-    return '<div class="mrow simrow"><div class="siminfo">' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + simBoard + '</div><div class="btns">' + skip + '</div></div>';
+    return '<div class="mrow"><div>' + ph(m.a) + ' <span class="muted">×</span> ' + ph(m.b) + '<br>' + status + '</div><div class="btns">' + skip + '</div></div>';
   }
 
   function tourScreen() {

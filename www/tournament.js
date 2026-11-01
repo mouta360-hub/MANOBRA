@@ -151,7 +151,7 @@
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
           reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null,
-          sim: m.sim ? { moves: m.sim.moves, turn: m.sim.turn, pieces: m.sim.pieces.slice(), board: Array.from(m.sim.board) } : null,
+          sim: m.sim ? { moves: m.sim.moves, turn: m.sim.turn, pieces: m.sim.pieces.slice() } : null,
           ready: m.ready.slice()
         }))
       };
@@ -338,7 +338,7 @@
     _simSnapshot(m, g, moves) {
       const c = [0, 0];
       for (let i = 0; i < this.E.N; i++) { const p = g.st.b[i]; if (p) c[this.E.sideOf(p)]++; }
-      m.sim = { moves: moves, turn: g.st.turn, pieces: c, board: Array.from(g.st.b) };
+      m.sim = { moves: moves, turn: g.st.turn, pieces: c };
     }
 
     _startBotSimulation(m) {
@@ -365,10 +365,11 @@
           this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
           return;
         }
-        this.broadcast();
-        setTimeout(step, Math.min(350, Math.max(80, this.botDelay)));
+        // A simulação é invisível: não transmite o tabuleiro nem cada lance.
+        // O temporizador curto mantém o celular livre para partidas humanas.
+        setTimeout(step, 5);
       };
-      setTimeout(step, Math.min(350, Math.max(80, this.botDelay)));
+      setTimeout(step, 5);
     }
 
     // O organizador pode terminar a simulação imediatamente, sem alterar o resultado.
@@ -391,7 +392,6 @@
         const c = m.sim.pieces, dA = c[0] - c[1];
         this._finish(m, rt.game.over.winner === 0 ? m.a : m.b, rt.game.over.reason, [dA, -dA], false, c);
       } else if (m.status === 'playing' && this.rt[mid] === rt) {
-        this.broadcast();
         setTimeout(() => this.skipSimulation(mid), 0);
       }
       return true;
