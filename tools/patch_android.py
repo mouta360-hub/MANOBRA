@@ -3,6 +3,7 @@
 Uso: python3 tools/patch_android.py <pasta_android> [--bluetooth | --no-bluetooth]
 
 - trava o app na horizontal;
+- instala o plugin ManobraScreen (tela sempre acesa durante o jogo), com ou sem Bluetooth;
 - com --bluetooth (padrão): instala o plugin ManobraBluetooth, registra no MainActivity
   e pede as permissões de Bluetooth no manifesto;
 - com --no-bluetooth: remove tudo isso (plano B se o plugin não compilar).
@@ -47,6 +48,10 @@ with open(manifest_path, "w", encoding="utf-8") as f:
 # ---- MainActivity.java e plugin
 os.makedirs(java_dir, exist_ok=True)
 plugin_dst = os.path.join(java_dir, "ManobraBluetoothPlugin.java")
+with open(os.path.join(root, "native", "ManobraScreenPlugin.java"), encoding="utf-8") as f:
+    screen_src = f.read().replace("__PACKAGE__", app_id)
+with open(os.path.join(java_dir, "ManobraScreenPlugin.java"), "w", encoding="utf-8") as f:
+    f.write(screen_src)
 if with_bt:
     with open(os.path.join(root, "native", "ManobraBluetoothPlugin.java"), encoding="utf-8") as f:
         src = f.read().replace("__PACKAGE__", app_id)
@@ -60,6 +65,7 @@ if with_bt:
         "    @Override\n"
         "    public void onCreate(Bundle savedInstanceState) {\n"
         "        registerPlugin(ManobraBluetoothPlugin.class);\n"
+        "        registerPlugin(ManobraScreenPlugin.class);\n"
         "        super.onCreate(savedInstanceState);\n"
         "    }\n"
         "}\n" % app_id
@@ -69,8 +75,15 @@ else:
         os.remove(plugin_dst)
     main = (
         "package %s;\n\n"
+        "import android.os.Bundle;\n"
         "import com.getcapacitor.BridgeActivity;\n\n"
-        "public class MainActivity extends BridgeActivity {}\n" % app_id
+        "public class MainActivity extends BridgeActivity {\n"
+        "    @Override\n"
+        "    public void onCreate(Bundle savedInstanceState) {\n"
+        "        registerPlugin(ManobraScreenPlugin.class);\n"
+        "        super.onCreate(savedInstanceState);\n"
+        "    }\n"
+        "}\n" % app_id
     )
 with open(os.path.join(java_dir, "MainActivity.java"), "w", encoding="utf-8") as f:
     f.write(main)

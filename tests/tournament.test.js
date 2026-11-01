@@ -299,7 +299,8 @@ async function until(cond, ms) { const t = Date.now(); while (!cond()) { if (Dat
   assert(h2.start());
   const bb = h2.matches.filter(x => x.a !== 0 && x.b !== 0);
   assert(bb.length === 3 && bb.filter(x => x.status === 'playing' && x.sim).length === 1 && bb.filter(x => x.status === 'pending').length === 2, 'apenas um jogo de robôs simula por vez');
-  bb.forEach(x => h2.handle(0, { k: 'skip', m: x.id }));
+  // pular roda em fatias curtas (não congela a tela): repete o pedido até as três terminarem
+  for (let i = 0; i < 400 && !bb.every(x => x.status === 'done'); i++) { bb.forEach(x => h2.handle(0, { k: 'skip', m: x.id })); await new Promise(r => setTimeout(r, 20)); }
   assert(bb.every(x => x.status === 'done' && Array.isArray(x.pieces) && Array.isArray(x.diff)), 'pular mantém resultado e saldo de peças');
   console.log('ok - robô contra robô simula uma partida por vez e pode ser pulado; saldo é calculado');
 

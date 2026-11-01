@@ -70,12 +70,27 @@ O app gira nos dois sentidos (retrato e paisagem, seguindo o sensor do celular).
   - **Todos contra todos:** cada par joga uma vez. Vitória = 3 pontos. O **saldo de peças** soma, em cada partida, as peças que o jogador vencedor tinha a mais que o adversário; numa derrota, a diferença entra negativa. Desempate: confronto direto entre os empatados, depois saldo de peças, depois vitórias.
   - **Mata-mata:** chaveamento sorteado (quem perde está fora). Se não fechar 4 ou 8 jogadores, alguns passam direto na 1ª fase.
 - Para jogar, cada um toca em **Jogar** na partida da rodada atual; não é possível escolher uma rodada futura. Quando os dois estiverem prontos ela começa (montagem em segredo, como sempre). Depois que todas as partidas da rodada terminarem, a próxima é liberada.
-- Quando uma partida da rodada chega à vez, cada jogador tem 2 minutos para tocar em **Jogar**. Quem não entrar nesse prazo perde por W.O. Depois de entrar, cada jogador tem mais 2 minutos para terminar a montagem; se não terminar, o computador escolhe uma montagem válida automaticamente para ele.
+- Quando uma partida da rodada chega à vez, cada jogador tem 2 minutos para tocar em **Jogar**. Quem não entrar nesse prazo perde por W.O. Depois de entrar, cada jogador tem mais 2 minutos para terminar a montagem; quando o tempo acaba, o juiz mantém as peças já colocadas, sorteia as que faltam e a partida começa normalmente — sem W.O. nem derrota.
 - A tela mostra contadores regressivos separados: o tempo de **Você** e o tempo do **Adversário**, primeiro para entrar e depois para concluir a montagem. Quando um jogador termina, aparece como pronto enquanto o relógio do outro continua visível.
 - Partidas entre dois robôs não são mais decididas por sorteio: os dois jogam lance a lance pelo mesmo motor do jogo, **uma partida por vez**, em segundo plano. A simulação não exibe o tabuleiro nem atrapalha quem está jogando uma partida humana. Quando uma termina, a próxima começa automaticamente. A contagem final de peças e o saldo são preservados normalmente.
 - O celular do organizador é o **juiz**: confere cada jogada com as regras e decide sozinho quem venceu. Ele também joga. Jogada inválida ou fora de hora = derrota por W.O.
 - Sair no meio de uma partida, não aparecer na partida atual ou cair a internet dá W.O. automático ao adversário. O resultado não pode ser alterado e a partida não pode ser refeita manualmente.
 - Se o organizador sair ou ficar sem internet, o campeonato termina para todos (não há servidor guardando nada). Quem cair pode voltar entrando com o mesmo código, desde que não tenha começado outra partida.
+
+## Desempenho do juiz
+- As partidas **robô contra robô** são simuladas no celular do organizador, uma por vez, com busca limitada (120 ms por lance) e pausa entre os lances (mais longa ainda quando há partida humana em andamento). Isso reduziu o uso de processador de ~99% para ~17% num campeonato de 8 jogadores com robôs difíceis, e o celular não trava.
+- O robô que joga contra você pensa no máximo 0,9 s por lance. O botão **Pular** da simulação termina a partida em fatias curtas, sem congelar a tela.
+
+## Tempo por jogada (1 min 30 s)
+- Cada jogada humana tem no máximo **1 minuto e 30 segundos**. O contador (⏱) aparece no placar, fica vermelho nos últimos 10 s e **zera a cada jogada**, valendo para os dois jogadores.
+- Quando o tempo acaba, o jogador **perde a vez**: o tabuleiro não muda e a vez passa para o adversário (sem derrota e sem W.O.). O relógio recomeça para o outro.
+- Não há relógio na vez do robô.
+- **Campeonato:** quem tira a vez é o juiz (organizador), mesmo que o celular de quem demorou esteja travado ou sem sinal; os dois celulares recebem o aviso e continuam iguais. Em partidas sem juiz (contra a IA, mesmo celular, Bluetooth, online) o celular de quem está na vez faz isso e avisa o outro.
+
+## Campeonato offline, salvar e tela acesa
+- **Sem internet:** em *Campeonato > Criar campeonato*, o app cria um campeonato offline (só contra robôs). Não precisa de código nem de Wi-Fi.
+- **Salvar quando quiser:** em campeonatos só com robôs há o botão **Salvar campeonato neste celular** (na tela do campeonato) e **💾 Salvar** (durante a partida). Nada é salvo sozinho. Para continuar depois: *Campeonato > Continuar campeonato salvo* (volta direto para a partida, no mesmo lance).
+- **Tela sempre acesa:** na montagem, na partida e na tela do campeonato o celular não apaga a tela. Ao voltar ao menu, ele volta ao comportamento normal. No Android isso usa o plugin `native/ManobraScreenPlugin.java`, instalado por `tools/patch_android.py`.
 
 ## Sons
 Os sons são criados pelo próprio app (nada para baixar): mover, eliminar, empurrar, trocar de lugar, virar de modo, eliminar defesa, vitória e derrota. Dá para ligar/desligar no menu ou no botão Som durante a partida.

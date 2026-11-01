@@ -223,6 +223,15 @@
       this.cur = l;
       if (!l.moves.length) { this.over = { winner: this.st.turn ^ 1, reason: 'sem_movimentos' }; }
     }
+    // Perder a vez (estourou o tempo da jogada): o tabuleiro não muda, a vez passa ao outro.
+    // Não entra no histórico de repetições, para não gerar "looping" à toa.
+    pass() {
+      if (this.over) return;
+      this.st.turn ^= 1;
+      this.last = null;
+      this.plies++;
+      this.refresh();
+    }
     play(mv) {
       const mover = this.st.turn;
       apply(this.st, mv);
@@ -357,8 +366,10 @@
     hard: { depth: 8, ms: 2000, noise: 0 }
   };
 
-  function chooseMove(st, rootMoves, level) {
-    const cfg = LEVELS[level] || LEVELS.medium;
+  // limit = { ms, depth } opcional: reduz a busca (usado nas partidas simuladas, para o celular não travar)
+  function chooseMove(st, rootMoves, level, limit) {
+    const cfg = Object.assign({}, LEVELS[level] || LEVELS.medium);
+    if (limit) { if (limit.ms) cfg.ms = Math.min(cfg.ms, limit.ms); if (limit.depth) cfg.depth = Math.min(cfg.depth, limit.depth); }
     const s = st.turn;
     const moves = rootMoves.slice();
     order(moves, s);
