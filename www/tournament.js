@@ -7,7 +7,7 @@
   'use strict';
 
   const WIN_POINTS = 3, MAX_PLAYERS = 8, MIN_PLAYERS = 2;
-  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000, SETUP_AUTOFILL_LEAD = 5000;
+  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000, SETUP_AUTOFILL_LEAD = 10000;
   // 60 nomes x 100 sobrenomes = 6.000 perfis fictícios. O nome parece humano,
   // mas continua sendo uma IA; o avatar é escolhido junto com o perfil.
   const BOT_FIRST = 'Ana Beatriz Bruno Camila Carlos Clara Daniel Davi Diego Eduarda Eduardo Elisa Fernanda Felipe Gabriel Gabriela Helena Henrique Igor Isabela João Joaquim Júlia Juliana Laura Larissa Leonardo Lívia Lucas Luana Manuel Manuela Marcelo Marcos Maria Mariana Mateus Melissa Miguel Murilo Natália Nicolas Otávio Patrícia Paulo Pedro Rafael Rafaela Raquel Renato Ricardo Rodrigo Sabrina Samuel Sofia Thiago Valentina Vicente Vinícius Vitória Yuri Alice Arthur Bianca Caio Cecília Enzo Gustavo'.split(' ');

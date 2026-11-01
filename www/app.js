@@ -269,7 +269,7 @@
     const dis = lock ? ' disabled' : '';
     const setupMatch = tourTimerMatch();
     if (setupMatch && setupMatch.timer) scheduleTourTimer();
-    if (setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup' && Number(setupMatch.timer.until) - Date.now() <= 5000) completeSetupLocally();
+    if (setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup' && Number(setupMatch.timer.until) - Date.now() <= 10000) completeSetupLocally();
     const setupClock = setupMatch && setupMatch.timer ? timerClock(setupMatch) : '';
     const setupMineReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide] : lock;
     const setupOppReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide ^ 1] : !!app.peerSetup;
@@ -278,7 +278,7 @@
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
-      (app.net === 'tour' ? ' Você tem 2 minutos para terminar; 5 segundos antes do fim o computador completa a montagem e aperta Pronto automaticamente.' : '');
+      (app.net === 'tour' ? ' Você tem 2 minutos para terminar; 10 segundos antes do fim o computador escolhe Padrão, completa a montagem e aperta Pronto automaticamente.' : '');
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
       '<div class="topbar"><b>Montagem: ' + NAMES[s] + '</b><span>' + total + '/' + PIECES + ' peças</span></div>' +
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
