@@ -7,7 +7,7 @@
   'use strict';
 
   const WIN_POINTS = 3, MAX_PLAYERS = 8, MIN_PLAYERS = 2;
-  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000;
+  const ENTRY_TIMEOUT = 120000, SETUP_TIMEOUT = 120000, MOVE_TIMEOUT = 90000, MOVE_GRACE = 3000;
   // 60 nomes x 100 sobrenomes = 6.000 perfis fictícios. O nome parece humano,
   // mas continua sendo uma IA; o avatar é escolhido junto com o perfil.
   const BOT_FIRST = 'Ana Beatriz Bruno Camila Carlos Clara Daniel Davi Diego Eduarda Eduardo Elisa Fernanda Felipe Gabriel Gabriela Helena Henrique Igor Isabela João Joaquim Júlia Juliana Laura Larissa Leonardo Lívia Lucas Luana Manuel Manuela Marcelo Marcos Maria Mariana Mateus Melissa Miguel Murilo Natália Nicolas Otávio Patrícia Paulo Pedro Rafael Rafaela Raquel Renato Ricardo Rodrigo Sabrina Samuel Sofia Thiago Valentina Vicente Vinícius Vitória Yuri Alice Arthur Bianca Caio Cecília Enzo Gustavo'.split(' ');
@@ -140,6 +140,9 @@
       this._setupTimeout = opts.setupTimeout == null ? SETUP_TIMEOUT : opts.setupTimeout;
       this._entryTimers = {};
       this._setupTimers = {};
+      this._moveTimeout = opts.moveTimeout == null ? MOVE_TIMEOUT : opts.moveTimeout; // por jogada humana
+      this._moveGrace = opts.moveGrace == null ? MOVE_GRACE : opts.moveGrace;
+      this._moveTimers = {};
       this._auto = false;
     }
 
@@ -297,7 +300,7 @@
       this.matches.forEach(m => {
         if (m.status === 'pending') this._armEntryTimer(m);
         else if (m.status === 'playing' && this.rt[m.id] && !this.rt[m.id].game) this._armSetupTimer(m);
-        else if (m.status === 'playing' && this.rt[m.id] && this.rt[m.id].game && this.rt[m.id].botSide != null) this._botMaybeMove(m);
+        else if (m.status === 'playing' && this.rt[m.id] && this.rt[m.id].game && this.rt[m.id].botSide != null) this._turnStarted(m);
       });
       return true;
     }
@@ -460,7 +463,26 @@
       const E = this.E, pieces = new Int8Array(E.N);
       rt.setups.forEach(list => list.forEach(it => { pieces[it[0]] = it[1]; }));
       rt.game = new E.Game(pieces);
-      this._botMaybeMove(m);
+      this._turnStarted(m);
+    }
+    _turnStarted(m) { this._botMaybeMove(m); this._armMoveTimer(m); }
+    // Tempo máximo por jogada humana (1min30). Passou do tempo: o jogador PERDE A VEZ (a vez passa
+    // ao adversário), sem derrota nem W.O. O juiz avisa os dois celulares.
+    _armMoveTimer(m) {
+      this._clearTimer(this._moveTimers, m.id);
+      const rt = this.rt[m.id];
+      if (!rt || !rt.game || rt.sim || rt.game.over || m.status !== 'playing') return;
+      const game = rt.game, turn = game.st.turn, plies = game.plies;
+      if (this.isBot(turn === 0 ? m.a : m.b)) return;
+      this._moveTimers[m.id] = setTimeout(() => {
+        delete this._moveTimers[m.id];
+        if (this.rt[m.id] !== rt || m.status !== 'playing' || game.over || game.st.turn !== turn || game.plies !== plies) return;
+        rt.lastForced = { side: turn, at: Date.now() };
+        [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'forcedPass', m: m.id }); });
+        game.pass();
+        this._afterPlay(m, game);
+      }, this._moveTimeout + this._moveGrace);
+      if (this._moveTimers[m.id] && this._moveTimers[m.id].unref) this._moveTimers[m.id].unref();
     }
     // Vez do robô: pensa um pouco e joga
     _botMaybeMove(m) {
@@ -485,7 +507,7 @@
         for (let i = 0; i < E.N; i++) { const p = g.st.b[i]; if (p) c[E.sideOf(p)]++; }
         const dA = c[0] - c[1];
         this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
-      } else this._botMaybeMove(m);
+      } else this._turnStarted(m);
     }
     // Partidas entre dois robôs: jogadas pelo motor, uma por vez, para que o
     // organizador consiga acompanhar e pular apenas a simulação atual.
@@ -621,6 +643,7 @@
       }
       if (o.k === 'move') {
         const g = rt.game;
+        if (g && !g.over && g.st.turn !== side && rt.lastForced && rt.lastForced.side === side && Date.now() - rt.lastForced.at < 8000) return; // chegou junto com o lance sorteado
         if (!g || g.over || g.st.turn !== side || !o.m) { this._forfeit(m, id, 'jogada fora de hora'); return; }
         const q = o.m;
         const mv = g.cur.moves.find(x => x.t === q.t && x.from === q.from && x.to === q.to && (x.beyond | 0) === (q.beyond | 0));
@@ -640,6 +663,7 @@
       const wasSimulation = !!(this.rt[m.id] && this.rt[m.id].sim);
       this._clearTimer(this._entryTimers, m.id);
       this._clearTimer(this._setupTimers, m.id);
+      this._clearTimer(this._moveTimers, m.id);
       m.timer = null;
       m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.sim = null; m.ready = [false, false];
       delete this.rt[m.id];

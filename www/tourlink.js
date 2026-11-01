@@ -101,6 +101,8 @@
           engine: E,
           botDelay: root.__manobraBotDelay, // só os testes mudam isso
           setupTimeout: root.__manobraSetupTimeout, // idem (indefinido = 2 minutos)
+          moveGrace: root.__manobraMoveGrace,
+          moveTimeout: root.__manobraMoveMs, // idem (indefinido = 1min30 por jogada)
           send: function (id, obj) {
             if (id === 0) { later(function () { emit('msg', obj); }); return; }
             const c = conns[id];

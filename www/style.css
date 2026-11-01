@@ -136,3 +136,7 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
   .menu, .rules { max-width: 640px; margin: 0 auto; }
   .avgrid { grid-template-columns: repeat(10, 1fr); }
 }
+
+/* relógio da jogada (1min30) */
+.mclock { font-style: normal; font-weight: 700; color: var(--text, #e8eaf0); font-variant-numeric: tabular-nums; }
+.mclock.low { color: #ff6b6b; }

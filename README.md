@@ -77,6 +77,12 @@ O app gira nos dois sentidos (retrato e paisagem, seguindo o sensor do celular).
 - Sair no meio de uma partida, não aparecer na partida atual ou cair a internet dá W.O. automático ao adversário. O resultado não pode ser alterado e a partida não pode ser refeita manualmente.
 - Se o organizador sair ou ficar sem internet, o campeonato termina para todos (não há servidor guardando nada). Quem cair pode voltar entrando com o mesmo código, desde que não tenha começado outra partida.
 
+## Tempo por jogada (1 min 30 s)
+- Cada jogada humana tem no máximo **1 minuto e 30 segundos**. O contador (⏱) aparece no placar, fica vermelho nos últimos 10 s e **zera a cada jogada**, valendo para os dois jogadores.
+- Quando o tempo acaba, o jogador **perde a vez**: o tabuleiro não muda e a vez passa para o adversário (sem derrota e sem W.O.). O relógio recomeça para o outro.
+- Não há relógio na vez do robô.
+- **Campeonato:** quem tira a vez é o juiz (organizador), mesmo que o celular de quem demorou esteja travado ou sem sinal; os dois celulares recebem o aviso e continuam iguais. Em partidas sem juiz (contra a IA, mesmo celular, Bluetooth, online) o celular de quem está na vez faz isso e avisa o outro.
+
 ## Campeonato offline, salvar e tela acesa
 - **Sem internet:** em *Campeonato > Criar campeonato*, o app cria um campeonato offline (só contra robôs). Não precisa de código nem de Wi-Fi.
 - **Salvar quando quiser:** em campeonatos só com robôs há o botão **Salvar campeonato neste celular** (na tela do campeonato) e **💾 Salvar** (durante a partida). Nada é salvo sozinho. Para continuar depois: *Campeonato > Continuar campeonato salvo* (volta direto para a partida, no mesmo lance).

@@ -14,7 +14,7 @@
   };
 
   const app = {
-    screen: 'menu', mode: 'ai', humanSide: WHITE, level: 'medium', rotate: false,
+    moveDeadline: 0, screen: 'menu', mode: 'ai', humanSide: WHITE, level: 'medium', rotate: false,
     pieces: new Int8Array(N), setupSide: WHITE, game: null,
     sel: -1, purge: false, choice: null, thinking: false, flipped: false,
     speed: 'slow', animating: false, animToken: 0,
@@ -307,9 +307,69 @@
     return atk ? 'Ataque: elimina o inimigo ao ocupar a casa dele.' : 'Defesa: anda 1 casa, empurra ou troca de lugar com inimigos.';
   }
 
+  /* ---------- Tempo por jogada (1min30, só para humanos) ---------- */
+  const moveMs = () => Number(window.__manobraMoveMs) || 90000;
+  function oppIsBot() { // no campeonato, o adversário pode ser robô (ele joga rápido: sem relógio)
+    const m = tourTimerMatch();
+    if (!m) return false;
+    const p = (app.tour.snap.players || []).find(x => x.id === (m.a === app.tour.myId ? m.b : m.a));
+    return !!(p && p.bot);
+  }
+  // Zera e reinicia o relógio a cada vez; sem relógio na vez do robô
+  function startMoveClock() {
+    const g = app.game;
+    const humanToMove = g && !g.over && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
+    app.moveDeadline = humanToMove ? Date.now() + moveMs() : 0;
+  }
+  const moveExpired = () => !!app.moveDeadline && Date.now() >= app.moveDeadline;
+  function clockText() {
+    if (!app.moveDeadline) return '';
+    const sec = Math.max(0, Math.ceil((app.moveDeadline - Date.now()) / 1000));
+    return '⏱ ' + String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
+  }
+  // Sem juiz (IA, mesmo celular, Bluetooth, online): acabou o tempo, quem estava na vez perde a vez.
+  // No campeonato quem joga é o juiz (vale mesmo se o celular estiver travado).
+  function moveClockTick() {
+    const g = app.game;
+    if (app.screen === 'game' && g && app.moveDeadline) {
+      const text = clockText(), left = app.moveDeadline - Date.now();
+      if (typeof document.querySelectorAll === 'function') document.querySelectorAll('[data-mclock]').forEach(el => {
+        el.textContent = text;
+        if (el.classList) { if (left <= 10000) el.classList.add('low'); else el.classList.remove('low'); }
+      });
+      if (left <= 0 && app.net !== 'tour' && !g.over && !app.animating && !app.thinking && (app.mode === 'pvp' || g.st.turn === app.humanSide)) {
+        app.moveDeadline = 0;
+        app.choice = null; app.purge = false;
+        if (app.mode === 'bt') btSend({ k: 'pass' });
+        doPass();
+      }
+    }
+    const t = setTimeout(moveClockTick, 500);
+    if (t && t.unref) t.unref();
+  }
+
+  // Estourou o tempo: a vez passa para o outro jogador (o tabuleiro não muda)
+  function doPass() {
+    const g = app.game;
+    if (!g || g.over) return;
+    const who = g.st.turn;
+    g.pass();
+    app.sel = -1; app.purge = false; app.choice = null;
+    const me = app.mode === 'pvp' ? NAMES[who] : (who === app.humanSide ? 'Você' : (app.peer.nick || 'O adversário'));
+    toast('Tempo esgotado: ' + me + ' perdeu a vez.');
+    updateFlip();
+    startMoveClock();
+    render();
+    if (g.over) {
+      const mine = app.mode === 'pvp' || g.over.winner === app.humanSide;
+      sfx(mine ? 'win' : 'lose', 0);
+    }
+    afterMove(false);
+  }
+
   function isHumanTurn() {
     const g = app.game;
-    return !g.over && !app.thinking && !app.animating && (app.mode === 'pvp' || g.st.turn === app.humanSide);
+    return !g.over && !app.thinking && !app.animating && !(app.net === 'tour' && moveExpired()) && (app.mode === 'pvp' || g.st.turn === app.humanSide);
   }
 
   function gameScreen() {
@@ -334,7 +394,7 @@
     const flipLabel = sel >= 0 && E.isAttack(b[sel]) ? 'Virar p/ defesa' : 'Virar p/ ataque';
     const canPurge = isHumanTurn() && g.cur.moves.some(m => m.t === 'x');
     let h = '<div class="layout"><div class="bw">' + boardHtml(b, marks) + '</div><div class="side">' +
-      '<div class="topbar"><b>' + statusText() + '</b><span>jogada ' + (g.plies + 1) + '</span></div>' +
+      '<div class="topbar"><b>' + statusText() + '</b><span>jogada ' + (g.plies + 1) + (app.moveDeadline ? ' · <i data-mclock class="mclock">' + clockText() + '</i>' : '') + '</span></div>' +
       '<div class="scoreboard">' + playerScore(WHITE, c, g.st.turn) + playerScore(BLACK, c, g.st.turn) + '</div>' +
       '<div class="hint">' + hintText() + '</div><div class="bar">' +
       '<button data-act="flipMode" ' + (canFlip ? '' : 'disabled') + '>' + flipLabel + '</button>' +
@@ -523,7 +583,7 @@
     if (!g.over) g.refresh(); else g.cur = null;
     app.mode = 'bt'; app.net = 'tour'; app.btLinked = true; app.btReady = false;
     app.humanSide = x.humanSide == null ? WHITE : x.humanSide; app.peer = x.peer || app.peer;
-    app.tour.matchId = x.matchId; app.game = g; app.screen = 'game'; app.animating = false; render();
+    app.tour.matchId = x.matchId; app.game = g; app.screen = 'game'; app.animating = false; startMoveClock(); render();
   }
 
   function tourMatchRow(m, s, t) {
@@ -766,6 +826,7 @@
     app.sel = -1; app.purge = false; app.choice = null; app.thinking = false; app.animating = false; app.animToken++;
     if (app.mode === 'ai' || app.mode === 'bt') app.flipped = app.humanSide === BLACK;
     else app.flipped = app.rotate && app.game.st.turn === BLACK;
+    startMoveClock();
     render();
     afterMove(false);
     processBtQueue();
@@ -773,6 +834,7 @@
 
   function afterMove(announce) {
     const g = app.game;
+    startMoveClock();
     if (g.over) { render(); return; }
     if (announce && g.cur && g.cur.blocked > 0 && (app.mode === 'pvp' || g.st.turn === app.humanSide)) {
       toast('Efeito looping: esse movimento repetido não é permitido, faça outro.');
@@ -859,6 +921,7 @@
   function finishAnim(token) {
     if (app.animToken !== token || !app.animating) return;
     app.animating = false;
+    startMoveClock();
     updateFlip();
     render();
     const g = app.game;
@@ -1044,6 +1107,9 @@
       if (Array.isArray(o.opp)) app.peerSetup = o.opp;
       app.btReady = true;
       tryStartBt();
+    } else if (o.k === 'pass') {
+      app.btQueue.push({ pass: true });
+      processBtQueue();
     } else if (o.k === 'move') {
       app.btQueue.push(o.m);
       processBtQueue();
@@ -1061,8 +1127,9 @@
     if (app.mode !== 'bt' || !app.game || app.screen !== 'game' || app.animating || !app.btQueue.length) return;
     const g = app.game;
     if (g.over) { app.btQueue.length = 0; return; }
-    if (g.st.turn === app.humanSide) { app.btQueue.length = 0; btError('Jogada recebida fora de hora. Partida encerrada.'); return; }
+    if (g.st.turn === app.humanSide && !(app.btQueue[0] && app.btQueue[0].forced)) { app.btQueue.length = 0; btError('Jogada recebida fora de hora. Partida encerrada.'); return; }
     const o = app.btQueue.shift();
+    if (o && o.pass) { doPass(); processBtQueue(); return; }
     const mv = o && g.cur.moves.find(m => m.t === o.t && m.from === o.from && m.to === o.to && (m.beyond | 0) === (o.beyond | 0));
     if (!mv) { btError('Jogada inválida recebida. Partida encerrada.'); return; }
     doMove(mv, true);
@@ -1413,6 +1480,9 @@
       if (o.m === app.tour.matchId && typeof o.d === 'string') tourEmit('message', { data: o.d });
     } else if (o.k === 'autoSetup') {
       if (o.m === app.tour.matchId) handleBtMessage(JSON.stringify({ k: 'autoSetup', p: o.p, opp: o.opp }));
+    } else if (o.k === 'forcedPass') {
+      // o juiz tirou a vez de quem estourou o 1min30; vale para os dois celulares (inclusive o de quem demorou)
+      if (o.m === app.tour.matchId) { app.btQueue.push({ pass: true, forced: true }); processBtQueue(); }
     } else if (o.k === 'matchEnd') {
       onTourMatchEnd(o, 0);
     }
@@ -1646,6 +1716,7 @@
 
   if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => { if (!document.hidden) syncAwake(true); });
 
+  moveClockTick();
   loadProfile();
   render();
   presenceStart();
