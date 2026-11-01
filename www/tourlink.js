@@ -16,7 +16,6 @@
   let conns = {};       // id do jogador -> conexão (só no organizador)
   let client = null;    // { peer, conn } (só no convidado)
   let closing = false;
-  let localOnly = false; // campeonato offline: só robôs, sem PeerJS
 
   function emit(ev, data) {
     (handlers[ev] || []).slice().forEach(function (f) { try { f(data); } catch (e) { /* ok */ } });
@@ -44,7 +43,7 @@
   function reset() {
     closing = true;
     const hp = hostPeer, cl = client, cs = conns;
-    role = null; hub = null; hostPeer = null; client = null; conns = {}; localOnly = false;
+    role = null; hub = null; hostPeer = null; client = null; conns = {};
     Object.keys(cs).forEach(function (k) { try { cs[k].close(); } catch (e) { /* ok */ } });
     try { if (hp) hp.destroy(); } catch (e) { /* ok */ }
     if (cl) {
@@ -90,9 +89,8 @@
 
   const api = {
     // Cria o campeonato. Resolve { code, you: 0 }.
-    // opts.local = true: campeonato offline (só contra robôs), sem precisar de internet.
     host: function (opts) {
-      return (opts.local ? Promise.resolve() : loadLib()).then(function () {
+      return loadLib().then(function () {
         reset();
         closing = false;
         const E = root.ManobraEngine, T = root.ManobraTournament;
@@ -100,9 +98,6 @@
         const h = new T.Hub({
           engine: E,
           botDelay: root.__manobraBotDelay, // só os testes mudam isso
-          setupTimeout: root.__manobraSetupTimeout, // idem (indefinido = 2 minutos)
-          moveGrace: root.__manobraMoveGrace,
-          moveTimeout: root.__manobraMoveMs, // idem (indefinido = 1min30 por jogada)
           send: function (id, obj) {
             if (id === 0) { later(function () { emit('msg', obj); }); return; }
             const c = conns[id];
@@ -111,7 +106,6 @@
         });
         hub = h;
         role = 'host';
-        localOnly = !!opts.local;
         if (opts.restore) {
           if (!h.importState(opts.restore)) throw new Error('O campeonato salvo está inválido ou corrompido.');
           const me = h.players.find(function (p) { return p.id === 0; });
@@ -119,7 +113,6 @@
         } else {
           h.join(String(opts.pid), opts.nick, opts.avatar); // o organizador é sempre o jogador 0
         }
-        if (opts.local) return { code: '', you: 0, local: true };
         return new Promise(function (resolve, reject) {
           let tries = 0, finished = false;
           const timer = setTimeout(function () {
@@ -215,7 +208,6 @@
     snapshot: function () { return hub ? hub.snapshot() : null; },
     saveState: function () { return hub && role === 'host' && hub.exportState ? hub.exportState() : null; },
     role: function () { return role; },
-    isLocal: function () { return localOnly; },
     leave: function () { reset(); },
     addListener: function (ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return Promise.resolve({ remove: function () {} }); }
   };

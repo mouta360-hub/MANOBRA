@@ -14,7 +14,7 @@
   };
 
   const app = {
-    moveDeadline: 0, screen: 'menu', mode: 'ai', humanSide: WHITE, level: 'medium', rotate: false,
+    screen: 'menu', mode: 'ai', humanSide: WHITE, level: 'medium', rotate: false,
     pieces: new Int8Array(N), setupSide: WHITE, game: null,
     sel: -1, purge: false, choice: null, thinking: false, flipped: false,
     speed: 'slow', animating: false, animToken: 0,
@@ -269,6 +269,7 @@
     const dis = lock ? ' disabled' : '';
     const setupMatch = tourTimerMatch();
     if (setupMatch && setupMatch.timer) scheduleTourTimer();
+    if (setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup' && Number(setupMatch.timer.until) - Date.now() <= 10000) completeSetupLocally();
     const setupClock = setupMatch && setupMatch.timer ? timerClock(setupMatch) : '';
     const setupMineReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide] : lock;
     const setupOppReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide ^ 1] : !!app.peerSetup;
@@ -277,7 +278,7 @@
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
-      (app.net === 'tour' ? ' Você tem 2 minutos. Quando o tempo acabar, o computador completa as peças que faltam ao acaso e a partida começa — sem perder.' : '');
+      (app.net === 'tour' ? ' Você tem 2 minutos para terminar; 10 segundos antes do fim o computador escolhe Padrão, completa a montagem e aperta Pronto automaticamente.' : '');
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
       '<div class="topbar"><b>Montagem: ' + NAMES[s] + '</b><span>' + total + '/' + PIECES + ' peças</span></div>' +
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
@@ -307,69 +308,9 @@
     return atk ? 'Ataque: elimina o inimigo ao ocupar a casa dele.' : 'Defesa: anda 1 casa, empurra ou troca de lugar com inimigos.';
   }
 
-  /* ---------- Tempo por jogada (1min30, só para humanos) ---------- */
-  const moveMs = () => Number(window.__manobraMoveMs) || 90000;
-  function oppIsBot() { // no campeonato, o adversário pode ser robô (ele joga rápido: sem relógio)
-    const m = tourTimerMatch();
-    if (!m) return false;
-    const p = (app.tour.snap.players || []).find(x => x.id === (m.a === app.tour.myId ? m.b : m.a));
-    return !!(p && p.bot);
-  }
-  // Zera e reinicia o relógio a cada vez; sem relógio na vez do robô
-  function startMoveClock() {
-    const g = app.game;
-    const humanToMove = g && !g.over && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
-    app.moveDeadline = humanToMove ? Date.now() + moveMs() : 0;
-  }
-  const moveExpired = () => !!app.moveDeadline && Date.now() >= app.moveDeadline;
-  function clockText() {
-    if (!app.moveDeadline) return '';
-    const sec = Math.max(0, Math.ceil((app.moveDeadline - Date.now()) / 1000));
-    return '⏱ ' + String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
-  }
-  // Sem juiz (IA, mesmo celular, Bluetooth, online): acabou o tempo, quem estava na vez perde a vez.
-  // No campeonato quem joga é o juiz (vale mesmo se o celular estiver travado).
-  function moveClockTick() {
-    const g = app.game;
-    if (app.screen === 'game' && g && app.moveDeadline) {
-      const text = clockText(), left = app.moveDeadline - Date.now();
-      if (typeof document.querySelectorAll === 'function') document.querySelectorAll('[data-mclock]').forEach(el => {
-        el.textContent = text;
-        if (el.classList) { if (left <= 10000) el.classList.add('low'); else el.classList.remove('low'); }
-      });
-      if (left <= 0 && app.net !== 'tour' && !g.over && !app.animating && !app.thinking && (app.mode === 'pvp' || g.st.turn === app.humanSide)) {
-        app.moveDeadline = 0;
-        app.choice = null; app.purge = false;
-        if (app.mode === 'bt') btSend({ k: 'pass' });
-        doPass();
-      }
-    }
-    const t = setTimeout(moveClockTick, 500);
-    if (t && t.unref) t.unref();
-  }
-
-  // Estourou o tempo: a vez passa para o outro jogador (o tabuleiro não muda)
-  function doPass() {
-    const g = app.game;
-    if (!g || g.over) return;
-    const who = g.st.turn;
-    g.pass();
-    app.sel = -1; app.purge = false; app.choice = null;
-    const me = app.mode === 'pvp' ? NAMES[who] : (who === app.humanSide ? 'Você' : (app.peer.nick || 'O adversário'));
-    toast('Tempo esgotado: ' + me + ' perdeu a vez.');
-    updateFlip();
-    startMoveClock();
-    render();
-    if (g.over) {
-      const mine = app.mode === 'pvp' || g.over.winner === app.humanSide;
-      sfx(mine ? 'win' : 'lose', 0);
-    }
-    afterMove(false);
-  }
-
   function isHumanTurn() {
     const g = app.game;
-    return !g.over && !app.thinking && !app.animating && !(app.net === 'tour' && moveExpired()) && (app.mode === 'pvp' || g.st.turn === app.humanSide);
+    return !g.over && !app.thinking && !app.animating && (app.mode === 'pvp' || g.st.turn === app.humanSide);
   }
 
   function gameScreen() {
@@ -394,15 +335,13 @@
     const flipLabel = sel >= 0 && E.isAttack(b[sel]) ? 'Virar p/ defesa' : 'Virar p/ ataque';
     const canPurge = isHumanTurn() && g.cur.moves.some(m => m.t === 'x');
     let h = '<div class="layout"><div class="bw">' + boardHtml(b, marks) + '</div><div class="side">' +
-      '<div class="topbar"><b>' + statusText() + '</b><span>jogada ' + (g.plies + 1) + (app.moveDeadline ? ' · <i data-mclock class="mclock">' + clockText() + '</i>' : '') + '</span></div>' +
+      '<div class="topbar"><b>' + statusText() + '</b><span>jogada ' + (g.plies + 1) + '</span></div>' +
       '<div class="scoreboard">' + playerScore(WHITE, c, g.st.turn) + playerScore(BLACK, c, g.st.turn) + '</div>' +
       '<div class="hint">' + hintText() + '</div><div class="bar">' +
       '<button data-act="flipMode" ' + (canFlip ? '' : 'disabled') + '>' + flipLabel + '</button>' +
       (canPurge ? '<button class="warn" data-act="purge">' + (app.purge ? 'Cancelar' : 'Eliminar defesa (7ª)') + '</button>' : '') +
       '<button data-act="toggleSound">' + (snd.on ? '🔊 Som' : '🔇 Mudo') + '</button>' +
-      '<button data-act="turnBoard">Girar</button>' +
-      (app.net === 'tour' && app.tour.role === 'host' && tourBotOnly(app.tour.snap) ? '<button data-act="tourSave">💾 Salvar</button>' : '') +
-      '<button data-act="menu">Menu</button></div></div></div>';
+      '<button data-act="turnBoard">Girar</button><button data-act="menu">Menu</button></div></div></div>';
     if (app.choice) {
       h += '<div class="overlay" data-act="cancelChoice"><div class="sheet"><h2>Como mover?</h2><p>Escolha o que fazer com a peça inimiga.</p>' +
         '<button class="primary" data-act="choose" data-v="p">Empurrar</button><button class="primary" data-act="choose" data-v="s">Trocar de lugar</button></div></div>';
@@ -556,22 +495,16 @@
   const TOUR_SAVE_KEY = 'manobra.tour.bot.save.v1';
   function tourBotOnly(s) { return !!(s && s.players && s.players.length && s.players.every(p => p.id === 0 || p.bot)); }
   function tourSaved() { try { return JSON.parse(localStorage.getItem(TOUR_SAVE_KEY) || 'null'); } catch (e) { return null; } }
-  // Salvamento manual (botão). O estado do jogo vem do juiz (fonte única), então o celular e o juiz nunca divergem.
-  function tourSaveLocal(silent) {
+  function tourSaveLocal() {
     const l = window.ManobraTourLink, s = app.tour.snap;
-    if (!l || app.tour.role !== 'host' || !tourBotOnly(s)) return false;
+    if (!l || app.tour.role !== 'host' || !tourBotOnly(s)) return;
     const data = l.saveState && l.saveState();
-    if (!data) { if (!silent) toast('Não foi possível salvar este campeonato.'); return false; }
-    let local = null;
-    const mine = s.matches.find(m => m.status === 'playing' && (m.a === 0 || m.b === 0));
-    if (mine) {
-      const gm = data.rt && data.rt[mine.id] && data.rt[mine.id].game;
-      if (!gm) return false; // montagem em andamento: mantém o último salvamento bom
-      const opp = s.players.find(p => p.id === (mine.a === 0 ? mine.b : mine.a)) || {};
-      local = { matchId: mine.id, humanSide: mine.a === 0 ? WHITE : BLACK, peer: { nick: opp.nick || 'Adversário', av: AV[opp.av] ? opp.av : 'robot' }, game: gm };
-    }
-    try { localStorage.setItem(TOUR_SAVE_KEY, JSON.stringify({ data: data, local: local, savedAt: Date.now() })); if (!silent) toast('Campeonato salvo neste celular.'); return true; }
-    catch (e) { if (!silent) toast('Não há espaço suficiente para salvar o campeonato.'); return false; }
+    if (!data) return toast('Não foi possível salvar este campeonato.');
+    const g = app.game;
+    const local = g && app.net === 'tour' ? { matchId: app.tour.matchId, humanSide: app.humanSide, peer: app.peer,
+      game: { b: Array.from(g.st.b), turn: g.st.turn, over: g.over, last: g.last, plies: g.plies, hist: Array.from(g.hist.entries()) } } : null;
+    try { localStorage.setItem(TOUR_SAVE_KEY, JSON.stringify({ data: data, local: local, savedAt: Date.now() })); toast('Campeonato salvo neste celular.'); }
+    catch (e) { toast('Não há espaço suficiente para salvar o campeonato.'); }
   }
   function tourClearSaved() { try { localStorage.removeItem(TOUR_SAVE_KEY); } catch (e) {} }
   function tourRestoreLocal(saved) {
@@ -583,7 +516,7 @@
     if (!g.over) g.refresh(); else g.cur = null;
     app.mode = 'bt'; app.net = 'tour'; app.btLinked = true; app.btReady = false;
     app.humanSide = x.humanSide == null ? WHITE : x.humanSide; app.peer = x.peer || app.peer;
-    app.tour.matchId = x.matchId; app.game = g; app.screen = 'game'; app.animating = false; startMoveClock(); render();
+    app.tour.matchId = x.matchId; app.game = g; app.screen = 'game'; app.animating = false; render();
   }
 
   function tourMatchRow(m, s, t) {
@@ -634,8 +567,7 @@
     if (!s) return h + '<div class="hint">Conectando…</div></div>';
     const isOrg = t.myId === 0;
     if (s.status === 'lobby') {
-      if (t.local) h += '<div class="card"><p style="margin:0;text-align:center"><b>Campeonato offline</b></p><p style="text-align:center;font-size:13px;margin:6px 0 0">Sem internet: só dá para jogar contra robôs. Adicione robôs abaixo. Use o botão Salvar para continuar depois.</p></div>';
-      else h += '<div class="card"><p style="margin:0;text-align:center">Código do campeonato</p><div class="bigcode">' + esc(t.code || '') + '</div>' +
+      h += '<div class="card"><p style="margin:0;text-align:center">Código do campeonato</p><div class="bigcode">' + esc(t.code || '') + '</div>' +
         '<p style="text-align:center;font-size:13px;margin:0">' + (isOrg ? 'Passe este código para os jogadores (de 1 a 8, contando com você e os robôs).' : 'Aguardando o organizador iniciar.') + '</p></div>';
       h += '<div class="card"><h3>Jogadores (' + s.players.length + '/' + T.MAX_PLAYERS + ')</h3>';
       s.players.forEach(p => {
@@ -670,7 +602,7 @@
     if (s.status === 'finished' && s.champion != null) {
       h += '<div class="card" style="text-align:center"><h3 style="margin:0">🏆 Campeão</h3><div class="bigcode" style="font-size:30px;letter-spacing:2px;padding:10px 0 4px">' + avHtml((s.players.find(x => x.id === s.champion) || {}).av) + ' ' + esc(T.nickOf(s, s.champion)) + '</div></div>';
     }
-    if (isOrg && tourBotOnly(s)) h += '<div class="card"><button data-act="tourSave">Salvar campeonato neste celular</button><p class="muted" style="margin:6px 0 0">Toque para guardar o ponto em que está (também há o botão 💾 Salvar durante a partida). Para continuar depois: Campeonato &gt; Continuar campeonato salvo.</p></div>';
+    if (isOrg && tourBotOnly(s)) h += '<div class="card"><button data-act="tourSave">Salvar campeonato neste celular</button><p class="muted" style="margin:6px 0 0">Disponível somente em campeonatos com robôs.</p></div>';
     const busyMe = s.players.some(p => p.id === t.myId && p.busy);
     const mine = s.matches.filter(m => (m.a === t.myId || m.b === t.myId));
     h += '<div class="card"><h3>Minhas partidas</h3>';
@@ -721,34 +653,7 @@
     return h + '</div>';
   }
 
-  /* ---------- Tela sempre acesa durante o jogo ---------- */
-  // Acesa na montagem, na partida e no campeonato; ao voltar ao menu, o celular volta ao comportamento normal.
-  const awake = { on: false, lock: null };
-  function nativeScreen() {
-    try {
-      const C = window.Capacitor;
-      if (!C) return null;
-      const native = C.isNativePlatform ? C.isNativePlatform() : (C.getPlatform ? C.getPlatform() !== 'web' : false);
-      if (!native) return null;
-      if (C.Plugins && C.Plugins.ManobraScreen) return C.Plugins.ManobraScreen;
-      if (C.registerPlugin) return C.registerPlugin('ManobraScreen');
-    } catch (e) { /* sem plugin */ }
-    return null;
-  }
-  function syncAwake(force) {
-    const want = app.screen === 'game' || app.screen === 'setup' || app.screen === 'tour';
-    if (want === awake.on && !force) return;
-    awake.on = want;
-    try { const p = nativeScreen(); if (p) Promise.resolve(p.keepAwake({ on: want })).catch(() => {}); } catch (e) { /* ok */ }
-    try { // navegador / WebView com Wake Lock
-      if (want && navigator.wakeLock && navigator.wakeLock.request && !awake.lock && !(document && document.hidden)) {
-        navigator.wakeLock.request('screen').then(l => { awake.lock = l; if (!awake.on) { l.release().catch(() => {}); awake.lock = null; } else l.addEventListener('release', () => { awake.lock = null; }); }).catch(() => {});
-      } else if (!want && awake.lock) { const l = awake.lock; awake.lock = null; l.release().catch(() => {}); }
-    } catch (e) { /* ok */ }
-  }
-
   function render() {
-    syncAwake();
     const root = $('#app');
     if (app.screen === 'menu') root.innerHTML = menuScreen();
     else if (app.screen === 'tour') root.innerHTML = tourScreen();
@@ -769,6 +674,25 @@
     const list = [];
     for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === app.setupSide) list.push([i, app.pieces[i]]);
     btSend({ k: 'setupProgress', p: list });
+  }
+  function completeSetupLocally() {
+    if (app.mode !== 'bt' || app.net !== 'tour' || app.screen !== 'setup' || app.btReady) return;
+    const side = app.setupSide, list = [];
+    for (let i = 0; i < N; i++) if (app.pieces[i] && E.sideOf(app.pieces[i]) === side) list.push([i, app.pieces[i]]);
+    const used = new Set(list.map(o => o[0]));
+    let def = list.reduce((n, o) => n + (E.isAttack(o[1]) ? 0 : 1), 0);
+    const add = o => {
+      if (list.length >= PIECES || used.has(o.i)) return;
+      const p = def >= MAX_DEF ? E.makePiece(side, true) : o.p;
+      list.push([o.i, p]); used.add(o.i); if (!E.isAttack(p)) def++;
+    };
+    E.presetSetup(side, Math.random).forEach(add);
+    if (list.length < PIECES) E.territoryCells(side).forEach(i => add({ i: i, p: E.makePiece(side, true) }));
+    if (list.length !== PIECES) return;
+    placeList(side, list.map(o => ({ i: o[0], p: o[1] })));
+    btSend({ k: 'setup', p: list });
+    app.btReady = true;
+    tryStartBt();
   }
   function placeAI(s) {
     placeList(s, app.level === 'easy' ? E.randomSetup(s) : E.presetSetup(s, Math.random));
@@ -826,7 +750,6 @@
     app.sel = -1; app.purge = false; app.choice = null; app.thinking = false; app.animating = false; app.animToken++;
     if (app.mode === 'ai' || app.mode === 'bt') app.flipped = app.humanSide === BLACK;
     else app.flipped = app.rotate && app.game.st.turn === BLACK;
-    startMoveClock();
     render();
     afterMove(false);
     processBtQueue();
@@ -834,7 +757,6 @@
 
   function afterMove(announce) {
     const g = app.game;
-    startMoveClock();
     if (g.over) { render(); return; }
     if (announce && g.cur && g.cur.blocked > 0 && (app.mode === 'pvp' || g.st.turn === app.humanSide)) {
       toast('Efeito looping: esse movimento repetido não é permitido, faça outro.');
@@ -921,7 +843,6 @@
   function finishAnim(token) {
     if (app.animToken !== token || !app.animating) return;
     app.animating = false;
-    startMoveClock();
     updateFlip();
     render();
     const g = app.game;
@@ -1101,15 +1022,11 @@
       app.peerSetup = o.p;
       tryStartBt();
     } else if (o.k === 'autoSetup') {
-      // montagem sorteada pelo juiz ao fim do tempo; cópias repetidas ou tardias são ignoradas
-      if (app.mode !== 'bt' || app.screen !== 'setup' || !Array.isArray(o.p)) return;
-      placeList(app.humanSide, o.p.map(it => ({ i: it[0], p: it[1] }))); // o juiz manda pares [casa, peça]
+      if (app.mode !== 'bt' || !Array.isArray(o.p)) return;
+      placeList(app.humanSide, o.p);
       if (Array.isArray(o.opp)) app.peerSetup = o.opp;
       app.btReady = true;
       tryStartBt();
-    } else if (o.k === 'pass') {
-      app.btQueue.push({ pass: true });
-      processBtQueue();
     } else if (o.k === 'move') {
       app.btQueue.push(o.m);
       processBtQueue();
@@ -1127,9 +1044,8 @@
     if (app.mode !== 'bt' || !app.game || app.screen !== 'game' || app.animating || !app.btQueue.length) return;
     const g = app.game;
     if (g.over) { app.btQueue.length = 0; return; }
-    if (g.st.turn === app.humanSide && !(app.btQueue[0] && app.btQueue[0].forced)) { app.btQueue.length = 0; btError('Jogada recebida fora de hora. Partida encerrada.'); return; }
+    if (g.st.turn === app.humanSide) { app.btQueue.length = 0; btError('Jogada recebida fora de hora. Partida encerrada.'); return; }
     const o = app.btQueue.shift();
-    if (o && o.pass) { doPass(); processBtQueue(); return; }
     const mv = o && g.cur.moves.find(m => m.t === o.t && m.from === o.from && m.to === o.to && (m.beyond | 0) === (o.beyond | 0));
     if (!mv) { btError('Jogada inválida recebida. Partida encerrada.'); return; }
     doMove(mv, true);
@@ -1406,12 +1322,12 @@
   };
   function tourEmit(ev, data) { (tourHandlers[ev] || []).slice().forEach(f => { try { f(data); } catch (e) { /* ok */ } }); }
   let tourWired = false;
-  const freshTour = () => ({ role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false, local: false });
+  const freshTour = () => ({ role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false });
 
-  function tourEnsure(allowOffline) {
+  function tourEnsure() {
     const l = window.ManobraTourLink;
     if (!l || !window.ManobraTournament) throw new Error('O campeonato não está disponível nesta versão.');
-    if (!allowOffline && typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('Sem internet. Conecte-se ao Wi-Fi ou aos dados móveis.');
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('Sem internet. Conecte-se ao Wi-Fi ou aos dados móveis.');
     app.net = 'tour';
     btAttach(tourTransport);
     if (!tourWired) {
@@ -1429,14 +1345,10 @@
   }
   async function tourCreate() {
     try {
-      const l = tourEnsure(true);
+      const l = tourEnsure();
       app.tour = freshTour(); app.tour.connecting = true; render();
-      const base = { nick: myNick(), pid: app.me.code, avatar: app.me.av };
-      let local = typeof navigator !== 'undefined' && navigator.onLine === false, r;
-      try { r = await l.host(Object.assign({ local: local }, base)); }
-      catch (e) { if (local) throw e; local = true; r = await l.host(Object.assign({ local: true }, base)); } // sem conexão com o serviço: joga offline
-      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you; app.tour.local = local;
-      if (local) toast('Sem internet: campeonato offline, só contra robôs.');
+      const r = await l.host({ nick: myNick(), pid: app.me.code, avatar: app.me.av });
+      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you;
       app.tour.snap = l.snapshot();
       render();
     } catch (e) { app.tour = freshTour(); app.tour.msg = errMsg(e); render(); }
@@ -1445,10 +1357,10 @@
     const saved = tourSaved();
     if (!saved || !saved.data) return toast('Nenhum campeonato salvo foi encontrado.');
     try {
-      const l = tourEnsure(true);
+      const l = tourEnsure();
       app.tour = freshTour(); app.tour.connecting = true; render();
-      const r = await l.host({ restore: saved.data, local: true, nick: myNick(), pid: app.me.code, avatar: app.me.av });
-      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you; app.tour.local = true;
+      const r = await l.host({ restore: saved.data, nick: myNick(), pid: app.me.code, avatar: app.me.av });
+      app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you;
       app.tour.snap = l.snapshot();
       toast('Campeonato retomado.');
       tourRestoreLocal(saved);
@@ -1480,9 +1392,6 @@
       if (o.m === app.tour.matchId && typeof o.d === 'string') tourEmit('message', { data: o.d });
     } else if (o.k === 'autoSetup') {
       if (o.m === app.tour.matchId) handleBtMessage(JSON.stringify({ k: 'autoSetup', p: o.p, opp: o.opp }));
-    } else if (o.k === 'forcedPass') {
-      // o juiz tirou a vez de quem estourou o 1min30; vale para os dois celulares (inclusive o de quem demorou)
-      if (o.m === app.tour.matchId) { app.btQueue.push({ pass: true, forced: true }); processBtQueue(); }
     } else if (o.k === 'matchEnd') {
       onTourMatchEnd(o, 0);
     }
@@ -1714,9 +1623,6 @@
     tryStartBt();
   }
 
-  if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => { if (!document.hidden) syncAwake(true); });
-
-  moveClockTick();
   loadProfile();
   render();
   presenceStart();

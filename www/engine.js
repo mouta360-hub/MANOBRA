@@ -223,15 +223,6 @@
       this.cur = l;
       if (!l.moves.length) { this.over = { winner: this.st.turn ^ 1, reason: 'sem_movimentos' }; }
     }
-    // Perder a vez (estourou o tempo da jogada): o tabuleiro não muda, a vez passa ao outro.
-    // Não entra no histórico de repetições, para não gerar "looping" à toa.
-    pass() {
-      if (this.over) return;
-      this.st.turn ^= 1;
-      this.last = null;
-      this.plies++;
-      this.refresh();
-    }
     play(mv) {
       const mover = this.st.turn;
       apply(this.st, mv);
