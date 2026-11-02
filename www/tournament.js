@@ -347,7 +347,7 @@
         old.connected = true; if (av) old.av = av; if (meta.peer) old.peer = String(meta.peer); this.broadcast(); return { ok: true, id: old.id };
       }
       if (this.status !== 'lobby') return { ok: false, why: 'O campeonato já começou.' };
-      if (this.players.length >= MAX_PLAYERS) return { ok: false, why: 'O campeonato está cheio (máximo ' + MAX_PLAYERS + ' jogadores).' };
+      if (this.players.filter(p => !p.eliminated).length >= MAX_PLAYERS) return { ok: false, why: 'O campeonato está cheio (máximo ' + MAX_PLAYERS + ' jogadores).' };
       let name = clean(nick) || 'Jogador';
       const base = name;
       for (let n = 2; this.players.some(p => p.nick.toLowerCase() === name.toLowerCase()); n++) name = base.slice(0, 13) + ' ' + n;
@@ -357,7 +357,7 @@
       return { ok: true, id: p.id };
     }
     _addBot() {
-      if (this.status !== 'lobby' || this.players.length >= MAX_PLAYERS) return false;
+      if (this.status !== 'lobby' || this.players.filter(p => !p.eliminated).length >= MAX_PLAYERS) return false;
       const n = ++this._botN;
       const available = [];
       for (let i = 0; i < BOT_PROFILES.length; i++) if (!this._usedBotProfiles.has(i)) available.push(i);
@@ -445,7 +445,7 @@
     start() {
       if (this.status !== 'lobby') return false;
       while (this.players.length < MIN_PLAYERS) this._addBot(); // sozinho: entra um robô para ter adversário
-      let ids = this.players.map(p => p.id);
+      let ids = this.players.filter(p => !p.eliminated).map(p => p.id);
       let fx;
       if (this.format === 'knockout') {
         ids = shuffle(ids, this.rnd); // sorteio das chaves
