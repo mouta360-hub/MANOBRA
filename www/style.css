@@ -164,9 +164,6 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 .chat-compose { display: flex; gap: 6px; padding: 8px; border-top: 1px solid #3b4962; }
 .chat-compose input { min-width: 0; flex: 1; padding: 9px 10px; border: 1px solid #45536d; border-radius: 9px; background: #0e131c; color: var(--text); font: inherit; font-size: 13px; }
 .chat-compose button { padding: 8px 10px; background: #3a6df0; font-size: 13px; }
-.chat-voice { white-space: nowrap; }
-.chat-voice.recording { background: #b33a3a; color: #fff; }
-.chat-msg audio { width: min(230px, 100%); height: 34px; }
 @media (orientation: landscape) {
   .chat-dock { right: 12px; bottom: 12px; }
   .chat-panel { max-height: min(70vh, 390px); }
@@ -191,10 +188,11 @@ body[data-theme="obsidian"] .cell.neutral { box-shadow: inset 0 3px 0 #e05268, i
 .fantasy-piece { filter: drop-shadow(0 2px 2px #0008); }
 
 /* Ajustes de legibilidade: o CSS original acima é preservado. */
-.piece-badge { position: absolute; right: 1px; top: 1px; z-index: 4; display: inline-flex; align-items: center; justify-content: center; width: max(13px, calc(var(--cs) * .24)); height: max(13px, calc(var(--cs) * .24)); border: 1px solid #fff; border-radius: 50%; color: #fff; font: 800 max(8px, calc(var(--cs) * .14))/1 system-ui, sans-serif; text-shadow: 0 1px 2px #000; box-shadow: 0 1px 3px #000b; pointer-events: none; }
-.piece-badge.attack { background: #d63d3d; }
-.piece-badge.defense { background: #2875d0; }
 .piece-attack { filter: drop-shadow(0 0 2px #e33) drop-shadow(0 2px 2px #0009); }
 .piece-defense { filter: drop-shadow(0 0 2px #3189ef) drop-shadow(0 2px 2px #0009); }
 .tour-final-card img { display: block; width: 100%; height: auto; margin: 8px auto; border: 1px solid #52617c; border-radius: 10px; background: #141b2b; }
 .button-like { display: block; width: 100%; padding: 10px; border-radius: 10px; background: #3a6df0; color: #fff; text-align: center; text-decoration: none; font-weight: 600; }
+.public-menu-button { min-height: 58px; font-size: 19px; letter-spacing: .2px; }
+.public-chat-page .public-hero { text-align: center; padding: 22px 14px; }
+.public-chat-page .public-hero h2 { margin: 0 0 8px; color: var(--accent); }
+.public-chat-page .public-hero .bigcode { font-size: 38px; margin: 6px 0 10px; }

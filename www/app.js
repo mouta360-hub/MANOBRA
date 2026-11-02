@@ -25,7 +25,7 @@
     net: 'bt',       // por onde o jogo remoto passa: 'bt' (Bluetooth) ou 'online' (internet)
     onlineCode: '',  // código digitado para entrar numa partida online
     tour: { role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false },
-    tourCode: '', directChat: { code: '', nick: '', connecting: false },
+    tourCode: '', directChat: { code: '', nick: '', connecting: false }, publicChat: { code: '', connected: false, host: false },
     tourInviteCode: '',
     me: { code: '', nick: '', av: 'fox' },
     ai: { nick: 'Rafael', av: 'eagle' },
@@ -55,7 +55,7 @@
     toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
   }
   const CHAT_QUICK = ['Boa partida!', 'Boa jogada!', 'Estou pensando.', 'Quase!', 'Vamos lá!', 'Parabéns!'];
-  function chatAllowed() { return (app.net === 'tour' && !!app.tour.role && ['tour', 'setup', 'game'].indexOf(app.screen) >= 0) || (app.net === 'direct' && app.screen === 'directChat' && app.btLinked) || (app.mode === 'bt' && app.screen === 'game' && app.btLinked && !app.game?.over); }
+  function chatAllowed() { return (app.net === 'tour' && !!app.tour.role && ['tour', 'setup', 'game'].indexOf(app.screen) >= 0) || (app.net === 'direct' && app.screen === 'directChat' && app.btLinked) || (app.net === 'public' && app.screen === 'publicChat' && app.publicChat.connected) || (app.mode === 'bt' && app.screen === 'game' && app.btLinked && !app.game?.over); }
   function chatClean(s) { return String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120); }
   function chatPush(text, mine, quick, nick, av) {
     const msg = { text: chatClean(text), mine: !!mine, quick: !!quick, nick: cleanNick(nick) || (mine ? myNick() : 'Participante'), av: AV[av] ? av : (mine ? app.me.av : ''), at: Date.now() };
@@ -112,7 +112,7 @@
     if (!chatAllowed()) return;
     const value = chatClean(text == null ? app.chat.draft : text);
     if (!value) return;
-    btSend({ k: 'chat', text: value, quick: !!quick, nick: myNick(), av: app.me.av });
+    btSend({ k: app.net === 'public' ? 'publicChat' : 'chat', text: value, quick: !!quick, nick: myNick(), av: app.me.av });
     chatPush(value, true, quick, myNick(), app.me.av); app.chat.draft = ''; render();
   }
   function chatScreen() {
@@ -126,10 +126,15 @@
         : '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<span>' + esc(m.text) + '</span></div>';
     }).join('') : '<p class="chat-empty">Envie uma mensagem curta para o grupo.</p>';
     const voiceLabel = app.chat.recording ? '⏹ ' + app.chat.seconds + 's' : '🎙️ Gravar';
-    return '<div class="chat-dock"><section class="chat-panel" aria-label="Chat do campeonato"><header class="chat-head"><b>Chat</b><button data-act="chatClose" aria-label="Fechar chat">×</button></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button><button class="chat-voice ' + (app.chat.recording ? 'recording' : '') + '" data-act="chatVoice" aria-label="Segure para gravar voz">' + voiceLabel + '</button></div></section></div>';
+    return '<div class="chat-dock"><section class="chat-panel" aria-label="Chat público"><header class="chat-head"><b>Chat</b><button data-act="chatClose" aria-label="Fechar chat">×</button></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button></div></section></div>';
   }
   function directChatScreen() {
     return '<div class="rules"><div class="topbar"><b>Conversa com ' + esc(app.directChat.nick || 'amigo') + '</b><button data-act="directChatBack">Voltar</button></div>' + (app.directChat.connecting ? '<div class="card"><p style="text-align:center;margin:0">Convite enviado. Aguardando seu amigo aceitar…</p></div>' : chatScreen()) + '</div>';
+  }
+  function publicChatScreen() {
+    if (!app.publicChat.connected) return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Voltar</button></div><div class="card public-hero"><h2>Chat público</h2><p>Converse com participantes e organize seu campeonato.</p><button class="primary" data-act="publicCreate">Criar sala pública</button><p class="muted">Ou entre com um código recebido:</p><input id="publicCode" class="codein" maxlength="6" placeholder="CÓDIGO"><button class="primary" data-act="publicJoin">Entrar no chat</button></div></div>';
+    const invites = app.publicChat.invites ? '<div class="card"><h3>Amigos online</h3>' + app.friends.filter(f => app.fstat[f.code] === 'online').map(f => '<div class="frow"><span>' + avHtml(f.av) + ' ' + esc(f.nick) + '</span><button data-act="publicInvite" data-v="' + esc(f.code) + '">Convidar</button></div>').join('') + '</div>' : '';
+    return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Sair</button></div><div class="card public-hero"><h2>Chat público</h2><p>Compartilhe este código para convidar pessoas:</p><div class="bigcode">' + esc(app.publicChat.code) + '</div><button data-act="publicInviteList">Convidar amigos</button></div>' + invites + chatScreen() + '</div>';
   }
   /* ---------- Sons (sintetizados no próprio app, sem arquivos) ---------- */
   const snd = { ctx: null, on: true };
@@ -197,11 +202,13 @@
     const body = dark ? '#26344c' : '#f6ead0', edge = dark ? '#8fb5e8' : '#a96b2d', shine = dark ? '#b9d8ff' : '#fff8e8';
     const sword = '<path d="M61 23l8-8 5 5-8 8 13 13-5 5-13-13-16 16-5-5 16-16-8-8 5-5z" fill="' + shine + '" stroke="' + edge + '" stroke-width="2"/><path d="M39 68h23" stroke="' + edge + '" stroke-width="5" stroke-linecap="round"/>';
     const shield = '<path d="M50 17l27 10v20c0 18-12 28-27 36-15-8-27-18-27-36V27z" fill="' + body + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 28v39M31 47h38" stroke="' + shine + '" stroke-width="4" opacity=".85"/>';
-    return '<svg class="pc fantasy-piece ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><defs><radialGradient id="g' + p + '"><stop stop-color="' + shine + '"/><stop offset="1" stop-color="' + body + '"/></radialGradient></defs><circle cx="50" cy="50" r="43" fill="url(#g' + p + ')" stroke="' + edge + '" stroke-width="4"/><circle cx="50" cy="34" r="9" fill="' + shine + '" stroke="' + edge + '" stroke-width="3"/>' + (attack ? sword : shield) + '</svg>';
+    return '<svg class="pc fantasy-piece ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><defs><radialGradient id="g' + p + '"><stop stop-color="' + shine + '"/><stop offset="1" stop-color="' + body + '"/></radialGradient></defs><circle cx="50" cy="50" r="43" fill="url(#g' + p + ')" stroke="' + edge + '" stroke-width="4"/>' + (attack ? sword : shield) + '</svg>';
   }
   function obsidianPiece(p) {
     const attack = E.isAttack(p), dark = E.sideOf(p) === BLACK, fill = dark ? '#101722' : '#f1f4ff', edge = dark ? '#72b8d8' : '#5967d9';
-    return '<svg class="pc ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><path d="M50 5l38 22v46L50 95 12 73V27z" fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 15v70M18 31l64 38M82 31L18 69" stroke="' + edge + '" stroke-width="2" opacity=".65"/><circle cx="50" cy="50" r="' + (attack ? 17 : 10) + '" fill="' + edge + '"/><path d="M42 50h16" stroke="' + fill + '" stroke-width="4"/></svg>';
+    const sword = '<path d="M57 26l9-9 7 7-9 9 15 15-7 7-15-15-18 18-7-7 18-18-9-9 7-7z" fill="' + (dark ? '#f3b5c4' : '#e6f7ff') + '" stroke="' + edge + '" stroke-width="3"/><path d="M37 73h28" stroke="' + edge + '" stroke-width="7" stroke-linecap="round"/>';
+    const shield = '<path d="M50 16l29 11v22c0 19-13 31-29 39-16-8-29-20-29-39V27z" fill="' + (dark ? '#284c70' : '#d9e7ff') + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 28v45M30 49h40" stroke="' + (dark ? '#b7eaff' : '#5368d8') + '" stroke-width="5" stroke-linecap="round"/>';
+    return '<svg class="pc ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><path d="M50 5l38 22v46L50 95 12 73V27z" fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/>' + (attack ? sword : shield) + '</svg>';
   }
   function pieceSvg(p) {
     const o = '<svg class="pc ' + (E.isAttack(p) ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100">';
@@ -209,10 +216,10 @@
     if (app.theme === 'fantasy') return fantasyPiece(p);
     if (app.theme === 'obsidian') return obsidianPiece(p);
     switch (p) {
-      case WD: return o + '<circle cx="50" cy="50" r="40" fill="#fff" stroke="#8d96a8" stroke-width="4"/></svg>';
-      case WA: return o + '<circle cx="50" cy="50" r="42" fill="#fff" stroke="#1a2433" stroke-width="5"/><circle cx="50" cy="50" r="22" fill="#111"/></svg>';
-      case BD: return o + '<circle cx="50" cy="50" r="40" fill="#0b0d12" stroke="#aab4c6" stroke-width="5"/></svg>';
-      case BA: return o + '<circle cx="50" cy="50" r="36" fill="#fff" stroke="#0b0d12" stroke-width="16"/><circle cx="50" cy="50" r="46" fill="none" stroke="#aab4c6" stroke-width="3"/></svg>';
+      case WD: return o + '<circle cx="50" cy="50" r="40" fill="#fff" stroke="#8d96a8" stroke-width="4"/><path d="M50 22v56M22 50h56" stroke="#3d6fc4" stroke-width="6" stroke-linecap="round"/></svg>';
+      case WA: return o + '<circle cx="50" cy="50" r="42" fill="#fff" stroke="#1a2433" stroke-width="5"/><path d="M58 25l10-10 7 7-10 10 14 14-7 7-14-14-18 18-7-7 18-18-10-10 7-7z" fill="#d43f48" stroke="#7b1823" stroke-width="3"/><path d="M35 73h29" stroke="#7b1823" stroke-width="6" stroke-linecap="round"/></svg>';
+      case BD: return o + '<circle cx="50" cy="50" r="40" fill="#0b0d12" stroke="#aab4c6" stroke-width="5"/><path d="M50 20l25 10v20c0 16-11 25-25 32-14-7-25-16-25-32V30z" fill="#24558b" stroke="#91d5ff" stroke-width="4"/><path d="M50 32v35M35 49h30" stroke="#d9f4ff" stroke-width="4" stroke-linecap="round"/></svg>';
+      case BA: return o + '<circle cx="50" cy="50" r="36" fill="#fff" stroke="#0b0d12" stroke-width="16"/><path d="M58 25l10-10 7 7-10 10 14 14-7 7-14-14-18 18-7-7 18-18-10-10 7-7z" fill="#d43f48" stroke="#7b1823" stroke-width="3"/><path d="M35 73h29" stroke="#7b1823" stroke-width="6" stroke-linecap="round"/></svg>';
     }
     return '';
   }
@@ -246,9 +253,8 @@
           if (marks.dest && marks.dest.has(i)) cls += ' ' + marks.dest.get(i);
         }
         const piece = arr[i];
-        const badge = piece ? '<b class="piece-badge ' + (E.isAttack(piece) ? 'attack' : 'defense') + '" aria-label="' + (E.isAttack(piece) ? 'Ataque' : 'Defesa') + '">' + (E.isAttack(piece) ? 'A' : 'D') + '</b>' : '';
         h += '<div class="' + cls + '"' + (dark ? ' data-i="' + i + '"' : '') + '>' +
-          (E.isMain(i) ? '<i class="mainsq"></i>' : '') + pieceSvg(piece) + badge + '</div>';
+          (E.isMain(i) ? '<i class="mainsq"></i>' : '') + pieceSvg(piece) + '</div>';
       }
     }
     return h + '</div>';
@@ -316,6 +322,7 @@
       '<button class="primary" data-act="startAI">Jogar contra a IA</button></div>' +
       '<div class="card"><h3>Dois jogadores</h3><button class="primary" data-act="startPVP">Jogar no mesmo celular</button>' +
       '<label class="chk"><input type="checkbox" id="rot" ' + (app.rotate ? 'checked' : '') + '> Girar o tabuleiro a cada vez</label></div>' +
+      '<div class="card"><h3>Chat público</h3><button class="primary public-menu-button" data-act="publicOpen">Entrar no chat público</button><p class="muted" style="margin:8px 0 0;text-align:center">Converse com outras pessoas e organize campeonatos.</p></div>' +
       '<div class="card"><h3>Dois celulares</h3><button class="primary" data-act="btOpen">Jogar por Bluetooth</button>' +
       '<button class="primary" style="margin-top:8px" data-act="onOpen">Jogar online (pela internet)</button>' +
       '<button class="primary" style="margin-top:8px" data-act="frOpen">Amigos e convites</button>' +
@@ -588,7 +595,6 @@
     const canInv = app.fr.state !== 'inviting' && st !== 'offline' && st !== 'match' && st !== 'tour' && st !== 'chat';
     return '<div class="frow"><div class="fwho">' + avHtml(fr.av) + '<div><b>' + esc(fr.nick) + '</b><br>' +
       '<span class="muted"><i class="dot ' + (st || 'wait') + '" data-st="' + esc(fr.code) + '"></i><span data-stt="' + esc(fr.code) + '">' + statusTxt(fr.code) + '</span> · ' + esc(fr.code) + '</span></div></div><div>' +
-      '<button data-act="frChat" data-v="' + esc(fr.code) + '"' + (st === 'online' ? '' : ' disabled') + '>Conversar</button>' +
       '<button data-act="frInvite" data-inv="' + esc(fr.code) + '" data-v="' + esc(fr.code) + '"' + (canInv ? '' : ' disabled') + '>Chamar</button>' +
       '<button data-act="frRemove" data-v="' + esc(fr.code) + '">Remover</button></div></div>';
   }
@@ -629,9 +635,10 @@
     const known = app.friends.some(x => x.code === i.code);
     const isTour = i.kind === 'tour';
     const isChat = i.kind === 'chat';
+    const isPublic = i.kind === 'public';
     box.innerHTML = '<div class="overlay center"><div class="sheet">' + '<div style="font-size:54px;line-height:1">' + avOf(i.av) + '</div>' +
-      '<h2>' + esc(i.nick) + (isTour ? ' convidou você para um campeonato' : (isChat ? ' quer conversar com você' : ' chamou você para jogar')) + '</h2>' +
-      '<p>' + (isTour ? 'Código do campeonato: ' + esc(i.tourCode || '?') : (isChat ? 'Aceite para abrir uma conversa privada.' : 'Código ' + esc(i.code) + (known ? ' (seu amigo)' : ' (não está na sua lista)') + '. Você joga de Pretas.')) + '</p>' +
+      '<h2>' + esc(i.nick) + (isTour ? ' convidou você para um campeonato' : (isChat ? ' quer conversar com você' : (isPublic ? ' convidou você para o chat público' : ' chamou você para jogar'))) + '</h2>' +
+      '<p>' + (isTour ? 'Código do campeonato: ' + esc(i.tourCode || '?') : (isChat ? 'Aceite para abrir uma conversa privada.' : (isPublic ? 'Aceite para entrar na sala pública.' : 'Código ' + esc(i.code) + (known ? ' (seu amigo)' : ' (não está na sua lista)') + '. Você joga de Pretas.'))) + '</p>' +
       '<button class="primary" data-act="frAccept">Aceitar</button><button data-act="frDecline">Recusar</button></div></div>';
   }
   // Atualiza só as bolinhas e botões (sem redesenhar a tela, para não atrapalhar quem está digitando)
@@ -884,6 +891,7 @@
     else if (app.screen === 'tour') root.innerHTML = tourScreen();
     else if (app.screen === 'friends') root.innerHTML = friendsScreen();
     else if (app.screen === 'directChat') root.innerHTML = directChatScreen();
+    else if (app.screen === 'publicChat') root.innerHTML = publicChatScreen();
     else if (app.screen === 'rules') root.innerHTML = rulesScreen();
     else if (app.screen === 'online') root.innerHTML = onlineScreen();
     else if (app.screen === 'bt') root.innerHTML = btScreen();
@@ -1127,6 +1135,7 @@
   function btPlugin() {
     if (app.net === 'tour') return tourTransport;
     if (app.net === 'direct') return window.ManobraOnline || null;
+    if (app.net === 'public') return window.ManobraOnline || null;
     return app.net === 'online' ? (window.ManobraOnline || null) : nativeBt();
   }
   function errMsg(e) {
@@ -1152,6 +1161,7 @@
     attachedPlugins.push(p);
     p.addListener('connected', ev => btConnected((ev && ev.role) || (app.bt.stage === 'connecting' ? 'guest' : 'host'), ev && ev.name));
     p.addListener('chatConnected', ev => directChatConnected(ev && ev.name));
+    p.addListener('publicMessage', ev => handlePublicMessage(ev && ev.data));
     p.addListener('message', ev => handleBtMessage(ev && ev.data));
     p.addListener('disconnected', () => btDisconnected());
     if (p === window.ManobraOnline) { // convites de amigos (só existem no modo online)
@@ -1162,7 +1172,8 @@
   }
   function btSend(obj) {
     const p = btPlugin();
-    if (!p || (!app.btLinked && app.net !== 'tour' && app.net !== 'direct')) return;
+    if (!p || (!app.btLinked && app.net !== 'tour' && app.net !== 'direct' && app.net !== 'public')) return;
+    if (app.net === 'public') { Promise.resolve(p.publicSend(obj)).catch(() => {}); return; }
     try { Promise.resolve(p.send({ data: JSON.stringify(obj) })).catch(() => {}); } catch (e) { /* ok */ }
   }
   function btLeave() {
@@ -1494,7 +1505,7 @@
       toast(nick + ' tentou chamar você, mas você está ocupado.');
       return;
     }
-    app.inv = { nick: nick, code: cleanCode6(ev.code), av: AV[ev.av] ? ev.av : '', kind: ev.kind === 'tour' ? 'tour' : (ev.kind === 'chat' ? 'chat' : 'game'), tourCode: String(ev.tourCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) };
+    app.inv = { nick: nick, code: cleanCode6(ev.code), av: AV[ev.av] ? ev.av : '', kind: ev.kind === 'tour' ? 'tour' : (ev.kind === 'chat' ? 'chat' : (ev.kind === 'public' ? 'public' : 'game')), tourCode: String(ev.tourCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) };
     sfx('f', 0);
     renderInvite();
   }
@@ -1567,6 +1578,28 @@
     btAttach(p); render();
     try { await p.invite({ kind: 'chat', code: friend.code, from: app.me.code, nick: myNick(), friendNick: friend.nick, av: app.me.av }); }
     catch (e) { if (app.screen === 'directChat') { toast(errMsg(e)); app.screen = 'friends'; app.net = 'online'; app.directChat.connecting = false; render(); } }
+  }
+
+  function publicMessage(o) {
+    if (!o || o.k !== 'publicChat') return;
+    chatPush(o.text, false, !!o.quick, o.nick, o.av); render();
+  }
+  function handlePublicMessage(line) { try { publicMessage(JSON.parse(line)); } catch (e) {} }
+  async function publicCreate() {
+    const p = window.ManobraOnline; if (!p) return;
+    app.net = 'public'; app.screen = 'publicChat'; app.publicChat = { code: '', connected: false, host: true }; app.chat = { open: true, draft: '', unread: 0, messages: [], muted: false, recording: false, recorder: null, chunks: [], stream: null, timer: null, seconds: 0 }; btAttach(p); render();
+    try { const r = await p.publicListen(); app.publicChat.code = r.code; app.publicChat.connected = true; render(); } catch (e) { toast(errMsg(e)); app.net = 'bt'; app.screen = 'menu'; render(); }
+  }
+  async function publicJoin() {
+    const code = ($('#publicCode') && $('#publicCode').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const p = window.ManobraOnline; if (!p || code.length !== 6) { toast('Digite o código de 6 caracteres.'); return; }
+    app.net = 'public'; app.screen = 'publicChat'; app.publicChat = { code: code, connected: false, host: false }; app.chat = { open: true, draft: '', unread: 0, messages: [], muted: false, recording: false, recorder: null, chunks: [], stream: null, timer: null, seconds: 0 }; btAttach(p); render();
+    try { await p.publicJoin(code, myNick(), app.me.av); app.publicChat.connected = true; render(); } catch (e) { toast(errMsg(e)); app.net = 'bt'; app.screen = 'menu'; render(); }
+  }
+  async function publicInviteFriend(code) {
+    const p = window.ManobraOnline, fr = app.friends.find(x => x.code === code);
+    if (!p || !fr || !app.publicChat.code) return;
+    try { await p.invite({ kind: 'public', tournamentCode: app.publicChat.code, code: fr.code, from: app.me.code, nick: myNick(), friendNick: fr.nick, av: app.me.av }); toast(fr.nick + ' foi convidado para o chat público.'); } catch (e) { toast(errMsg(e)); }
   }
 
   /* ---------- Campeonato: ligação com a partida ---------- */
@@ -1788,11 +1821,17 @@
     if (act === 'chatSend') { chatSend(); return; }
     if (act === 'chatQuick') { const q = CHAT_QUICK[+v]; if (q) chatSend(q, true); return; }
     if (act === 'chatVoice') { return; }
+    if (act === 'publicChatBack') { const p = window.ManobraOnline; if (p && p.publicClose) p.publicClose(); app.publicChat = { code: '', connected: false, host: false }; app.net = 'bt'; app.screen = 'menu'; render(); return; }
+    if (act === 'publicCreate') { publicCreate(); return; }
+    if (act === 'publicJoin') { publicJoin(); return; }
+    if (act === 'publicInvite') { publicInviteFriend(v); return; }
+    if (act === 'publicInviteList') { app.publicChat.invites = true; render(); return; }
     if (act === 'directChatBack') { btLeave(); app.net = 'online'; app.screen = 'friends'; render(); presenceStart(); pollFriends(++pollGen); return; }
     switch (act) {
       case 'side': app.humanSide = +v; render(); break;
       case 'level': app.level = v; render(); break;
       case 'rules': app.screen = 'rules'; render(); break;
+      case 'publicOpen': app.net = 'public'; app.screen = 'publicChat'; app.publicChat = { code: '', connected: false, host: false }; render(); break;
       case 'menu':
         if (app.net === 'tour' && app.mode === 'bt' && (app.screen === 'game' || app.screen === 'setup')) { tourLeaveMatch(); break; }
         if (app.mode === 'bt') btLeave();
@@ -1887,6 +1926,12 @@
           Promise.resolve(p.acceptInvite()).catch(e => toast(errMsg(e)));
           break;
         }
+        if (app.inv.kind === 'public') {
+          const invite = app.inv; app.inv = null; renderInvite();
+          app.net = 'public'; app.screen = 'publicChat'; app.publicChat = { code: invite.tourCode, connected: false, host: false }; app.chat.open = true; btAttach(p); render();
+          Promise.resolve(p.acceptInvite()).then(() => p.publicJoin(invite.tourCode, myNick(), app.me.av)).then(() => { app.publicChat.connected = true; render(); }).catch(e => toast(errMsg(e)));
+          break;
+        }
         if (app.inv.kind === 'tour') {
           const invite = app.inv; app.inv = null; renderInvite();
           Promise.resolve(p.acceptInvite()).then(r => {
@@ -1929,20 +1974,6 @@
   document.addEventListener('change', e => {
     if (e.target && e.target.id === 'rot') app.rotate = e.target.checked;
   });
-  document.addEventListener('pointerdown', e => {
-    const el = e.target.closest && e.target.closest('[data-act="chatVoice"]');
-    if (!el || !chatAllowed() || app.chat.recording) return;
-    e.preventDefault(); app.chat.hold = true; chatVoiceStart();
-  });
-  document.addEventListener('pointerup', e => {
-    if (!app.chat.hold) return;
-    app.chat.hold = false;
-    if (app.chat.recording) chatVoiceStop();
-  });
-  document.addEventListener('pointercancel', () => {
-    if (app.chat.hold) { app.chat.hold = false; if (app.chat.recording) chatVoiceStop(); }
-  });
-
   function startSetup(mode) {
     app.mode = mode;
     app.pieces.fill(0);

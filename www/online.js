@@ -17,6 +17,7 @@
 
   const handlers = {};
   let peer = null, conn = null, closing = false, loading = null;
+  let publicPeer = null, publicRoom = "", publicConnections = [];
 
   function emit(ev, data) {
     (handlers[ev] || []).slice().forEach(function (f) {
@@ -57,6 +58,8 @@
     }
     return out;
   }
+
+  function publicCode() { let s = ''; for (let i = 0; i < 6; i++) s += ALPHABET[Math.floor(Math.random() * ALPHABET.length)]; return s; }
 
   function cleanup() {
     closing = true;
@@ -180,7 +183,62 @@
     },
 
     close: function () { cleanup(); return Promise.resolve(); },
-
+    publicListen: function () {
+      return loadLib().then(function () {
+        api.publicClose();
+        return new Promise(function (resolve, reject) {
+          const code = publicCode();
+          const p = new root.Peer(PREFIX + 'public-' + code);
+          publicPeer = p; publicRoom = code;
+          const timer = setTimeout(function () { try { p.destroy(); } catch (e) {} reject(new Error('Não consegui criar o chat público.')); }, 20000);
+          p.on('open', function () { clearTimeout(timer); resolve({ code: code }); });
+          p.on('connection', function (c) {
+            publicConnections.push(c);
+            c.on('data', function (d) {
+              let o; try { o = JSON.parse(d); } catch (e) { return; }
+              if (o && o.k === 'publicChat') {
+                publicConnections.forEach(function (x) { if (x !== c && x.open) try { x.send(JSON.stringify(o)); } catch (e) {} });
+                emit('publicMessage', { data: JSON.stringify(o) });
+              }
+            });
+            c.on('close', function () { publicConnections = publicConnections.filter(function (x) { return x !== c; }); });
+          });
+          p.on('error', function () {});
+        });
+      });
+    },
+    publicJoin: function (code, nick, av) {
+      code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (code.length !== 6) return Promise.reject(new Error('O código público precisa ter 6 caracteres.'));
+      return loadLib().then(function () {
+        api.publicClose();
+        return new Promise(function (resolve, reject) {
+          const p = new root.Peer(); publicPeer = p; publicRoom = code;
+          const timer = setTimeout(function () { try { p.destroy(); } catch (e) {} reject(new Error('Chat público não encontrado.')); }, 20000);
+          p.on('open', function () {
+            const c = p.connect(PREFIX + 'public-' + code, { reliable: true });
+            c.on('open', function () {
+              clearTimeout(timer); publicConnections = [c];
+              c.send(JSON.stringify({ k: 'publicHello', nick: cleanText(nick, 16), av: cleanAv(av) }));
+              c.on('data', function (d) { emit('publicMessage', { data: typeof d === 'string' ? d : String(d) }); });
+              emit('publicConnected', {}); resolve({ code: code });
+            });
+            c.on('error', function () { reject(new Error('Não foi possível entrar no chat público.')); });
+          });
+        });
+      });
+    },
+    publicSend: function (obj) {
+      const d = JSON.stringify(obj);
+      publicConnections.forEach(function (c) { if (c.open) try { c.send(d); } catch (e) {} });
+      return Promise.resolve();
+    },
+    publicClose: function () {
+      publicConnections.forEach(function (c) { try { c.close(); } catch (e) {} });
+      publicConnections = [];
+      if (publicPeer) { try { publicPeer.destroy(); } catch (e) {} }
+      publicPeer = null; publicRoom = '';
+    },
     addListener: function (ev, fn) {
       (handlers[ev] = handlers[ev] || []).push(fn);
       return Promise.resolve({ remove: function () { handlers[ev] = (handlers[ev] || []).filter(function (f) { return f !== fn; }); } });
@@ -226,7 +284,7 @@
         setTimeout(function () { try { c.close(); } catch (e) { /* ok */ } }, 400);
         return;
       }
-      if (!o || (o.k !== 'invite' && o.k !== 'tourInvite' && o.k !== 'chatInvite')) return;
+      if (!o || (o.k !== 'invite' && o.k !== 'tourInvite' && o.k !== 'chatInvite' && o.k !== 'publicInvite')) return;
       if (st.pending) { // já tem um convite na tela: recusa o novo
         try { c.send(JSON.stringify({ k: 'decline', why: 'busy' })); } catch (e) { /* ok */ }
         setTimeout(function () { try { c.close(); } catch (e) { /* ok */ } }, 300);
@@ -234,7 +292,7 @@
       }
       const from = cleanCode(o.code);
       if (from.length !== 6) return;
-      st.pending = { conn: c, nick: cleanText(o.nick, 16) || from, from: from, av: cleanAv(o.av), kind: o.k === 'tourInvite' ? 'tour' : (o.k === 'chatInvite' ? 'chat' : 'game'), tourCode: cleanCode(o.tourCode).slice(0, 4), adopt: function () { adopted = true; } };
+      st.pending = { conn: c, nick: cleanText(o.nick, 16) || from, from: from, av: cleanAv(o.av), kind: o.k === 'tourInvite' ? 'tour' : (o.k === 'chatInvite' ? 'chat' : (o.k === 'publicInvite' ? 'public' : 'game')), tourCode: cleanCode(o.tourCode), adopt: function () { adopted = true; } };
       emit('invite', { nick: st.pending.nick, code: from, av: st.pending.av, kind: st.pending.kind, tourCode: st.pending.tourCode });
     });
     c.on('close', function () {
@@ -302,6 +360,10 @@
       pnd.adopt(); closing = false; attach(c);
       emit('chatConnected', { name: pnd.nick, address: pnd.from, role: 'guest' });
       return Promise.resolve({ name: pnd.nick, code: pnd.from, chat: true });
+    }
+    if (pnd.kind === 'public') {
+      try { c.send(JSON.stringify({ k: 'publicAccept' })); c.close(); } catch (e) { return Promise.reject(new Error('Falha ao aceitar o convite público.')); }
+      return Promise.resolve({ name: pnd.nick, code: pnd.from, public: true, roomCode: pnd.tourCode });
     }
     try { c.send(JSON.stringify({ k: 'accept' })); } catch (e) { return Promise.reject(new Error('Falha ao aceitar o convite.')); }
     pnd.adopt();
@@ -388,6 +450,7 @@
     const av = cleanAv(opts && opts.av);
     const tour = opts && opts.kind === 'tour';
     const chat = opts && opts.kind === 'chat';
+    const pub = opts && opts.kind === 'public';
     const tourCode = cleanCode(opts && opts.tournamentCode).slice(0, 4);
     if (code.length !== 6 || from.length !== 6) return Promise.reject(new Error('Código do amigo inválido.'));
     return loadLib().then(function () {
@@ -413,7 +476,7 @@
           if (done) return;
           c = p.connect(UPREFIX + code, { reliable: true });
           c.on('open', function () {
-            try { c.send(JSON.stringify({ k: tour ? 'tourInvite' : (chat ? 'chatInvite' : 'invite'), nick: nick, code: from, av: av, tourCode: tourCode })); }
+            try { c.send(JSON.stringify({ k: tour ? 'tourInvite' : (chat ? 'chatInvite' : (pub ? 'publicInvite' : 'invite')), nick: nick, code: from, av: av, tourCode: tourCode })); }
             catch (e) { fail('Não foi possível enviar o convite.'); }
           });
           c.on('data', function (d) {
@@ -421,11 +484,12 @@
             let o;
             try { o = JSON.parse(d); } catch (e) { return; }
             if (!o || done) return;
-            if (o.k === (tour ? 'tourAccept' : (chat ? 'chatAccept' : 'accept'))) {
+            if (o.k === (tour ? 'tourAccept' : (chat ? 'chatAccept' : (pub ? 'publicAccept' : 'accept')))) {
               done = true; adopted = true; clearTimeout(timer);
               invitation = null;
               if (tour) { adopted = false; try { c.close(); } catch (e) { /* ok */ } resolve({ name: friendNick, code: code, tourCode: tourCode, tour: true }); return; }
               if (chat) { if (peer && peer !== p) { try { peer.destroy(); } catch (e) { /* ok */ } } peer = p; closing = false; attach(c); emit('chatConnected', { name: friendNick, address: code, role: 'host' }); resolve({ name: friendNick, code: code, chat: true }); return; }
+              if (pub) { adopted = false; try { c.close(); } catch (e) {} resolve({ name: friendNick, code: code, public: true, roomCode: tourCode }); return; }
               if (peer && peer !== p) { try { peer.destroy(); } catch (e) { /* ok */ } }
               peer = p;
               closing = false;
