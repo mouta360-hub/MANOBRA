@@ -22,6 +22,7 @@
   let promoting = false;
   let tournamentCode = '';
   let lossTimer = null;
+  let localId = null;
 
   function emit(ev, data) {
     (handlers[ev] || []).slice().forEach(function (f) { try { f(data); } catch (e) { /* ok */ } });
@@ -78,7 +79,7 @@
   function reset() {
     closing = true;
     const hp = hostPeer, cl = client, cs = conns;
-    role = null; hub = null; hostPeer = null; client = null; conns = {}; localOnly = false; lastState = null; promoting = false; tournamentCode = ''; if (lossTimer) { clearTimeout(lossTimer); lossTimer = null; }
+    role = null; hub = null; hostPeer = null; client = null; conns = {}; localOnly = false; lastState = null; promoting = false; tournamentCode = ''; localId = null; if (lossTimer) { clearTimeout(lossTimer); lossTimer = null; }
     if (simWorker) { simWorker.terminate(); simWorker = null; }
     Object.keys(cs).forEach(function (k) { try { cs[k].close(); } catch (e) { /* ok */ } });
     try { if (hp) hp.destroy(); } catch (e) { /* ok */ }
@@ -92,6 +93,7 @@
     if (!p || p.__manobraGuestHook) return;
     p.__manobraGuestHook = true;
     p.on('connection', function (c) {
+      if (role === 'host' && hub) { onGuest(hub, c); return; }
       c.on('data', function (raw) {
         let o; try { o = JSON.parse(raw); } catch (e) { return; }
         if (!o || typeof o !== 'object') return;
@@ -106,18 +108,18 @@
     if (promoting || role !== 'guest' || !lastState || !lastState.x || !client || !client.peer) return false;
     const snap = lastState.s || {}, pid = client.pid, mine = (snap.players || []).find(p => p.pid === String(pid));
     if (!mine || mine.bot || mine.eliminated) return false;
-    const order = snap.reserveOrder || (snap.players || []).filter(p => !p.bot && !p.eliminated).map(p => p.id);
+    const order = snap.reserveOrder || (snap.players || []).filter(p => !p.bot && !p.eliminated && p.connected).map(p => p.id);
     if (order[0] !== mine.id) return false;
     promoting = true;
     const E = root.ManobraEngine, T = root.ManobraTournament, peer = client.peer, myId = mine.id;
     const h = new T.Hub({ engine: E, simWorker: simWorker, send: function (id, obj) {
-      if (id === myId) { later(function () { emit('msg', obj); }); return; }
+      if (id === localId) { later(function () { emit('msg', obj); }); return; }
       const c = conns[id];
       if (c && c.open !== false) { try { c.send(JSON.stringify(obj.k === 'state' ? Object.assign({}, obj, { x: h.exportState(), epoch: h.epoch }) : obj)); } catch (e) {} }
     }});
     if (!h.importState(lastState.x) || !h.promote(myId, peer.id || '')) { promoting = false; return false; }
     h.players.forEach(p => { if (p.id === myId) { p.connected = true; p.peer = peer.id || p.peer; } });
-    role = 'host'; hub = h; hostPeer = peer; client = null; conns = {};
+    role = 'host'; hub = h; hostPeer = peer; client = null; conns = {}; localId = myId;
     installPeerForGuest(peer);
     h.players.forEach(p => {
       if (p.bot || p.id === myId || p.eliminated || !p.peer) return;
@@ -187,13 +189,14 @@
           moveGrace: root.__manobraMoveGrace,
           moveTimeout: root.__manobraMoveMs, // idem (indefinido = 1min30 por jogada)
           send: function (id, obj) {
-            if (id === 0) { later(function () { emit('msg', obj); }); return; }
+            if (id === localId) { later(function () { emit('msg', obj); }); return; }
             const c = conns[id];
             if (c && c.open !== false) { try { c.send(JSON.stringify(obj.k === 'state' ? Object.assign({}, obj, { x: h.exportState ? h.exportState() : null, epoch: h.epoch || 1 }) : obj)); } catch (e) { /* ok */ } }
           }
         });
         hub = h;
         role = 'host';
+        localId = 0;
         localOnly = !!opts.local;
         if (opts.restore) {
           if (!h.importState(opts.restore)) throw new Error('O campeonato salvo está inválido ou corrompido.');
@@ -283,7 +286,7 @@
               let o;
               try { o = JSON.parse(d); } catch (e) { return; }
               if (!o || typeof o !== 'object') return;
-              if (o.k === 'joined' && !done) { done = true; joined = true; clearTimeout(timer); resolve({ you: o.you }); return; }
+              if (o.k === 'joined' && !done) { done = true; joined = true; localId = o.you; clearTimeout(timer); resolve({ you: o.you }); return; }
               if (o.k === 'rejected' && !done) { fail(o.why || 'O organizador não aceitou a sua entrada.'); return; }
               if (joined) { if (o.k === 'state') lastState = o; emit('msg', o); }
             });
@@ -298,7 +301,7 @@
     send: function (obj) {
       if (role === 'host') {
         const h = hub;
-        later(function () { if (h && hub === h) h.handle(0, obj); });
+        later(function () { if (h && hub === h) h.handle(localId == null ? h.judgeId : localId, obj); });
       } else if (role === 'guest' && client && client.conn && client.conn.open !== false) {
         try { client.conn.send(JSON.stringify(obj)); } catch (e) { /* ok */ }
       }

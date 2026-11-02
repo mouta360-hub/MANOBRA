@@ -269,7 +269,7 @@
       return {
         status: this.status, format: this.format, rounds: this.rounds, champion: this.champion, botLevel: this.botLevel,
         judge: { id: this.judgeId, peer: this.judgePeer, epoch: this.epoch },
-        reserveOrder: this.players.filter(p => !p.bot && !p.eliminated && p.id !== this.judgeId && p.id !== this.originalJudgeId).map(p => p.id),
+        reserveOrder: this.players.filter(p => !p.bot && !p.eliminated && p.connected && p.id !== this.judgeId && p.id !== this.originalJudgeId).map(p => p.id),
         players: this.players.map(p => ({ id: p.id, pid: p.pid, nick: p.nick, av: p.av || '', peer: p.peer || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
