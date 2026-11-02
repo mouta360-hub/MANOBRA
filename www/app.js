@@ -25,7 +25,7 @@
     net: 'bt',       // por onde o jogo remoto passa: 'bt' (Bluetooth) ou 'online' (internet)
     onlineCode: '',  // código digitado para entrar numa partida online
     tour: { role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false },
-    tourCode: '',
+    tourCode: '', directChat: { code: '', nick: '', connecting: false },
     tourInviteCode: '',
     me: { code: '', nick: '', av: 'fox' },
     ai: { nick: 'Rafael', av: 'eagle' },
@@ -55,18 +55,18 @@
     toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
   }
   const CHAT_QUICK = ['Boa partida!', 'Boa jogada!', 'Estou pensando.', 'Quase!', 'Vamos lá!', 'Parabéns!'];
-  function chatAllowed() { return (app.net === 'tour' && !!app.tour.role && ['tour', 'setup', 'game'].indexOf(app.screen) >= 0) || (app.mode === 'bt' && app.screen === 'game' && app.btLinked && !app.game?.over); }
+  function chatAllowed() { return (app.net === 'tour' && !!app.tour.role && ['tour', 'setup', 'game'].indexOf(app.screen) >= 0) || (app.net === 'direct' && app.screen === 'directChat' && app.btLinked) || (app.mode === 'bt' && app.screen === 'game' && app.btLinked && !app.game?.over); }
   function chatClean(s) { return String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120); }
-  function chatPush(text, mine, quick) {
-    const msg = { text: chatClean(text), mine: !!mine, quick: !!quick, at: Date.now() };
+  function chatPush(text, mine, quick, nick, av) {
+    const msg = { text: chatClean(text), mine: !!mine, quick: !!quick, nick: cleanNick(nick) || (mine ? myNick() : 'Participante'), av: AV[av] ? av : (mine ? app.me.av : ''), at: Date.now() };
     if (!msg.text) return;
     app.chat.messages.push(msg);
     if (app.chat.messages.length > 30) app.chat.messages.splice(0, app.chat.messages.length - 30);
     if (!mine && !app.chat.open) app.chat.unread++;
   }
-  function chatPushVoice(data, mine) {
+  function chatPushVoice(data, mine, nick, av) {
     if (!data || typeof data !== 'string' || data.length > 500000) return;
-    app.chat.messages.push({ voice: data, mine: !!mine, at: Date.now() });
+    app.chat.messages.push({ voice: data, mine: !!mine, nick: cleanNick(nick) || (mine ? myNick() : 'Participante'), av: AV[av] ? av : (mine ? app.me.av : ''), at: Date.now() });
     if (app.chat.messages.length > 30) app.chat.messages.splice(0, app.chat.messages.length - 30);
     if (!mine && !app.chat.open) app.chat.unread++;
   }
@@ -98,19 +98,25 @@
     if (!chatAllowed()) return;
     const value = chatClean(text == null ? app.chat.draft : text);
     if (!value) return;
-    btSend({ k: 'chat', text: value, quick: !!quick });
-    chatPush(value, true, quick); app.chat.draft = ''; render();
+    btSend({ k: 'chat', text: value, quick: !!quick, nick: myNick(), av: app.me.av });
+    chatPush(value, true, quick, myNick(), app.me.av); app.chat.draft = ''; render();
   }
   function chatScreen() {
     if (!chatAllowed()) return '';
     const unread = app.chat.unread ? '<b class="chat-unread">' + app.chat.unread + '</b>' : '';
     if (!app.chat.open) return '<div class="chat-dock closed"><button class="chat-fab" data-act="chatOpen" aria-label="Abrir chat">💬' + unread + '</button></div>';
-    const rows = app.chat.messages.length ? app.chat.messages.map(m => m.voice
-      ? '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '"><audio ' + (app.chat.muted ? 'muted ' : '') + 'controls preload="none" src="' + esc(m.voice) + '"></audio></div>'
-      : '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '"><span>' + esc(m.text) + '</span></div>').join('') : '<p class="chat-empty">Envie uma mensagem curta para o grupo.</p>';
+    const rows = app.chat.messages.length ? app.chat.messages.map(m => {
+      const author = '<div class="chat-author">' + avHtml(m.av) + '<b>' + esc(m.mine ? 'Você' : (m.nick || 'Participante')) + '</b></div>';
+      return m.voice
+        ? '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<audio ' + (app.chat.muted ? 'muted ' : '') + 'controls preload="none" src="' + esc(m.voice) + '"></audio></div>'
+        : '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<span>' + esc(m.text) + '</span></div>';
+    }).join('') : '<p class="chat-empty">Envie uma mensagem curta para o grupo.</p>';
     const voiceLabel = app.chat.recording ? '⏹ ' + app.chat.seconds + 's' : '🎙️ Gravar';
     const muteLabel = app.chat.muted ? '🔇 Mudo' : '🔊 Som';
     return '<div class="chat-dock"><section class="chat-panel" aria-label="Chat do campeonato"><header class="chat-head"><b>Chat</b><div><button data-act="chatMute" aria-label="Silenciar chat">' + muteLabel + '</button><button data-act="chatClose" aria-label="Fechar chat">×</button></div></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button><button class="chat-voice ' + (app.chat.recording ? 'recording' : '') + '" data-act="chatVoice" aria-label="Gravar voz">' + voiceLabel + '</button></div></section></div>';
+  }
+  function directChatScreen() {
+    return '<div class="rules"><div class="topbar"><b>Conversa com ' + esc(app.directChat.nick || 'amigo') + '</b><button data-act="directChatBack">Voltar</button></div>' + (app.directChat.connecting ? '<div class="card"><p style="text-align:center;margin:0">Convite enviado. Aguardando seu amigo aceitar…</p></div>' : chatScreen()) + '</div>';
   }
   /* ---------- Sons (sintetizados no próprio app, sem arquivos) ---------- */
   const snd = { ctx: null, on: true };
@@ -553,7 +559,7 @@
     return h + '</div>';
   }
 
-  const STATUS_TXT = { online: 'Online', match: 'Em partida', tour: 'Em campeonato', offline: 'Offline' };
+  const STATUS_TXT = { online: 'Online', match: 'Em partida', tour: 'Em campeonato', chat: 'Em conversa', offline: 'Offline' };
   const statusTxt = c => STATUS_TXT[app.fstat[c]] || 'verificando…';
   function presenceLine() {
     const pr = app.presence;
@@ -564,9 +570,10 @@
   }
   function friendRowHtml(fr) {
     const st = app.fstat[fr.code];
-    const canInv = app.fr.state !== 'inviting' && st !== 'offline' && st !== 'match' && st !== 'tour';
+    const canInv = app.fr.state !== 'inviting' && st !== 'offline' && st !== 'match' && st !== 'tour' && st !== 'chat';
     return '<div class="frow"><div class="fwho">' + avHtml(fr.av) + '<div><b>' + esc(fr.nick) + '</b><br>' +
       '<span class="muted"><i class="dot ' + (st || 'wait') + '" data-st="' + esc(fr.code) + '"></i><span data-stt="' + esc(fr.code) + '">' + statusTxt(fr.code) + '</span> · ' + esc(fr.code) + '</span></div></div><div>' +
+      '<button data-act="frChat" data-v="' + esc(fr.code) + '"' + (st === 'online' ? '' : ' disabled') + '>Conversar</button>' +
       '<button data-act="frInvite" data-inv="' + esc(fr.code) + '" data-v="' + esc(fr.code) + '"' + (canInv ? '' : ' disabled') + '>Chamar</button>' +
       '<button data-act="frRemove" data-v="' + esc(fr.code) + '">Remover</button></div></div>';
   }
@@ -606,9 +613,10 @@
     if (!i) { box.innerHTML = ''; return; }
     const known = app.friends.some(x => x.code === i.code);
     const isTour = i.kind === 'tour';
+    const isChat = i.kind === 'chat';
     box.innerHTML = '<div class="overlay center"><div class="sheet">' + '<div style="font-size:54px;line-height:1">' + avOf(i.av) + '</div>' +
-      '<h2>' + esc(i.nick) + (isTour ? ' convidou você para um campeonato' : ' chamou você para jogar') + '</h2>' +
-      '<p>' + (isTour ? 'Código do campeonato: ' + esc(i.tourCode || '?') : 'Código ' + esc(i.code) + (known ? ' (seu amigo)' : ' (não está na sua lista)') + '. Você joga de Pretas.') + '</p>' +
+      '<h2>' + esc(i.nick) + (isTour ? ' convidou você para um campeonato' : (isChat ? ' quer conversar com você' : ' chamou você para jogar')) + '</h2>' +
+      '<p>' + (isTour ? 'Código do campeonato: ' + esc(i.tourCode || '?') : (isChat ? 'Aceite para abrir uma conversa privada.' : 'Código ' + esc(i.code) + (known ? ' (seu amigo)' : ' (não está na sua lista)') + '. Você joga de Pretas.')) + '</p>' +
       '<button class="primary" data-act="frAccept">Aceitar</button><button data-act="frDecline">Recusar</button></div></div>';
   }
   // Atualiza só as bolinhas e botões (sem redesenhar a tela, para não atrapalhar quem está digitando)
@@ -618,7 +626,7 @@
     document.querySelectorAll('[data-st]').forEach(el => { if (el.dataset.st === code) el.className = 'dot ' + (st || 'wait'); });
     document.querySelectorAll('[data-stt]').forEach(el => { if (el.dataset.stt === code) el.textContent = statusTxt(code); });
     document.querySelectorAll('[data-inv]').forEach(el => {
-      if (el.dataset.inv === code) el.disabled = app.fr.state === 'inviting' || st === 'offline' || st === 'match' || st === 'tour';
+      if (el.dataset.inv === code) el.disabled = app.fr.state === 'inviting' || st === 'offline' || st === 'match' || st === 'tour' || st === 'chat';
     });
   }
   function paintPresence() {
@@ -840,16 +848,27 @@
 
   function render() {
     syncAwake();
+    const focusedChat = typeof document !== 'undefined' && document.activeElement && document.activeElement.id === 'chatInput';
+    const chatStart = focusedChat ? document.activeElement.selectionStart : null;
+    const chatEnd = focusedChat ? document.activeElement.selectionEnd : null;
     if (typeof document !== 'undefined' && document.body) document.body.dataset.theme = app.theme;
     const root = $('#app');
     if (app.screen === 'menu') root.innerHTML = menuScreen();
     else if (app.screen === 'tour') root.innerHTML = tourScreen();
     else if (app.screen === 'friends') root.innerHTML = friendsScreen();
+    else if (app.screen === 'directChat') root.innerHTML = directChatScreen();
     else if (app.screen === 'rules') root.innerHTML = rulesScreen();
     else if (app.screen === 'online') root.innerHTML = onlineScreen();
     else if (app.screen === 'bt') root.innerHTML = btScreen();
     else if (app.screen === 'setup') root.innerHTML = setupScreen();
     else root.innerHTML = gameScreen();
+    if (focusedChat) {
+      const input = $('#chatInput');
+      if (input) {
+        input.focus({ preventScroll: true });
+        try { input.setSelectionRange(chatStart == null ? input.value.length : chatStart, chatEnd == null ? input.value.length : chatEnd); } catch (e) { /* ok */ }
+      }
+    }
     syncPresenceStatus();
   }
 
@@ -1080,6 +1099,7 @@
   // O "cano" atual do jogo remoto: Bluetooth (plugin nativo) ou internet (online.js)
   function btPlugin() {
     if (app.net === 'tour') return tourTransport;
+    if (app.net === 'direct') return window.ManobraOnline || null;
     return app.net === 'online' ? (window.ManobraOnline || null) : nativeBt();
   }
   function errMsg(e) {
@@ -1104,6 +1124,7 @@
     if (attachedPlugins.indexOf(p) >= 0) return;
     attachedPlugins.push(p);
     p.addListener('connected', ev => btConnected((ev && ev.role) || (app.bt.stage === 'connecting' ? 'guest' : 'host'), ev && ev.name));
+    p.addListener('chatConnected', ev => directChatConnected(ev && ev.name));
     p.addListener('message', ev => handleBtMessage(ev && ev.data));
     p.addListener('disconnected', () => btDisconnected());
     if (p === window.ManobraOnline) { // convites de amigos (só existem no modo online)
@@ -1114,7 +1135,7 @@
   }
   function btSend(obj) {
     const p = btPlugin();
-    if (!p || (!app.btLinked && app.net !== 'tour')) return;
+    if (!p || (!app.btLinked && app.net !== 'tour' && app.net !== 'direct')) return;
     try { Promise.resolve(p.send({ data: JSON.stringify(obj) })).catch(() => {}); } catch (e) { /* ok */ }
   }
   function btLeave() {
@@ -1142,6 +1163,7 @@
     startSetup('bt');
   }
   function btDisconnected() {
+    if (app.net === 'direct') { directChatDisconnected(); return; }
     if (!app.btLinked) return;
     app.btLinked = false;
     app.btReady = false;
@@ -1204,11 +1226,11 @@
     } else if (o.k === 'chat') {
       const text = chatClean(o.text);
       if (!text || !chatAllowed()) return;
-      chatPush(text, false, !!o.quick);
+      chatPush(text, false, !!o.quick, o.nick, o.av);
       render();
     } else if (o.k === 'chatVoice') {
       if (!chatAllowed() || typeof o.data !== 'string' || o.data.length > 500000) return;
-      chatPushVoice(o.data, false);
+      chatPushVoice(o.data, false, o.nick, o.av);
       render();
     } else if (o.k === 'pass') {
       app.btQueue.push({ pass: true });
@@ -1353,7 +1375,7 @@
   let presRetry = null, presBusy = false;
   const isBusy = () => app.screen === 'game' || app.screen === 'setup' || app.btLinked || !!app.tour.role ||
     app.fr.state === 'inviting' || app.animating || ((app.screen === 'online' || app.screen === 'bt') && app.bt.stage !== 'idle');
-  const myStatus = () => (app.tour.role ? 'tour' : isBusy() ? 'match' : 'online');
+  const myStatus = () => (app.tour.role ? 'tour' : app.net === 'direct' && app.btLinked ? 'chat' : isBusy() ? 'match' : 'online');
   function syncPresenceStatus() {
     const p = window.ManobraOnline;
     if (!p || !p.setStatus) return;
@@ -1445,7 +1467,7 @@
       toast(nick + ' tentou chamar você, mas você está ocupado.');
       return;
     }
-    app.inv = { nick: nick, code: cleanCode6(ev.code), av: AV[ev.av] ? ev.av : '', kind: ev.kind === 'tour' ? 'tour' : 'game', tourCode: String(ev.tourCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) };
+    app.inv = { nick: nick, code: cleanCode6(ev.code), av: AV[ev.av] ? ev.av : '', kind: ev.kind === 'tour' ? 'tour' : (ev.kind === 'chat' ? 'chat' : 'game'), tourCode: String(ev.tourCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) };
     sfx('f', 0);
     renderInvite();
   }
@@ -1499,6 +1521,26 @@
     } catch (e) { toast(errMsg(e)); }
     app.tourInviteCode = ''; render();
   }
+  function directChatConnected(name) {
+    if (app.net !== 'direct') return;
+    app.directChat.connecting = false;
+    if (name) app.directChat.nick = cleanNick(name) || app.directChat.nick;
+    app.btLinked = true; app.chat.open = true; render();
+  }
+  function directChatDisconnected() {
+    app.btLinked = false;
+    if (app.screen === 'directChat') { toast('A conversa foi encerrada.'); app.screen = 'friends'; app.net = 'online'; render(); }
+  }
+  async function directChatStart(code) {
+    const friend = app.friends.find(x => x.code === code), p = window.ManobraOnline;
+    if (!friend || !p) return;
+    if (app.fstat[code] !== 'online') { toast('Esse amigo precisa estar online para conversar.'); return; }
+    app.net = 'direct'; app.screen = 'directChat'; app.directChat = { code: code, nick: friend.nick, connecting: true };
+    app.btLinked = false; app.chat = { open: true, draft: '', unread: 0, messages: [], muted: false, recording: false, recorder: null, chunks: [], stream: null, timer: null, seconds: 0 };
+    btAttach(p); render();
+    try { await p.invite({ kind: 'chat', code: friend.code, from: app.me.code, nick: myNick(), friendNick: friend.nick, av: app.me.av }); }
+    catch (e) { if (app.screen === 'directChat') { toast(errMsg(e)); app.screen = 'friends'; app.net = 'online'; app.directChat.connecting = false; render(); } }
+  }
 
   /* ---------- Campeonato: ligação com a partida ---------- */
   // A partida de campeonato usa a mesma lógica do Bluetooth/online; só muda o "cano":
@@ -1546,6 +1588,8 @@
     app.net = 'tour';
     if (!app.tour.role) app.tour = freshTour();
     app.screen = 'tour';
+    syncPresenceStatus();
+    presenceStart();
     render();
     app.friends.forEach(fr => { probeOne(fr.code); });
   }
@@ -1558,6 +1602,7 @@
       try { r = await l.host(Object.assign({ local: local }, base)); }
       catch (e) { if (local) throw e; local = true; r = await l.host(Object.assign({ local: true }, base)); } // sem conexão com o serviço: joga offline
       app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you; app.tour.local = local;
+      syncPresenceStatus();
       if (local) toast('Sem internet: campeonato offline, só contra robôs.');
       app.tour.snap = l.snapshot();
       app.friends.forEach(fr => { probeOne(fr.code); });
@@ -1572,6 +1617,7 @@
       app.tour = freshTour(); app.tour.connecting = true; render();
       const r = await l.host({ restore: saved.data, local: true, nick: myNick(), pid: app.me.code, avatar: app.me.av });
       app.tour.connecting = false; app.tour.role = 'host'; app.tour.code = r.code; app.tour.myId = r.you; app.tour.local = true;
+      syncPresenceStatus();
       app.tour.snap = l.snapshot();
       toast('Campeonato retomado.');
       tourRestoreLocal(saved);
@@ -1586,6 +1632,7 @@
       app.tour = freshTour(); app.tour.connecting = true; render();
       const r = await l.join({ code: code, nick: myNick(), pid: app.me.code, avatar: app.me.av });
       app.tour.connecting = false; app.tour.role = 'guest'; app.tour.code = code; app.tour.myId = r.you;
+      syncPresenceStatus();
       app.friends.forEach(fr => { probeOne(fr.code); });
       render();
     } catch (e) { app.tour = freshTour(); app.tour.msg = errMsg(e); render(); }
@@ -1715,6 +1762,7 @@
     if (act === 'chatQuick') { const q = CHAT_QUICK[+v]; if (q) chatSend(q, true); return; }
     if (act === 'chatVoice') { app.chat.recording ? chatVoiceStop() : chatVoiceStart(); return; }
     if (act === 'chatMute') { app.chat.muted = !app.chat.muted; render(); return; }
+    if (act === 'directChatBack') { btLeave(); app.net = 'online'; app.screen = 'friends'; render(); presenceStart(); pollFriends(++pollGen); return; }
     switch (act) {
       case 'side': app.humanSide = +v; render(); break;
       case 'level': app.level = v; render(); break;
@@ -1800,11 +1848,19 @@
         app.friends = app.friends.filter(x => x.code !== v);
         saveFriends(); render(); break;
       case 'frInvite': friendInvite(v); break;
+      case 'frChat': directChatStart(v); break;
       case 'frCancelInvite': { const p = window.ManobraOnline; if (p) Promise.resolve(p.cancelInvite()).catch(() => {}); break; }
       case 'frAccept': {
         const p = window.ManobraOnline;
         if (!app.inv || !p) break;
         if (isBusy()) { toast('Termine o que está fazendo antes de aceitar.'); break; }
+        if (app.inv.kind === 'chat') {
+          const invite = app.inv; app.inv = null; renderInvite();
+          app.net = 'direct'; app.screen = 'directChat'; app.directChat = { code: invite.code, nick: invite.nick, connecting: false };
+          app.chat.open = true; btAttach(p); render();
+          Promise.resolve(p.acceptInvite()).catch(e => toast(errMsg(e)));
+          break;
+        }
         if (app.inv.kind === 'tour') {
           const invite = app.inv; app.inv = null; renderInvite();
           Promise.resolve(p.acceptInvite()).then(r => {

@@ -151,7 +151,9 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 .chat-head b { font-size: 14px; }
 .chat-head button { padding: 2px 8px; background: transparent; font-size: 24px; line-height: 1; }
 .chat-messages { display: flex; flex-direction: column; gap: 6px; min-height: 54px; overflow-y: auto; padding: 10px; }
-.chat-msg { display: flex; align-items: center; gap: 5px; max-width: 88%; padding: 6px 8px; border-radius: 11px; color: #f3f5fa; font-size: 13px; line-height: 1.25; }
+.chat-msg { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; max-width: 88%; padding: 6px 8px; border-radius: 11px; color: #f3f5fa; font-size: 13px; line-height: 1.25; }
+.chat-author { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; color: #dbe5ff; font-size: 10px; }
+.chat-author .av { width: 18px; height: 18px; font-size: 12px; }
 .chat-msg span { overflow-wrap: anywhere; }
 .chat-msg.mine { align-self: flex-end; background: #3159b8; border-bottom-right-radius: 3px; }
 .chat-msg.theirs { align-self: flex-start; background: #303a4c; border-bottom-left-radius: 3px; }

@@ -33,6 +33,12 @@ BT_BLOCK = (
     '    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />\n'
     "    <!-- /manobra-bluetooth -->\n"
 )
+MIC_BLOCK = (
+    "    <!-- manobra-microphone -->\n"
+    '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n'
+    '    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n'
+    "    <!-- /manobra-microphone -->\n"
+)
 
 # ---- AndroidManifest.xml
 with open(manifest_path, encoding="utf-8") as f:
@@ -40,8 +46,10 @@ with open(manifest_path, encoding="utf-8") as f:
 if "screenOrientation" not in manifest:
     manifest = manifest.replace("<activity", '<activity android:screenOrientation="fullSensor"', 1)
 manifest = re.sub(r"[ \t]*<!-- manobra-bluetooth -->.*?<!-- /manobra-bluetooth -->\n?", "", manifest, flags=re.S)
+manifest = re.sub(r"[ \t]*<!-- manobra-microphone -->.*?<!-- /manobra-microphone -->\n?", "", manifest, flags=re.S)
 if with_bt:
     manifest = manifest.replace("</manifest>", BT_BLOCK + "</manifest>", 1)
+manifest = manifest.replace("</manifest>", MIC_BLOCK + "</manifest>", 1)
 with open(manifest_path, "w", encoding="utf-8") as f:
     f.write(manifest)
 

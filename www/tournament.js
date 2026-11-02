@@ -157,11 +157,13 @@
       if (msg.k === 'chat') {
         const text = String(msg.text == null ? '' : msg.text).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
         if (!text) return;
-        this.players.forEach(p => { if (p.id !== id && p.connected && !p.bot) this.send(p.id, { k: 'chat', text: text, quick: !!msg.quick }); });
+        const from = this._p(id);
+        this.players.forEach(p => { if (p.id !== id && p.connected && !p.bot) this.send(p.id, { k: 'chat', text: text, quick: !!msg.quick, nick: from ? from.nick : msg.nick, av: from ? from.av : msg.av }); });
       } else if (msg.k === 'chatVoice') {
         const data = typeof msg.data === 'string' && msg.data.length <= 500000 ? msg.data : '';
         if (!data) return;
-        this.players.forEach(p => { if (p.id !== id && p.connected && !p.bot) this.send(p.id, { k: 'chatVoice', data: data }); });
+        const from = this._p(id);
+        this.players.forEach(p => { if (p.id !== id && p.connected && !p.bot) this.send(p.id, { k: 'chatVoice', data: data, nick: from ? from.nick : msg.nick, av: from ? from.av : msg.av }); });
       }
     }
     busy(id) { return this.matches.some(m => m.status === 'playing' && (m.a === id || m.b === id)); }
@@ -677,12 +679,14 @@
       if (o.k === 'hello') { forward(); return; }
       if (o.k === 'chat') {
         const text = String(o.text == null ? '' : o.text).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
-        if (text) this.send(opp, { k: 'relay', m: mid, d: JSON.stringify({ k: 'chat', text: text, quick: !!o.quick }) });
+        const from = this._p(id);
+        if (text) this.send(opp, { k: 'relay', m: mid, d: JSON.stringify({ k: 'chat', text: text, quick: !!o.quick, nick: from ? from.nick : o.nick, av: from ? from.av : o.av }) });
         return;
       }
       if (o.k === 'chatVoice') {
         const data = typeof o.data === 'string' && o.data.length <= 500000 ? o.data : '';
-        if (data) this.send(opp, { k: 'relay', m: mid, d: JSON.stringify({ k: 'chatVoice', data: data }) });
+        const from = this._p(id);
+        if (data) this.send(opp, { k: 'relay', m: mid, d: JSON.stringify({ k: 'chatVoice', data: data, nick: from ? from.nick : o.nick, av: from ? from.av : o.av }) });
         return;
       }
       if (o.k === 'bye') { this._forfeit(m, id, 'saiu da partida'); return; }

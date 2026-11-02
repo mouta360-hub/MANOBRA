@@ -226,7 +226,7 @@
         setTimeout(function () { try { c.close(); } catch (e) { /* ok */ } }, 400);
         return;
       }
-      if (!o || (o.k !== 'invite' && o.k !== 'tourInvite')) return;
+      if (!o || (o.k !== 'invite' && o.k !== 'tourInvite' && o.k !== 'chatInvite')) return;
       if (st.pending) { // já tem um convite na tela: recusa o novo
         try { c.send(JSON.stringify({ k: 'decline', why: 'busy' })); } catch (e) { /* ok */ }
         setTimeout(function () { try { c.close(); } catch (e) { /* ok */ } }, 300);
@@ -234,7 +234,7 @@
       }
       const from = cleanCode(o.code);
       if (from.length !== 6) return;
-      st.pending = { conn: c, nick: cleanText(o.nick, 16) || from, from: from, av: cleanAv(o.av), kind: o.k === 'tourInvite' ? 'tour' : 'game', tourCode: cleanCode(o.tourCode).slice(0, 4), adopt: function () { adopted = true; } };
+      st.pending = { conn: c, nick: cleanText(o.nick, 16) || from, from: from, av: cleanAv(o.av), kind: o.k === 'tourInvite' ? 'tour' : (o.k === 'chatInvite' ? 'chat' : 'game'), tourCode: cleanCode(o.tourCode).slice(0, 4), adopt: function () { adopted = true; } };
       emit('invite', { nick: st.pending.nick, code: from, av: st.pending.av, kind: st.pending.kind, tourCode: st.pending.tourCode });
     });
     c.on('close', function () {
@@ -297,6 +297,12 @@
       try { c.send(JSON.stringify({ k: 'tourAccept' })); c.close(); } catch (e) { return Promise.reject(new Error('Falha ao aceitar o convite do campeonato.')); }
       return Promise.resolve({ name: pnd.nick, code: pnd.from, tourCode: pnd.tourCode, tour: true });
     }
+    if (pnd.kind === 'chat') {
+      try { c.send(JSON.stringify({ k: 'chatAccept' })); } catch (e) { return Promise.reject(new Error('Falha ao aceitar a conversa.')); }
+      pnd.adopt(); closing = false; attach(c);
+      emit('chatConnected', { name: pnd.nick, address: pnd.from, role: 'guest' });
+      return Promise.resolve({ name: pnd.nick, code: pnd.from, chat: true });
+    }
     try { c.send(JSON.stringify({ k: 'accept' })); } catch (e) { return Promise.reject(new Error('Falha ao aceitar o convite.')); }
     pnd.adopt();
     // a conexão do convite vira a partida; o registro (presença) continua ativo para os amigos
@@ -307,7 +313,7 @@
     return Promise.resolve({ name: pnd.nick, code: pnd.from });
   };
 
-  api.setStatus = function (s) { presStatus = (s === 'match' || s === 'tour') ? s : 'online'; };
+  api.setStatus = function (s) { presStatus = (s === 'match' || s === 'tour' || s === 'chat') ? s : 'online'; };
   api.setAvatar = function (av) { presAvatar = cleanAv(av); };
   api.lastSeen = {}; // código -> avatar visto na última sonda
 
@@ -346,7 +352,7 @@
           c.on('data', function (d) {
             let o;
             try { o = JSON.parse(d); } catch (e) { return; }
-            if (o && o.k === 'pong') { api.lastSeen[code] = cleanAv(o.av); finish(o.s === 'match' || o.s === 'tour' ? o.s : 'online'); }
+            if (o && o.k === 'pong') { api.lastSeen[code] = cleanAv(o.av); finish(o.s === 'match' || o.s === 'tour' || o.s === 'chat' ? o.s : 'online'); }
           });
           c.on('error', function () { finish('offline'); });
           c.on('close', function () { finish('offline'); }); // fechou sem responder
@@ -381,6 +387,7 @@
     const friendNick = cleanText(opts && opts.friendNick, 16) || code;
     const av = cleanAv(opts && opts.av);
     const tour = opts && opts.kind === 'tour';
+    const chat = opts && opts.kind === 'chat';
     const tourCode = cleanCode(opts && opts.tournamentCode).slice(0, 4);
     if (code.length !== 6 || from.length !== 6) return Promise.reject(new Error('Código do amigo inválido.'));
     return loadLib().then(function () {
@@ -406,7 +413,7 @@
           if (done) return;
           c = p.connect(UPREFIX + code, { reliable: true });
           c.on('open', function () {
-            try { c.send(JSON.stringify({ k: tour ? 'tourInvite' : 'invite', nick: nick, code: from, av: av, tourCode: tourCode })); }
+            try { c.send(JSON.stringify({ k: tour ? 'tourInvite' : (chat ? 'chatInvite' : 'invite'), nick: nick, code: from, av: av, tourCode: tourCode })); }
             catch (e) { fail('Não foi possível enviar o convite.'); }
           });
           c.on('data', function (d) {
@@ -414,10 +421,11 @@
             let o;
             try { o = JSON.parse(d); } catch (e) { return; }
             if (!o || done) return;
-            if (o.k === (tour ? 'tourAccept' : 'accept')) {
+            if (o.k === (tour ? 'tourAccept' : (chat ? 'chatAccept' : 'accept'))) {
               done = true; adopted = true; clearTimeout(timer);
               invitation = null;
               if (tour) { adopted = false; try { c.close(); } catch (e) { /* ok */ } resolve({ name: friendNick, code: code, tourCode: tourCode, tour: true }); return; }
+              if (chat) { if (peer && peer !== p) { try { peer.destroy(); } catch (e) { /* ok */ } } peer = p; closing = false; attach(c); emit('chatConnected', { name: friendNick, address: code, role: 'host' }); resolve({ name: friendNick, code: code, chat: true }); return; }
               if (peer && peer !== p) { try { peer.destroy(); } catch (e) { /* ok */ } }
               peer = p;
               closing = false;
