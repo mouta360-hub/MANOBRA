@@ -33,13 +33,6 @@ BT_BLOCK = (
     '    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />\n'
     "    <!-- /manobra-bluetooth -->\n"
 )
-MIC_BLOCK = (
-    "    <!-- manobra-microphone -->\n"
-    '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n'
-    '    <uses-feature android:name="android.hardware.microphone" android:required="false" />\n'
-    "    <!-- /manobra-microphone -->\n"
-)
-
 # ---- AndroidManifest.xml
 with open(manifest_path, encoding="utf-8") as f:
     manifest = f.read()
@@ -49,7 +42,6 @@ manifest = re.sub(r"[ \t]*<!-- manobra-bluetooth -->.*?<!-- /manobra-bluetooth -
 manifest = re.sub(r"[ \t]*<!-- manobra-microphone -->.*?<!-- /manobra-microphone -->\n?", "", manifest, flags=re.S)
 if with_bt:
     manifest = manifest.replace("</manifest>", BT_BLOCK + "</manifest>", 1)
-manifest = manifest.replace("</manifest>", MIC_BLOCK + "</manifest>", 1)
 with open(manifest_path, "w", encoding="utf-8") as f:
     f.write(manifest)
 
@@ -69,8 +61,6 @@ if with_bt:
         "package %s;\n\n"
         "import android.os.Bundle;\n"
         "import android.view.View;\n"
-        "import android.Manifest;\n"
-        "import android.content.pm.PackageManager;\n"
         "import com.getcapacitor.BridgeActivity;\n\n"
         "public class MainActivity extends BridgeActivity {\n"
         "    @Override\n"
@@ -78,9 +68,6 @@ if with_bt:
         "        registerPlugin(ManobraBluetoothPlugin.class);\n"
         "        registerPlugin(ManobraScreenPlugin.class);\n"
         "        super.onCreate(savedInstanceState);\n"
-        "        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {\n"
-        "            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);\n"
-        "        }\n"
         "        hideSystemUi();\n"
         "    }\n"
         "    private void hideSystemUi() {\n"
@@ -99,17 +86,12 @@ else:
         "package %s;\n\n"
         "import android.os.Bundle;\n"
         "import android.view.View;\n"
-        "import android.Manifest;\n"
-        "import android.content.pm.PackageManager;\n"
         "import com.getcapacitor.BridgeActivity;\n\n"
         "public class MainActivity extends BridgeActivity {\n"
         "    @Override\n"
         "    public void onCreate(Bundle savedInstanceState) {\n"
         "        registerPlugin(ManobraScreenPlugin.class);\n"
         "        super.onCreate(savedInstanceState);\n"
-        "        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {\n"
-        "            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);\n"
-        "        }\n"
         "        hideSystemUi();\n"
         "    }\n"
         "    private void hideSystemUi() {\n"

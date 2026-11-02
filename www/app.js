@@ -40,6 +40,7 @@
     pollMs: 20000    // de quanto em quanto tempo a tela Amigos confere o status
   };
   const attachedPlugins = [];
+  let chatCollapseTimer = null;
   window.__manobraApp = app; // gancho usado só pelos testes
   const DURS = { slow: 1100, medium: 650, fast: 280 }; // duração do movimento (ms)
   try { const sp = localStorage.getItem('manobra.speed'); if (DURS[sp]) app.speed = sp; } catch (e) { /* sem armazenamento */ }
@@ -136,11 +137,12 @@
   }
   function publicChatScreen() {
     if (!app.publicChat.connected) return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Voltar</button></div><div class="card public-hero"><h2>Chat público</h2><p>Converse com participantes e organize seu campeonato.</p><button class="primary" data-act="publicCreate">Criar sala pública</button><p class="muted">Ou entre com um código recebido:</p><input id="publicCode" class="codein" maxlength="6" placeholder="CÓDIGO"><button class="primary" data-act="publicJoin">Entrar no chat</button></div></div>';
-    const invites = app.publicChat.invites ? '<div class="card"><h3>Amigos online</h3>' + app.friends.filter(f => app.fstat[f.code] === 'online').map(f => '<div class="frow"><span>' + avHtml(f.av) + ' ' + esc(f.nick) + '</span><button data-act="publicInvite" data-v="' + esc(f.code) + '">Convidar</button></div>').join('') + '</div>' : '';
-    return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Sair</button></div><div class="card public-hero"><h2>Chat público</h2><p>Compartilhe este código para convidar pessoas:</p><div class="bigcode">' + esc(app.publicChat.code) + '</div><button data-act="publicInviteList">Convidar amigos</button><button class="primary" data-act="publicCreateTour">Criar campeonato</button></div>' + invites + chatScreen(true) + '</div>';
+    const invites = '<div class="card public-friends"><h3>Amigos e convites</h3>' + (app.friends.length ? app.friends.map(f => { const online = app.fstat[f.code] === 'online'; return '<div class="frow"><span>' + avHtml(f.av) + ' ' + esc(f.nick) + '<small class="muted">' + (online ? ' · online' : ' · offline') + '</small></span><button data-act="publicInvite" data-v="' + esc(f.code) + '"' + (online ? '' : ' disabled') + '>Convidar</button></div>'; }).join('') : '<p class="muted">Adicione amigos na tela Amigos e convites para convidá-los aqui.</p>') + '</div>';
+    return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Sair</button></div><div class="card public-hero"><h2>Chat público</h2><p>Compartilhe este código para convidar pessoas:</p><div class="bigcode">' + esc(app.publicChat.code) + '</div><button class="primary" data-act="publicCreateTour">Criar campeonato</button></div>' + invites + chatScreen(true) + '</div>';
   }
   /* ---------- Sons (sintetizados no próprio app, sem arquivos) ---------- */
-  const snd = { ctx: null, on: true };
+  const snd = { ctx: null, on: true, music: true };
+  try { if (localStorage.getItem('manobra.music') === '0') snd.music = false; } catch (e) { /* ok */ }
   function actx() {
     try {
       if (!snd.ctx) {
@@ -162,7 +164,7 @@
     bgm.track = '';
   }
   function startBgm() {
-    if (!snd.on || typeof Audio !== 'function') return;
+    if (!snd.on || !snd.music || typeof Audio !== 'function') { stopBgm(); return; }
     const track = bgmTrack();
     if (!track) { stopBgm(); return; }
     if (!bgm.audio) { bgm.audio = new Audio(); bgm.audio.loop = true; bgm.audio.volume = 0.045; }
@@ -172,6 +174,17 @@
     if (play && play.catch) play.catch(() => {});
   }
 
+  function scheduleChatCollapse() {
+    if (chatCollapseTimer || !app.chat.open || app.screen === 'publicChat' || app.chat.draft || !chatAllowed()) return;
+    chatCollapseTimer = setTimeout(() => {
+      chatCollapseTimer = null;
+      if (app.chat.open && !app.chat.draft && app.screen !== 'publicChat') { app.chat.open = false; render(); }
+    }, 8000);
+  }
+  function resetChatCollapse() {
+    if (chatCollapseTimer) { clearTimeout(chatCollapseTimer); chatCollapseTimer = null; }
+    scheduleChatCollapse();
+  }
   function tone(ctx, t, freq, dur, type, vol, freqEnd) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type;
@@ -283,10 +296,9 @@
   }
 
   /* ---------- Avatares ---------- */
-  const AVATAR_BASES = ['🦊','🐻','🦁','🐯','🐺','🐼','🐱','🐶','🦉','🦅','🦈','🐲','🦄','🤖','🥷','👑','🛡️','🚀','🔥','⭐','🐸','🐵','🐙','🦋','🐝','🧙','🐢','🦖','🐳','🦜'];
-  const AVATAR_ACCENTS = ['👑','⚔️','🛡️','🚀','🪄','🌸','⚡','🎩','🕶️','🎮'];
-  const AVATARS = [];
-  AVATAR_BASES.forEach((base, bi) => AVATAR_ACCENTS.forEach((accent, ai) => AVATARS.push(['avatar-' + bi + '-' + ai, base + accent])));
+  // Cada avatar é um único pictograma: não há bolinha, dupla de emojis ou acessório ao lado.
+  // A faixa Unicode reúne animais, rostos, natureza, transporte e objetos de jogos.
+  const AVATARS = Array.from({ length: 300 }, (_, i) => ['avatar-' + i, String.fromCodePoint(0x1F300 + i)]);
   const AV = {};
   AVATARS.forEach(a => { AV[a[0]] = a[1]; });
   const usedAiBots = new Set();
@@ -349,7 +361,8 @@
       seg('speed', app.speed, [['slow', 'Lenta'], ['medium', 'Média'], ['fast', 'Rápida']]) +
       '<h3>Visual do tabuleiro e das peças</h3>' +
       seg('theme', app.theme, [['classic', 'Clássico'], ['fantasy', 'Escudos e espadas'], ['obsidian', 'Obsidiana']]) +
-      '<h3>Som</h3>' + seg('sound', snd.on ? '1' : '0', [['1', 'Ligado'], ['0', 'Desligado']]) + '</div>' +
+      '<h3>Som das peças</h3>' + seg('sound', snd.on ? '1' : '0', [['1', 'Ligado'], ['0', 'Desligado']]) +
+      '<h3>Música das partidas</h3>' + seg('music', snd.music ? '1' : '0', [['1', 'Ligada'], ['0', 'Desligada']]) + '</div>' +
       '<button class="link" data-act="rules">Como jogar</button></div>';
   }
 
@@ -525,7 +538,7 @@
       '<div class="hint">' + hintText() + '</div><div class="bar">' +
       '<button data-act="flipMode" ' + (canFlip ? '' : 'disabled') + '>' + flipLabel + '</button>' +
       (canPurge ? '<button class="warn" data-act="purge">' + (app.purge ? 'Cancelar' : 'Eliminar defesa (7ª)') + '</button>' : '') +
-      '<button data-act="toggleSound">' + (snd.on ? '🔊 Som' : '🔇 Mudo') + '</button>' +
+      '<button data-act="toggleSound">' + (snd.on ? '🔊 Peças' : '🔇 Peças') + '</button><button data-act="toggleMusic">' + (snd.music ? '🎵 Música' : '🚫 Música') + '</button>' +
       '<button data-act="turnBoard">Girar</button>' +
       (app.net === 'tour' && app.tour.role === 'host' && tourBotOnly(app.tour.snap) ? '<button data-act="tourSave">💾 Salvar</button>' : '') +
       '<button data-act="menu">Menu</button></div></div></div>';
@@ -922,6 +935,7 @@
       }
     }
     syncPresenceStatus();
+    scheduleChatCollapse();
   }
 
   /* ---------- Montagem ---------- */
@@ -1815,6 +1829,7 @@
       app.fr.newNick = cleanNick(t.value);
     } else if (t.id === 'chatInput') {
       app.chat.draft = String(t.value || '').slice(0, 120);
+      resetChatCollapse();
     }
   });
   document.addEventListener('click', e => {
@@ -1833,7 +1848,7 @@
       if (e.target === el) { app.choice = null; render(); }
       return;
     }
-    if (act === 'chatOpen') { app.chat.open = true; app.chat.unread = 0; render(); return; }
+    if (act === 'chatOpen') { app.chat.open = true; app.chat.unread = 0; resetChatCollapse(); render(); return; }
     if (act === 'chatClose') { app.chat.open = false; render(); return; }
     if (act === 'chatSend') { chatSend(); return; }
     if (act === 'chatQuick') { const q = CHAT_QUICK[+v]; if (q) chatSend(q, true); return; }
@@ -1871,11 +1886,21 @@
         if (snd.on) startBgm(); else stopBgm();
         sfx('m', 0);
         render(); break;
+      case 'music':
+        snd.music = v === '1';
+        try { localStorage.setItem('manobra.music', v); } catch (err) { /* ok */ }
+        if (snd.music) startBgm(); else stopBgm();
+        render(); break;
       case 'toggleSound':
         snd.on = !snd.on;
         try { localStorage.setItem('manobra.sound', snd.on ? '1' : '0'); } catch (err) { /* ok */ }
         if (snd.on) startBgm(); else stopBgm();
         sfx('m', 0);
+        render(); break;
+      case 'toggleMusic':
+        snd.music = !snd.music;
+        try { localStorage.setItem('manobra.music', snd.music ? '1' : '0'); } catch (err) { /* ok */ }
+        if (snd.music) startBgm(); else stopBgm();
         render(); break;
       case 'startAI': startSetup('ai'); break;
       case 'startPVP': startSetup('pvp'); break;
