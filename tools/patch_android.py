@@ -68,6 +68,8 @@ if with_bt:
     main = (
         "package %s;\n\n"
         "import android.os.Bundle;\n"
+        "import android.Manifest;\n"
+        "import android.content.pm.PackageManager;\n"
         "import com.getcapacitor.BridgeActivity;\n\n"
         "public class MainActivity extends BridgeActivity {\n"
         "    @Override\n"
@@ -75,6 +77,9 @@ if with_bt:
         "        registerPlugin(ManobraBluetoothPlugin.class);\n"
         "        registerPlugin(ManobraScreenPlugin.class);\n"
         "        super.onCreate(savedInstanceState);\n"
+        "        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {\n"
+        "            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);\n"
+        "        }\n"
         "    }\n"
         "}\n" % app_id
     )
@@ -84,12 +89,17 @@ else:
     main = (
         "package %s;\n\n"
         "import android.os.Bundle;\n"
+        "import android.Manifest;\n"
+        "import android.content.pm.PackageManager;\n"
         "import com.getcapacitor.BridgeActivity;\n\n"
         "public class MainActivity extends BridgeActivity {\n"
         "    @Override\n"
         "    public void onCreate(Bundle savedInstanceState) {\n"
         "        registerPlugin(ManobraScreenPlugin.class);\n"
         "        super.onCreate(savedInstanceState);\n"
+        "        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {\n"
+        "            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);\n"
+        "        }\n"
         "    }\n"
         "}\n" % app_id
     )

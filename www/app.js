@@ -74,12 +74,17 @@
     const r = app.chat.recorder;
     if (r && r.state !== 'inactive') r.stop();
   }
+  function chatVoiceMime() {
+    const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+    return types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+  }
   async function chatVoiceStart() {
     if (!chatAllowed() || app.chat.recording) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof window.MediaRecorder !== 'function') { toast('A gravação de voz não está disponível neste aparelho.'); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const r = new MediaRecorder(stream);
+      const mime = chatVoiceMime();
+      const r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       app.chat.recording = true; app.chat.recorder = r; app.chat.chunks = []; app.chat.stream = stream; app.chat.seconds = 0;
       app.chat.timer = setInterval(() => { app.chat.seconds++; if (app.chat.seconds >= 20) chatVoiceStop(); render(); }, 1000);
       r.ondataavailable = e => { if (e.data && e.data.size) app.chat.chunks.push(e.data); };
@@ -88,11 +93,20 @@
         stream.getTracks().forEach(t => t.stop());
         const blob = new Blob(app.chat.chunks, { type: r.mimeType || 'audio/webm' });
         const reader = new FileReader();
-        reader.onloadend = () => { const data = String(reader.result || ''); if (data.length <= 500000) { btSend({ k: 'chatVoice', data: data }); chatPushVoice(data, true); } else toast('O áudio ficou grande demais. Grave uma mensagem mais curta.'); app.chat.recording = false; app.chat.recorder = null; app.chat.stream = null; app.chat.chunks = []; render(); };
+        reader.onloadend = () => { const data = String(reader.result || ''); if (data.length <= 500000) { btSend({ k: 'chatVoice', data: data, nick: myNick(), av: app.me.av }); chatPushVoice(data, true, myNick(), app.me.av); } else toast('O áudio ficou grande demais. Grave uma mensagem mais curta.'); app.chat.recording = false; app.chat.recorder = null; app.chat.stream = null; app.chat.chunks = []; app.chat.hold = false; render(); };
         reader.readAsDataURL(blob);
       };
       r.start(); render();
-    } catch (e) { app.chat.recording = false; toast('Permita o acesso ao microfone para gravar a mensagem.'); }
+      if (!app.chat.hold) chatVoiceStop();
+    } catch (e) {
+      app.chat.recording = false;
+      const name = e && e.name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') toast('O Android bloqueou o microfone. Abra Configurações > Aplicativos > Manobra > Permissões e permita Microfone.');
+      else if (name === 'NotFoundError') toast('Nenhum microfone foi encontrado neste aparelho.');
+      else if (name === 'NotReadableError') toast('O microfone está sendo usado por outro aplicativo.');
+      else toast('Não foi possível iniciar a gravação (' + (name || 'erro desconhecido') + ').');
+      render();
+    }
   }
   function chatSend(text, quick) {
     if (!chatAllowed()) return;
@@ -108,12 +122,11 @@
     const rows = app.chat.messages.length ? app.chat.messages.map(m => {
       const author = '<div class="chat-author">' + avHtml(m.av) + '<b>' + esc(m.mine ? 'Você' : (m.nick || 'Participante')) + '</b></div>';
       return m.voice
-        ? '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<audio ' + (app.chat.muted ? 'muted ' : '') + 'controls preload="none" src="' + esc(m.voice) + '"></audio></div>'
+        ? '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<audio controls preload="none" src="' + esc(m.voice) + '"></audio></div>'
         : '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<span>' + esc(m.text) + '</span></div>';
     }).join('') : '<p class="chat-empty">Envie uma mensagem curta para o grupo.</p>';
     const voiceLabel = app.chat.recording ? '⏹ ' + app.chat.seconds + 's' : '🎙️ Gravar';
-    const muteLabel = app.chat.muted ? '🔇 Mudo' : '🔊 Som';
-    return '<div class="chat-dock"><section class="chat-panel" aria-label="Chat do campeonato"><header class="chat-head"><b>Chat</b><div><button data-act="chatMute" aria-label="Silenciar chat">' + muteLabel + '</button><button data-act="chatClose" aria-label="Fechar chat">×</button></div></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button><button class="chat-voice ' + (app.chat.recording ? 'recording' : '') + '" data-act="chatVoice" aria-label="Gravar voz">' + voiceLabel + '</button></div></section></div>';
+    return '<div class="chat-dock"><section class="chat-panel" aria-label="Chat do campeonato"><header class="chat-head"><b>Chat</b><button data-act="chatClose" aria-label="Fechar chat">×</button></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button><button class="chat-voice ' + (app.chat.recording ? 'recording' : '') + '" data-act="chatVoice" aria-label="Segure para gravar voz">' + voiceLabel + '</button></div></section></div>';
   }
   function directChatScreen() {
     return '<div class="rules"><div class="topbar"><b>Conversa com ' + esc(app.directChat.nick || 'amigo') + '</b><button data-act="directChatBack">Voltar</button></div>' + (app.directChat.connecting ? '<div class="card"><p style="text-align:center;margin:0">Convite enviado. Aguardando seu amigo aceitar…</p></div>' : chatScreen()) + '</div>';
@@ -184,14 +197,14 @@
     const body = dark ? '#26344c' : '#f6ead0', edge = dark ? '#8fb5e8' : '#a96b2d', shine = dark ? '#b9d8ff' : '#fff8e8';
     const sword = '<path d="M61 23l8-8 5 5-8 8 13 13-5 5-13-13-16 16-5-5 16-16-8-8 5-5z" fill="' + shine + '" stroke="' + edge + '" stroke-width="2"/><path d="M39 68h23" stroke="' + edge + '" stroke-width="5" stroke-linecap="round"/>';
     const shield = '<path d="M50 17l27 10v20c0 18-12 28-27 36-15-8-27-18-27-36V27z" fill="' + body + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 28v39M31 47h38" stroke="' + shine + '" stroke-width="4" opacity=".85"/>';
-    return '<svg class="pc fantasy-piece" viewBox="0 0 100 100"><defs><radialGradient id="g' + p + '"><stop stop-color="' + shine + '"/><stop offset="1" stop-color="' + body + '"/></radialGradient></defs><circle cx="50" cy="50" r="43" fill="url(#g' + p + ')" stroke="' + edge + '" stroke-width="4"/><circle cx="50" cy="34" r="9" fill="' + shine + '" stroke="' + edge + '" stroke-width="3"/>' + (attack ? sword : shield) + '</svg>';
+    return '<svg class="pc fantasy-piece ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><defs><radialGradient id="g' + p + '"><stop stop-color="' + shine + '"/><stop offset="1" stop-color="' + body + '"/></radialGradient></defs><circle cx="50" cy="50" r="43" fill="url(#g' + p + ')" stroke="' + edge + '" stroke-width="4"/><circle cx="50" cy="34" r="9" fill="' + shine + '" stroke="' + edge + '" stroke-width="3"/>' + (attack ? sword : shield) + '</svg>';
   }
   function obsidianPiece(p) {
     const attack = E.isAttack(p), dark = E.sideOf(p) === BLACK, fill = dark ? '#101722' : '#f1f4ff', edge = dark ? '#72b8d8' : '#5967d9';
-    return '<svg class="pc" viewBox="0 0 100 100"><path d="M50 5l38 22v46L50 95 12 73V27z" fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 15v70M18 31l64 38M82 31L18 69" stroke="' + edge + '" stroke-width="2" opacity=".65"/><circle cx="50" cy="50" r="' + (attack ? 17 : 10) + '" fill="' + edge + '"/><path d="M42 50h16" stroke="' + fill + '" stroke-width="4"/></svg>';
+    return '<svg class="pc ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><path d="M50 5l38 22v46L50 95 12 73V27z" fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 15v70M18 31l64 38M82 31L18 69" stroke="' + edge + '" stroke-width="2" opacity=".65"/><circle cx="50" cy="50" r="' + (attack ? 17 : 10) + '" fill="' + edge + '"/><path d="M42 50h16" stroke="' + fill + '" stroke-width="4"/></svg>';
   }
   function pieceSvg(p) {
-    const o = '<svg class="pc" viewBox="0 0 100 100">';
+    const o = '<svg class="pc ' + (E.isAttack(p) ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100">';
     if (!p) return '';
     if (app.theme === 'fantasy') return fantasyPiece(p);
     if (app.theme === 'obsidian') return obsidianPiece(p);
@@ -232,8 +245,10 @@
           if (marks.sel === i) cls += ' sel';
           if (marks.dest && marks.dest.has(i)) cls += ' ' + marks.dest.get(i);
         }
+        const piece = arr[i];
+        const badge = piece ? '<b class="piece-badge ' + (E.isAttack(piece) ? 'attack' : 'defense') + '" aria-label="' + (E.isAttack(piece) ? 'Ataque' : 'Defesa') + '">' + (E.isAttack(piece) ? 'A' : 'D') + '</b>' : '';
         h += '<div class="' + cls + '"' + (dark ? ' data-i="' + i + '"' : '') + '>' +
-          (E.isMain(i) ? '<i class="mainsq"></i>' : '') + pieceSvg(arr[i]) + '</div>';
+          (E.isMain(i) ? '<i class="mainsq"></i>' : '') + pieceSvg(piece) + badge + '</div>';
       }
     }
     return h + '</div>';
@@ -768,6 +783,7 @@
     // campeonato em andamento ou terminado
     if (s.status === 'finished' && s.champion != null) {
       h += '<div class="card" style="text-align:center"><h3 style="margin:0">🏆 Campeão</h3><div class="bigcode" style="font-size:30px;letter-spacing:2px;padding:10px 0 4px">' + avHtml((s.players.find(x => x.id === s.champion) || {}).av) + ' ' + esc(T.nickOf(s, s.champion)) + '</div></div>';
+      h += tourFinalCard(s);
     }
     if (isOrg && tourBotOnly(s)) h += '<div class="card"><button data-act="tourSave">Salvar campeonato neste celular</button><p class="muted" style="margin:6px 0 0">Toque para guardar o ponto em que está (também há o botão 💾 Salvar durante a partida). Para continuar depois: Campeonato &gt; Continuar campeonato salvo.</p></div>';
     const busyMe = s.players.some(p => p.id === t.myId && p.busy);
@@ -818,6 +834,17 @@
     });
     h += '</div>';
     return h + chatScreen() + '</div>';
+  }
+  function tourFinalCard(s) {
+    const T = window.ManobraTournament, champ = s.players.find(p => p.id === s.champion) || {};
+    const rows = T.standings(s);
+    const lineH = 42, height = 190 + rows.length * lineH;
+    const tx = v => esc(String(v == null ? '' : v));
+    let svg = '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="' + height + '" viewBox="0 0 900 ' + height + '"><rect width="900" height="100%" rx="28" fill="#141b2b"/><text x="450" y="52" text-anchor="middle" fill="#ffd54a" font-family="sans-serif" font-size="30" font-weight="700">MANOBRA — RESULTADO DO CAMPEONATO</text><text x="450" y="94" text-anchor="middle" fill="#f4f6fb" font-family="sans-serif" font-size="24">CAMPEÃO: ' + tx(champ.nick || T.nickOf(s, s.champion)) + '</text><line x1="38" y1="125" x2="862" y2="125" stroke="#52617c"/><text x="55" y="153" fill="#98a1b3" font-family="sans-serif" font-size="16">#</text><text x="105" y="153" fill="#98a1b3" font-family="sans-serif" font-size="16">JOGADOR</text><text x="610" y="153" fill="#98a1b3" font-family="sans-serif" font-size="16">PTS</text><text x="735" y="153" fill="#98a1b3" font-family="sans-serif" font-size="16">SALDO</text>';
+    rows.forEach((r, i) => { const y = 188 + i * lineH, color = i === 0 ? '#ffd54a' : '#f4f6fb'; svg += '<text x="55" y="' + y + '" fill="' + color + '" font-family="sans-serif" font-size="20" font-weight="' + (i === 0 ? '700' : '400') + '">' + (i + 1) + '</text><text x="105" y="' + y + '" fill="' + color + '" font-family="sans-serif" font-size="20">' + tx(r.nick) + '</text><text x="610" y="' + y + '" fill="' + color + '" font-family="sans-serif" font-size="20">' + r.points + '</text><text x="735" y="' + y + '" fill="' + color + '" font-family="sans-serif" font-size="20">' + (r.diff > 0 ? '+' : '') + r.diff + '</text>'; });
+    svg += '</svg>';
+    const uri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    return '<div class="card tour-final-card"><h3>Print do resultado</h3><img src="' + uri + '" alt="Vencedor e tabela do campeonato"><a class="button-like" download="manobra-resultado.svg" href="' + uri + '">Salvar print</a><p class="muted">Este resultado aparece automaticamente para todos os competidores humanos.</p></div>';
   }
 
   /* ---------- Tela sempre acesa durante o jogo ---------- */
@@ -1760,8 +1787,7 @@
     if (act === 'chatClose') { app.chat.open = false; render(); return; }
     if (act === 'chatSend') { chatSend(); return; }
     if (act === 'chatQuick') { const q = CHAT_QUICK[+v]; if (q) chatSend(q, true); return; }
-    if (act === 'chatVoice') { app.chat.recording ? chatVoiceStop() : chatVoiceStart(); return; }
-    if (act === 'chatMute') { app.chat.muted = !app.chat.muted; render(); return; }
+    if (act === 'chatVoice') { return; }
     if (act === 'directChatBack') { btLeave(); app.net = 'online'; app.screen = 'friends'; render(); presenceStart(); pollFriends(++pollGen); return; }
     switch (act) {
       case 'side': app.humanSide = +v; render(); break;
@@ -1902,6 +1928,19 @@
   });
   document.addEventListener('change', e => {
     if (e.target && e.target.id === 'rot') app.rotate = e.target.checked;
+  });
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest && e.target.closest('[data-act="chatVoice"]');
+    if (!el || !chatAllowed() || app.chat.recording) return;
+    e.preventDefault(); app.chat.hold = true; chatVoiceStart();
+  });
+  document.addEventListener('pointerup', e => {
+    if (!app.chat.hold) return;
+    app.chat.hold = false;
+    if (app.chat.recording) chatVoiceStop();
+  });
+  document.addEventListener('pointercancel', () => {
+    if (app.chat.hold) { app.chat.hold = false; if (app.chat.recording) chatVoiceStop(); }
   });
 
   function startSetup(mode) {
