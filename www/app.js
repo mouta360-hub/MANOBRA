@@ -25,6 +25,7 @@
     net: 'bt',       // por onde o jogo remoto passa: 'bt' (Bluetooth) ou 'online' (internet)
     onlineCode: '',  // código digitado para entrar numa partida online
     tour: { role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false },
+    avatarOpen: false,
     tourCode: '', directChat: { code: '', nick: '', connecting: false }, publicChat: { code: '', connected: false, host: false },
     tourInviteCode: '',
     me: { code: '', nick: '', av: 'fox' },
@@ -115,10 +116,10 @@
     btSend({ k: app.net === 'public' ? 'publicChat' : 'chat', text: value, quick: !!quick, nick: myNick(), av: app.me.av });
     chatPush(value, true, quick, myNick(), app.me.av); app.chat.draft = ''; render();
   }
-  function chatScreen() {
+  function chatScreen(full) {
     if (!chatAllowed()) return '';
     const unread = app.chat.unread ? '<b class="chat-unread">' + app.chat.unread + '</b>' : '';
-    if (!app.chat.open) return '<div class="chat-dock closed"><button class="chat-fab" data-act="chatOpen" aria-label="Abrir chat">💬' + unread + '</button></div>';
+    if (!full && !app.chat.open) return '<div class="chat-dock closed"><button class="chat-fab" data-act="chatOpen" aria-label="Abrir chat">💬' + unread + '</button></div>';
     const rows = app.chat.messages.length ? app.chat.messages.map(m => {
       const author = '<div class="chat-author">' + avHtml(m.av) + '<b>' + esc(m.mine ? 'Você' : (m.nick || 'Participante')) + '</b></div>';
       return m.voice
@@ -126,7 +127,9 @@
         : '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<span>' + esc(m.text) + '</span></div>';
     }).join('') : '<p class="chat-empty">Envie uma mensagem curta para o grupo.</p>';
     const voiceLabel = app.chat.recording ? '⏹ ' + app.chat.seconds + 's' : '🎙️ Gravar';
-    return '<div class="chat-dock"><section class="chat-panel" aria-label="Chat público"><header class="chat-head"><b>Chat</b><button data-act="chatClose" aria-label="Fechar chat">×</button></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button></div></section></div>';
+    const close = full ? 'publicChatBack' : 'chatClose';
+    const panel = '<section class="chat-panel" aria-label="Chat público"><header class="chat-head"><b>Chat público</b><button data-act="' + close + '" aria-label="Fechar chat">×</button></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button></div></section>';
+    return full ? '<div class="chat-public-full">' + panel + '</div>' : '<div class="chat-dock">' + panel + '</div>';
   }
   function directChatScreen() {
     return '<div class="rules"><div class="topbar"><b>Conversa com ' + esc(app.directChat.nick || 'amigo') + '</b><button data-act="directChatBack">Voltar</button></div>' + (app.directChat.connecting ? '<div class="card"><p style="text-align:center;margin:0">Convite enviado. Aguardando seu amigo aceitar…</p></div>' : chatScreen()) + '</div>';
@@ -134,11 +137,10 @@
   function publicChatScreen() {
     if (!app.publicChat.connected) return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Voltar</button></div><div class="card public-hero"><h2>Chat público</h2><p>Converse com participantes e organize seu campeonato.</p><button class="primary" data-act="publicCreate">Criar sala pública</button><p class="muted">Ou entre com um código recebido:</p><input id="publicCode" class="codein" maxlength="6" placeholder="CÓDIGO"><button class="primary" data-act="publicJoin">Entrar no chat</button></div></div>';
     const invites = app.publicChat.invites ? '<div class="card"><h3>Amigos online</h3>' + app.friends.filter(f => app.fstat[f.code] === 'online').map(f => '<div class="frow"><span>' + avHtml(f.av) + ' ' + esc(f.nick) + '</span><button data-act="publicInvite" data-v="' + esc(f.code) + '">Convidar</button></div>').join('') + '</div>' : '';
-    return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Sair</button></div><div class="card public-hero"><h2>Chat público</h2><p>Compartilhe este código para convidar pessoas:</p><div class="bigcode">' + esc(app.publicChat.code) + '</div><button data-act="publicInviteList">Convidar amigos</button></div>' + invites + chatScreen() + '</div>';
+    return '<div class="rules public-chat-page"><div class="topbar"><b>Chat público</b><button data-act="publicChatBack">Sair</button></div><div class="card public-hero"><h2>Chat público</h2><p>Compartilhe este código para convidar pessoas:</p><div class="bigcode">' + esc(app.publicChat.code) + '</div><button data-act="publicInviteList">Convidar amigos</button><button class="primary" data-act="publicCreateTour">Criar campeonato</button></div>' + invites + chatScreen(true) + '</div>';
   }
   /* ---------- Sons (sintetizados no próprio app, sem arquivos) ---------- */
   const snd = { ctx: null, on: true };
-  try { if (localStorage.getItem('manobra.sound') === '0') snd.on = false; } catch (e) { /* ok */ }
   function actx() {
     try {
       if (!snd.ctx) {
@@ -150,6 +152,26 @@
       return snd.ctx;
     } catch (e) { return null; }
   }
+  const bgm = { audio: null, track: '' };
+  function bgmTrack() {
+    if (app.screen === 'game' || app.screen === 'setup') return 'audio-partida.mp3';
+    if (app.screen === 'tour' || app.screen === 'publicChat' || app.screen === 'directChat') return 'audio-campeonato.mp3';
+    return 'audio-menu.mp3';
+  }
+  function stopBgm() {
+    if (bgm.audio) { bgm.audio.pause(); bgm.audio.currentTime = 0; }
+    bgm.track = '';
+  }
+  function startBgm() {
+    if (!snd.on || typeof Audio !== 'function') return;
+    const track = bgmTrack();
+    if (!bgm.audio) { bgm.audio = new Audio(); bgm.audio.loop = true; bgm.audio.volume = 0.045; }
+    if (bgm.track !== track) { bgm.audio.src = track; bgm.track = track; }
+    bgm.audio.volume = 0.045;
+    const play = bgm.audio.play();
+    if (play && play.catch) play.catch(() => {});
+  }
+
   function tone(ctx, t, freq, dur, type, vol, freqEnd) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = type;
@@ -216,10 +238,10 @@
     if (app.theme === 'fantasy') return fantasyPiece(p);
     if (app.theme === 'obsidian') return obsidianPiece(p);
     switch (p) {
-      case WD: return o + '<circle cx="50" cy="50" r="40" fill="#fff" stroke="#8d96a8" stroke-width="4"/><path d="M50 22v56M22 50h56" stroke="#3d6fc4" stroke-width="6" stroke-linecap="round"/></svg>';
-      case WA: return o + '<circle cx="50" cy="50" r="42" fill="#fff" stroke="#1a2433" stroke-width="5"/><path d="M58 25l10-10 7 7-10 10 14 14-7 7-14-14-18 18-7-7 18-18-10-10 7-7z" fill="#d43f48" stroke="#7b1823" stroke-width="3"/><path d="M35 73h29" stroke="#7b1823" stroke-width="6" stroke-linecap="round"/></svg>';
-      case BD: return o + '<circle cx="50" cy="50" r="40" fill="#0b0d12" stroke="#aab4c6" stroke-width="5"/><path d="M50 20l25 10v20c0 16-11 25-25 32-14-7-25-16-25-32V30z" fill="#24558b" stroke="#91d5ff" stroke-width="4"/><path d="M50 32v35M35 49h30" stroke="#d9f4ff" stroke-width="4" stroke-linecap="round"/></svg>';
-      case BA: return o + '<circle cx="50" cy="50" r="36" fill="#fff" stroke="#0b0d12" stroke-width="16"/><path d="M58 25l10-10 7 7-10 10 14 14-7 7-14-14-18 18-7-7 18-18-10-10 7-7z" fill="#d43f48" stroke="#7b1823" stroke-width="3"/><path d="M35 73h29" stroke="#7b1823" stroke-width="6" stroke-linecap="round"/></svg>';
+      case WD: return o + '<circle cx="50" cy="50" r="40" fill="#fff" stroke="#8d96a8" stroke-width="4"/></svg>';
+      case WA: return o + '<circle cx="50" cy="50" r="42" fill="#fff" stroke="#1a2433" stroke-width="5"/><circle cx="50" cy="50" r="22" fill="#111"/></svg>';
+      case BD: return o + '<circle cx="50" cy="50" r="40" fill="#0b0d12" stroke="#aab4c6" stroke-width="5"/></svg>';
+      case BA: return o + '<circle cx="50" cy="50" r="36" fill="#fff" stroke="#0b0d12" stroke-width="16"/><circle cx="50" cy="50" r="46" fill="none" stroke="#aab4c6" stroke-width="3"/></svg>';
     }
     return '';
   }
@@ -261,12 +283,10 @@
   }
 
   /* ---------- Avatares ---------- */
-  const AVATARS = [
-    ['fox', '🦊'], ['bear', '🐻'], ['lion', '🦁'], ['tiger', '🐯'], ['wolf', '🐺'], ['panda', '🐼'],
-    ['cat', '🐱'], ['dog', '🐶'], ['owl', '🦉'], ['eagle', '🦅'], ['shark', '🦈'], ['dragon', '🐲'],
-    ['unicorn', '🦄'], ['robot', '🤖'], ['ninja', '🥷'], ['king', '👑'], ['knight', '🛡️'], ['rocket', '🚀'],
-    ['fire', '🔥'], ['star', '⭐']
-  ];
+  const AVATAR_BASES = ['🦊','🐻','🦁','🐯','🐺','🐼','🐱','🐶','🦉','🦅','🦈','🐲','🦄','🤖','🥷','👑','🛡️','🚀','🔥','⭐','🐸','🐵','🐙','🦋','🐝','🦄','🐢','🦖','🐳','🦜'];
+  const AVATAR_ACCENTS = ['🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','💠'];
+  const AVATARS = [];
+  AVATAR_BASES.forEach((base, bi) => AVATAR_ACCENTS.forEach((accent, ai) => AVATARS.push(['avatar-' + bi + '-' + ai, base + accent])));
   const AV = {};
   AVATARS.forEach(a => { AV[a[0]] = a[1]; });
   const usedAiBots = new Set();
@@ -304,12 +324,9 @@
       '<div class="player-breakdown">Ataque ' + c[side][0] + ' · Defesa ' + c[side][1] + '</div></div>';
   }
   function profileEditor() {
-    return '<div class="card"><div class="prof"><span class="av big">' + avOf(app.me.av) + '</span>' +
-      '<input id="nick" class="txtin" maxlength="16" placeholder="Seu apelido" autocomplete="off" value="' + esc(app.me.nick) + '"></div>' +
-      '<p class="muted" style="margin:0 0 6px">Escolha seu avatar:</p><div class="avgrid">' +
-      AVATARS.map(a => '<button data-act="avatar" data-v="' + a[0] + '" class="' + (app.me.av === a[0] ? 'on' : '') + '">' + a[1] + '</button>').join('') + '</div></div>';
+    const grid = app.avatarOpen ? '<div class="avgrid">' + AVATARS.map(a => '<button data-act="avatar" data-v="' + a[0] + '" class="' + (app.me.av === a[0] ? 'on' : '') + '">' + a[1] + '</button>').join('') + '</div>' : '';
+    return '<div class="card"><div class="prof"><span class="av big">' + avOf(app.me.av) + '</span>' + '<input id="nick" class="txtin" maxlength="16" placeholder="Seu apelido" autocomplete="off" value="' + esc(app.me.nick) + '"></div>' + '<button data-act="avatarToggle">' + (app.avatarOpen ? 'Fechar avatares' : 'Escolher avatar (' + AVATARS.length + ')') + '</button>' + grid + '</div>';
   }
-
   /* ---------- Telas ---------- */
   function menuScreen() {
     const seg = (act, cur, items) => '<div class="seg">' + items.map(([v, label]) =>
@@ -1801,7 +1818,7 @@
     }
   });
   document.addEventListener('click', e => {
-    actx(); // o navegador só libera o áudio depois de um toque
+    actx(); startBgm(); // o navegador só libera o áudio depois de um toque
     const cell = e.target.closest('[data-i]');
     if (cell && !e.target.closest('.overlay')) {
       const i = +cell.dataset.i;
@@ -1826,6 +1843,7 @@
     if (act === 'publicJoin') { publicJoin(); return; }
     if (act === 'publicInvite') { publicInviteFriend(v); return; }
     if (act === 'publicInviteList') { app.publicChat.invites = true; render(); return; }
+    if (act === 'publicCreateTour') { tourOpen(); return; }
     if (act === 'directChatBack') { btLeave(); app.net = 'online'; app.screen = 'friends'; render(); presenceStart(); pollFriends(++pollGen); return; }
     switch (act) {
       case 'side': app.humanSide = +v; render(); break;
@@ -1850,11 +1868,13 @@
       case 'sound':
         snd.on = v === '1';
         try { localStorage.setItem('manobra.sound', v); } catch (err) { /* ok */ }
+        if (snd.on) startBgm(); else stopBgm();
         sfx('m', 0);
         render(); break;
       case 'toggleSound':
         snd.on = !snd.on;
         try { localStorage.setItem('manobra.sound', snd.on ? '1' : '0'); } catch (err) { /* ok */ }
+        if (snd.on) startBgm(); else stopBgm();
         sfx('m', 0);
         render(); break;
       case 'startAI': startSetup('ai'); break;
@@ -1899,8 +1919,9 @@
       case 'tourUnready': tourSend({ k: 'unready' }); break;
       case 'tourInviteFriend': tourInviteFriend(v); break;
       case 'avatar':
-        if (AV[v]) { app.me.av = v; saveMe(); syncPresenceStatus(); render(); }
+        if (AV[v]) { app.me.av = v; app.avatarOpen = false; saveMe(); syncPresenceStatus(); render(); }
         break;
+      case 'avatarToggle': app.avatarOpen = !app.avatarOpen; render(); break;
       case 'frVisible':
         app.presence.visible = v === '1';
         lsSet('visible', v === '1' ? '1' : '0');
