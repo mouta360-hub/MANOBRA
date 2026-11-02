@@ -68,6 +68,7 @@ if with_bt:
     main = (
         "package %s;\n\n"
         "import android.os.Bundle;\n"
+        "import android.view.View;\n"
         "import android.Manifest;\n"
         "import android.content.pm.PackageManager;\n"
         "import com.getcapacitor.BridgeActivity;\n\n"
@@ -80,6 +81,14 @@ if with_bt:
         "        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {\n"
         "            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);\n"
         "        }\n"
+        "        hideSystemUi();\n"
+        "    }\n"
+        "    private void hideSystemUi() {\n"
+        "        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);\n"
+        "    }\n"
+        "    @Override public void onWindowFocusChanged(boolean hasFocus) {\n"
+        "        super.onWindowFocusChanged(hasFocus);\n"
+        "        if (hasFocus) hideSystemUi();\n"
         "    }\n"
         "}\n" % app_id
     )
@@ -89,6 +98,7 @@ else:
     main = (
         "package %s;\n\n"
         "import android.os.Bundle;\n"
+        "import android.view.View;\n"
         "import android.Manifest;\n"
         "import android.content.pm.PackageManager;\n"
         "import com.getcapacitor.BridgeActivity;\n\n"
@@ -100,6 +110,14 @@ else:
         "        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {\n"
         "            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 701);\n"
         "        }\n"
+        "        hideSystemUi();\n"
+        "    }\n"
+        "    private void hideSystemUi() {\n"
+        "        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);\n"
+        "    }\n"
+        "    @Override public void onWindowFocusChanged(boolean hasFocus) {\n"
+        "        super.onWindowFocusChanged(hasFocus);\n"
+        "        if (hasFocus) hideSystemUi();\n"
         "    }\n"
         "}\n" % app_id
     )

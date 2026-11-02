@@ -155,8 +155,7 @@
   const bgm = { audio: null, track: '' };
   function bgmTrack() {
     if (app.screen === 'game' || app.screen === 'setup') return 'audio-partida.mp3';
-    if (app.screen === 'tour' || app.screen === 'publicChat' || app.screen === 'directChat') return 'audio-campeonato.mp3';
-    return 'audio-menu.mp3';
+    return null;
   }
   function stopBgm() {
     if (bgm.audio) { bgm.audio.pause(); bgm.audio.currentTime = 0; }
@@ -165,6 +164,7 @@
   function startBgm() {
     if (!snd.on || typeof Audio !== 'function') return;
     const track = bgmTrack();
+    if (!track) { stopBgm(); return; }
     if (!bgm.audio) { bgm.audio = new Audio(); bgm.audio.loop = true; bgm.audio.volume = 0.045; }
     if (bgm.track !== track) { bgm.audio.src = track; bgm.track = track; }
     bgm.audio.volume = 0.045;
@@ -283,8 +283,8 @@
   }
 
   /* ---------- Avatares ---------- */
-  const AVATAR_BASES = ['🦊','🐻','🦁','🐯','🐺','🐼','🐱','🐶','🦉','🦅','🦈','🐲','🦄','🤖','🥷','👑','🛡️','🚀','🔥','⭐','🐸','🐵','🐙','🦋','🐝','🦄','🐢','🦖','🐳','🦜'];
-  const AVATAR_ACCENTS = ['🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟤','💠'];
+  const AVATAR_BASES = ['🦊','🐻','🦁','🐯','🐺','🐼','🐱','🐶','🦉','🦅','🦈','🐲','🦄','🤖','🥷','👑','🛡️','🚀','🔥','⭐','🐸','🐵','🐙','🦋','🐝','🧙','🐢','🦖','🐳','🦜'];
+  const AVATAR_ACCENTS = ['👑','⚔️','🛡️','🚀','🪄','🌸','⚡','🎩','🕶️','🎮'];
   const AVATARS = [];
   AVATAR_BASES.forEach((base, bi) => AVATAR_ACCENTS.forEach((accent, ai) => AVATARS.push(['avatar-' + bi + '-' + ai, base + accent])));
   const AV = {};

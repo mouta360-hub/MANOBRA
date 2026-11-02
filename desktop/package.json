@@ -1,0 +1,23 @@
+{
+  "name": "manobra-windows",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Manobra para Windows",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.manobra.game",
+    "productName": "Manobra",
+    "directories": { "output": "dist" },
+    "files": ["main.cjs", "../www/**/*"],
+    "win": { "target": ["nsis", "portable"], "icon": "../assets/manobra-icon-base.png" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+  }
+}
