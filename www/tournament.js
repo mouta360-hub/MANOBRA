@@ -152,6 +152,18 @@
     _p(id) { return this.players.find(p => p.id === id) || null; }
     _m(mid) { return this.matches.find(m => m.id === mid) || null; }
     send(id, obj) { const p = this._p(id); if (p && p.connected && !p.bot) this._send(id, obj); }
+    chat(id, msg) {
+      if (!this._p(id) || !this._p(id).connected || !msg || typeof msg !== 'object') return;
+      if (msg.k === 'chat') {
+        const text = String(msg.text == null ? '' : msg.text).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
+        if (!text) return;
+        this.players.forEach(p => { if (p.id !== id && p.connected && !p.bot) this.send(p.id, { k: 'chat', text: text, quick: !!msg.quick }); });
+      } else if (msg.k === 'chatVoice') {
+        const data = typeof msg.data === 'string' && msg.data.length <= 500000 ? msg.data : '';
+        if (!data) return;
+        this.players.forEach(p => { if (p.id !== id && p.connected && !p.bot) this.send(p.id, { k: 'chatVoice', data: data }); });
+      }
+    }
     busy(id) { return this.matches.some(m => m.status === 'playing' && (m.a === id || m.b === id)); }
     isBot(id) { const p = id == null ? null : this._p(id); return !!(p && p.bot); }
     _currentRound() {
@@ -369,6 +381,7 @@
         case 'ready': this.ready(id, msg.m); break;
         case 'unready': this.unready(id); break;
         case 'relay': this.relay(id, msg.m, msg.d); break;
+        case 'chat': case 'chatVoice': this.chat(id, msg); break;
         case 'format': if (org) this.setFormat(msg.v); break;
         case 'start': if (org) this.start(); break;
         case 'addbot': if (org && this._addBot()) this.broadcast(); break;
@@ -665,6 +678,11 @@
       if (o.k === 'chat') {
         const text = String(o.text == null ? '' : o.text).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
         if (text) this.send(opp, { k: 'relay', m: mid, d: JSON.stringify({ k: 'chat', text: text, quick: !!o.quick }) });
+        return;
+      }
+      if (o.k === 'chatVoice') {
+        const data = typeof o.data === 'string' && o.data.length <= 500000 ? o.data : '';
+        if (data) this.send(opp, { k: 'relay', m: mid, d: JSON.stringify({ k: 'chatVoice', data: data }) });
         return;
       }
       if (o.k === 'bye') { this._forfeit(m, id, 'saiu da partida'); return; }

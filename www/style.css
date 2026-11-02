@@ -166,3 +166,7 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
   .chat-dock { right: 12px; bottom: 12px; }
   .chat-panel { max-height: min(70vh, 390px); }
 }
+
+.chat-voice { white-space: nowrap; }
+.chat-voice.recording { background: #b33a3a; color: #fff; }
+.chat-msg audio { width: min(230px, 100%); height: 34px; }
