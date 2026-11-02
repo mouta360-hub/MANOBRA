@@ -803,7 +803,7 @@
         h += '<div class="mrow"><div class="fwho">' + avHtml(p.av) + '<span><b>' + esc(p.nick) + '</b>' + (p.id === 0 ? ' <span class="muted">(organizador)</span>' : '') +
           (p.bot ? ' <span class="muted">(IA)</span>' : '') +
           (p.id === t.myId ? ' <span class="muted">(você)</span>' : '') + '</span></div><div class="btns">' +
-          (p.bot && isOrg ? '<button data-act="tourRmBot" data-v="' + p.id + '">Tirar</button>' : '<span class="' + (p.connected ? 'live' : 'muted') + '">' + (p.connected ? 'online' : 'fora') + '</span>') + '</div></div>';
+          (p.eliminated ? '<span class="muted">eliminado</span>' : (p.bot && isOrg ? '<button data-act="tourRmBot" data-v="' + p.id + '">Tirar</button>' : '<span class="' + (p.connected ? 'live' : 'muted') + '">' + (p.connected ? 'online' : 'fora') + '</span>')) + '</div></div>';
       });
       if (isOrg) {
         h += '<button data-act="tourAddBot"' + (s.players.length >= T.MAX_PLAYERS ? ' disabled' : '') + '>+ Adicionar robô</button>';
@@ -1824,13 +1824,14 @@
     const l = window.ManobraTourLink;
     if (app.tour.role) {
       const running = app.tour.snap && app.tour.snap.status === 'running';
-      const msg = app.tour.role === 'host' ? 'Sair encerra o campeonato para todos. Deseja sair?' : 'Sair do campeonato? Suas partidas pendentes ficam sem jogar.';
-      if (running || app.tour.role === 'host') {
+      const msg = app.tour.role === 'host' ? 'Sair encerra o campeonato para todos. Deseja sair?' : 'Sair do campeonato elimina você e não permite retornar. Deseja continuar?';
+      if (running || app.tour.role === 'host' || app.tour.role === 'guest') {
         const ok = typeof confirm === 'function' ? confirm(msg) : true;
         if (!ok) return;
       }
     }
-    if (l) l.leave();
+    if (l && app.tour.role === 'guest') l.withdraw();
+    else if (l) l.leave();
     tourEndMatchLocal();
     app.tour = freshTour();
     app.screen = 'menu';

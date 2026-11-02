@@ -245,6 +245,13 @@
         try { client.conn.send(JSON.stringify(obj)); } catch (e) { /* ok */ }
       }
     },
+    withdraw: function () {
+      if (role === 'guest' && client && client.conn && client.conn.open !== false) {
+        try { client.conn.send(JSON.stringify({ k: 'withdraw' })); } catch (e) { /* ok */ }
+      }
+      reset();
+      return Promise.resolve();
+    },
     snapshot: function () { return hub ? hub.snapshot() : null; },
     saveState: function () { return hub && role === 'host' && hub.exportState ? hub.exportState() : null; },
     role: function () { return role; },

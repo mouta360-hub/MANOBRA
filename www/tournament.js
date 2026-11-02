@@ -264,7 +264,7 @@
     snapshot() {
       return {
         status: this.status, format: this.format, rounds: this.rounds, champion: this.champion, botLevel: this.botLevel,
-        players: this.players.map(p => ({ id: p.id, nick: p.nick, av: p.av || '', bot: !!p.bot, connected: p.connected, busy: this.busy(p.id) })),
+        players: this.players.map(p => ({ id: p.id, nick: p.nick, av: p.av || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
           reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null,
@@ -330,13 +330,16 @@
     join(pid, nick, avatar) {
       const av = cleanAv(avatar);
       const old = this.players.find(p => p.pid === pid);
-      if (old) { old.connected = true; if (av) old.av = av; this.broadcast(); return { ok: true, id: old.id }; }
+      if (old) {
+        if (old.eliminated) return { ok: false, why: 'Você foi eliminado deste campeonato e não pode retornar.' };
+        old.connected = true; if (av) old.av = av; this.broadcast(); return { ok: true, id: old.id };
+      }
       if (this.status !== 'lobby') return { ok: false, why: 'O campeonato já começou.' };
       if (this.players.length >= MAX_PLAYERS) return { ok: false, why: 'O campeonato está cheio (máximo ' + MAX_PLAYERS + ' jogadores).' };
       let name = clean(nick) || 'Jogador';
       const base = name;
       for (let n = 2; this.players.some(p => p.nick.toLowerCase() === name.toLowerCase()); n++) name = base.slice(0, 13) + ' ' + n;
-      const p = { id: this._next++, pid: String(pid), nick: name, av: av, connected: true };
+      const p = { id: this._next++, pid: String(pid), nick: name, av: av, connected: true, eliminated: false };
       this.players.push(p);
       this.broadcast();
       return { ok: true, id: p.id };
@@ -375,6 +378,22 @@
       }
       this.broadcast();
     }
+    withdraw(id) {
+      const p = this._p(id);
+      if (!p || p.bot || id === 0 || p.eliminated) return false;
+      p.eliminated = true;
+      p.connected = false;
+      if (this.status === 'lobby') {
+        this.broadcast();
+        return true;
+      }
+      this.matches.filter(m => m.a === id || m.b === id).forEach(m => {
+        if (m.status === 'pending' || m.status === 'playing') this._forfeit(m, id, 'jogador saiu voluntariamente');
+      });
+      this._forfeitDisconnected();
+      this.broadcast();
+      return true;
+    }
 
     handle(id, msg) {
       if (!msg || typeof msg !== 'object' || !this._p(id)) return;
@@ -386,6 +405,7 @@
         case 'chat': case 'chatVoice': this.chat(id, msg); break;
         case 'format': if (org) this.setFormat(msg.v); break;
         case 'start': if (org) this.start(); break;
+        case 'withdraw': if (!org) this.withdraw(id); break;
         case 'addbot': if (org && this._addBot()) this.broadcast(); break;
         case 'rmbot': if (org && this._removeBot(msg.id)) this.broadcast(); break;
         case 'botlevel': if (org && this.status === 'lobby' && this.E.LEVELS[msg.v]) { this.botLevel = msg.v; this.broadcast(); } break;
