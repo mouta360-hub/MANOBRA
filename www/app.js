@@ -33,6 +33,7 @@
     fr: { state: 'idle', msg: '', invite: null, target: null, newCode: '', newNick: '' },
     presence: { visible: true, state: 'off', msg: '' }, // 'off' | 'connecting' | 'ready' | 'error'
     inv: null,       // convite recebido, na tela por cima de qualquer coisa
+    chat: { open: false, draft: '', unread: 0, messages: [] },
     fstat: {},       // código do amigo -> 'online' | 'match' | 'tour' | 'offline'
     pollMs: 20000    // de quanto em quanto tempo a tela Amigos confere o status
   };
@@ -50,6 +51,35 @@
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+  const CHAT_QUICK = ['Boa partida!', 'Boa jogada!', 'Estou pensando.', 'Quase!', 'Vamos lá!', 'Parabéns!'];
+  function chatAllowed() { return app.screen === 'game' && app.mode === 'bt' && app.btLinked && !app.game?.over; }
+  function chatClean(s) { return String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120); }
+  function speakChat(text) {
+    if (typeof window.speechSynthesis !== 'object' || typeof window.SpeechSynthesisUtterance !== 'function') { toast('A voz curta não está disponível neste aparelho.'); return; }
+    try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'pt-BR'; u.rate = 1.05; window.speechSynthesis.speak(u); }
+    catch (e) { toast('Não foi possível reproduzir a voz.'); }
+  }
+  function chatPush(text, mine, quick) {
+    const msg = { text: chatClean(text), mine: !!mine, quick: !!quick, at: Date.now() };
+    if (!msg.text) return;
+    app.chat.messages.push(msg);
+    if (app.chat.messages.length > 30) app.chat.messages.splice(0, app.chat.messages.length - 30);
+    if (!mine && !app.chat.open) app.chat.unread++;
+  }
+  function chatSend(text, quick) {
+    if (!chatAllowed()) return;
+    const value = chatClean(text == null ? app.chat.draft : text);
+    if (!value) return;
+    btSend({ k: 'chat', text: value, quick: !!quick });
+    chatPush(value, true, quick); app.chat.draft = ''; render();
+  }
+  function chatScreen() {
+    if (!(app.screen === 'game' && app.mode === 'bt' && app.btLinked)) return '';
+    const unread = app.chat.unread ? '<b class="chat-unread">' + app.chat.unread + '</b>' : '';
+    if (!app.chat.open) return '<div class="chat-dock closed"><button class="chat-fab" data-act="chatOpen" aria-label="Abrir chat">💬' + unread + '</button></div>';
+    const rows = app.chat.messages.length ? app.chat.messages.map(m => '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '"><span>' + esc(m.text) + '</span><button data-act="chatSpeak" data-v="' + encodeURIComponent(m.text) + '" aria-label="Ouvir mensagem">🔊</button></div>').join('') : '<p class="chat-empty">Envie uma mensagem curta para o adversário.</p>';
+    return '<div class="chat-dock"><section class="chat-panel" aria-label="Chat da partida"><header class="chat-head"><b>Chat da partida</b><button data-act="chatClose" aria-label="Fechar chat">×</button></header><div class="chat-messages">' + rows + '</div><div class="chat-quick">' + CHAT_QUICK.map((q, i) => '<button data-act="chatQuick" data-v="' + i + '">' + esc(q) + '</button>').join('') + '</div><div class="chat-compose"><input id="chatInput" maxlength="120" autocomplete="off" placeholder="Escreva uma mensagem…" value="' + esc(app.chat.draft) + '"><button data-act="chatSend" aria-label="Enviar">Enviar</button></div></section></div>';
   }
 
   /* ---------- Sons (sintetizados no próprio app, sem arquivos) ---------- */
@@ -425,7 +455,7 @@
           : '<button class="primary" data-act="again">Jogar de novo</button><button data-act="menu">Menu</button>') +
         '</div></div>';
     }
-    return h;
+    return h + chatScreen();
   }
 
   function btScreen() {
@@ -1038,11 +1068,13 @@
     }
     app.btLinked = false; app.btReady = false; app.peerSetup = null; app.btQueue.length = 0;
     app.bt = { stage: 'idle', devices: [], msg: '', code: '' };
+    app.chat = { open: false, draft: '', unread: 0, messages: [] };
     app.peer = { nick: 'Adversário', av: 'robot' };
   }
   function btConnected(role, name) {
     if (app.btLinked) return;
     app.btLinked = true;
+    app.chat = { open: false, draft: '', unread: 0, messages: [] };
     app.mode = 'bt';
     app.humanSide = role === 'host' ? WHITE : BLACK;
     app.peerSetup = null;
@@ -1112,6 +1144,11 @@
       if (Array.isArray(o.opp)) app.peerSetup = o.opp;
       app.btReady = true;
       tryStartBt();
+    } else if (o.k === 'chat') {
+      const text = chatClean(o.text);
+      if (!text || app.screen !== 'game') return;
+      chatPush(text, false, !!o.quick);
+      render();
     } else if (o.k === 'pass') {
       app.btQueue.push({ pass: true });
       processBtQueue();
@@ -1568,6 +1605,8 @@
       if (t.value !== v) t.value = v;
     } else if (t.id === 'fnick') {
       app.fr.newNick = cleanNick(t.value);
+    } else if (t.id === 'chatInput') {
+      app.chat.draft = String(t.value || '').slice(0, 120);
     }
   });
   document.addEventListener('click', e => {
@@ -1586,6 +1625,11 @@
       if (e.target === el) { app.choice = null; render(); }
       return;
     }
+    if (act === 'chatOpen') { app.chat.open = true; app.chat.unread = 0; render(); return; }
+    if (act === 'chatClose') { app.chat.open = false; render(); return; }
+    if (act === 'chatSend') { chatSend(); return; }
+    if (act === 'chatQuick') { const q = CHAT_QUICK[+v]; if (q) chatSend(q, true); return; }
+    if (act === 'chatSpeak') { speakChat(decodeURIComponent(v || '')); return; }
     switch (act) {
       case 'side': app.humanSide = +v; render(); break;
       case 'level': app.level = v; render(); break;
@@ -1694,6 +1738,9 @@
       case 'btJoin': btJoin(); break;
       case 'btConnect': btConnect(v); break;
     }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target && e.target.id === 'chatInput') { e.preventDefault(); chatSend(); }
   });
   document.addEventListener('change', e => {
     if (e.target && e.target.id === 'rot') app.rotate = e.target.checked;

@@ -662,6 +662,11 @@
       if (!o || typeof o !== 'object') return;
       const forward = () => this.send(opp, { k: 'relay', m: mid, d: d });
       if (o.k === 'hello') { forward(); return; }
+      if (o.k === 'chat') {
+        const text = String(o.text == null ? '' : o.text).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
+        if (text) this.send(opp, { k: 'relay', m: mid, d: JSON.stringify({ k: 'chat', text: text, quick: !!o.quick }) });
+        return;
+      }
       if (o.k === 'bye') { this._forfeit(m, id, 'saiu da partida'); return; }
       if (o.k === 'setup') {
         if (rt.setups[side] || rt.game) return; // já definida (ex.: sorteada ao fim do tempo): ignora, sem punir
