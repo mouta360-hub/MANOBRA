@@ -271,7 +271,7 @@
 
   let presStatus = 'online'; // o que os amigos veem: online | match (em partida) | tour (em campeonato)
   let presAvatar = '';       // avatar que os amigos veem
-  const cleanAv = function (s) { return String(s == null ? '' : s).replace(/[^a-z0-9]/gi, '').slice(0, 12); };
+  const cleanAv = function (s) { return String(s == null ? '' : s).replace(/[^a-z0-9-]/gi, '').slice(0, 12); };
 
   function onIncoming(st, c) {
     let adopted = false;

@@ -305,6 +305,8 @@
   const avId = id => {
     const v = String(id == null ? '' : id);
     if (AV[v]) return v;
+    const compact = /^avatar(\d+)$/.exec(v);
+    if (compact && AV['avatar-' + compact[1]]) return 'avatar-' + compact[1];
     if (Object.prototype.hasOwnProperty.call(LEGACY_AVATARS, v)) return 'avatar-' + LEGACY_AVATARS[v];
     return '';
   };

@@ -17,7 +17,7 @@
   BOT_FIRST.forEach(first => BOT_LAST.forEach(last => BOT_PROFILES.push({ nick: first + ' ' + last, av: BOT_AVATARS[BOT_PROFILES.length % BOT_AVATARS.length] })));
   if (root) root.ManobraBotProfiles = BOT_PROFILES;
 
-  const cleanAv = s => String(s == null ? '' : s).replace(/[^a-z0-9]/gi, '').slice(0, 12);
+  const cleanAv = s => String(s == null ? '' : s).replace(/[^a-z0-9-]/gi, '').slice(0, 12);
   const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16);
 
   function shuffle(arr, rnd) {
