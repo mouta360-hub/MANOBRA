@@ -18,7 +18,7 @@
     moveDeadline: 0, screen: 'menu', mode: 'ai', humanSide: WHITE, level: 'medium', rotate: false,
     pieces: new Int8Array(N), setupSide: WHITE, game: null,
     sel: -1, purge: false, choice: null, thinking: false, flipped: false,
-    speed: 'slow', animating: false, animToken: 0,
+    speed: 'slow', theme: 'classic', animating: false, animToken: 0,
     // Bluetooth
     bt: { stage: 'idle', devices: [], msg: '', code: '' }, btLinked: false, btReady: false,
     peerSetup: null, btQueue: [],
@@ -42,6 +42,7 @@
   window.__manobraApp = app; // gancho usado só pelos testes
   const DURS = { slow: 1100, medium: 650, fast: 280 }; // duração do movimento (ms)
   try { const sp = localStorage.getItem('manobra.speed'); if (DURS[sp]) app.speed = sp; } catch (e) { /* sem armazenamento */ }
+  try { const th = localStorage.getItem('manobra.theme'); if (['classic', 'fantasy', 'obsidian'].indexOf(th) >= 0) app.theme = th; } catch (e) { /* sem armazenamento */ }
 
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -172,8 +173,22 @@
   }
 
   /* ---------- Peças (como no manual) ---------- */
+  function fantasyPiece(p) {
+    const side = E.sideOf(p), attack = E.isAttack(p), dark = side === BLACK;
+    const body = dark ? '#26344c' : '#f6ead0', edge = dark ? '#8fb5e8' : '#a96b2d', shine = dark ? '#b9d8ff' : '#fff8e8';
+    const sword = '<path d="M61 23l8-8 5 5-8 8 13 13-5 5-13-13-16 16-5-5 16-16-8-8 5-5z" fill="' + shine + '" stroke="' + edge + '" stroke-width="2"/><path d="M39 68h23" stroke="' + edge + '" stroke-width="5" stroke-linecap="round"/>';
+    const shield = '<path d="M50 17l27 10v20c0 18-12 28-27 36-15-8-27-18-27-36V27z" fill="' + body + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 28v39M31 47h38" stroke="' + shine + '" stroke-width="4" opacity=".85"/>';
+    return '<svg class="pc fantasy-piece" viewBox="0 0 100 100"><defs><radialGradient id="g' + p + '"><stop stop-color="' + shine + '"/><stop offset="1" stop-color="' + body + '"/></radialGradient></defs><circle cx="50" cy="50" r="43" fill="url(#g' + p + ')" stroke="' + edge + '" stroke-width="4"/><circle cx="50" cy="34" r="9" fill="' + shine + '" stroke="' + edge + '" stroke-width="3"/>' + (attack ? sword : shield) + '</svg>';
+  }
+  function obsidianPiece(p) {
+    const attack = E.isAttack(p), dark = E.sideOf(p) === BLACK, fill = dark ? '#101722' : '#f1f4ff', edge = dark ? '#72b8d8' : '#5967d9';
+    return '<svg class="pc" viewBox="0 0 100 100"><path d="M50 5l38 22v46L50 95 12 73V27z" fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 15v70M18 31l64 38M82 31L18 69" stroke="' + edge + '" stroke-width="2" opacity=".65"/><circle cx="50" cy="50" r="' + (attack ? 17 : 10) + '" fill="' + edge + '"/><path d="M42 50h16" stroke="' + fill + '" stroke-width="4"/></svg>';
+  }
   function pieceSvg(p) {
     const o = '<svg class="pc" viewBox="0 0 100 100">';
+    if (!p) return '';
+    if (app.theme === 'fantasy') return fantasyPiece(p);
+    if (app.theme === 'obsidian') return obsidianPiece(p);
     switch (p) {
       case WD: return o + '<circle cx="50" cy="50" r="40" fill="#fff" stroke="#8d96a8" stroke-width="4"/></svg>';
       case WA: return o + '<circle cx="50" cy="50" r="42" fill="#fff" stroke="#1a2433" stroke-width="5"/><circle cx="50" cy="50" r="22" fill="#111"/></svg>';
@@ -287,6 +302,8 @@
       '<div class="card"><h3>Campeonato</h3><button class="primary" data-act="tourOpen">Criar ou entrar num campeonato</button></div>' +
       '<div class="card"><h3>Velocidade das jogadas</h3>' +
       seg('speed', app.speed, [['slow', 'Lenta'], ['medium', 'Média'], ['fast', 'Rápida']]) +
+      '<h3>Visual do tabuleiro e das peças</h3>' +
+      seg('theme', app.theme, [['classic', 'Clássico'], ['fantasy', 'Escudos e espadas'], ['obsidian', 'Obsidiana']]) +
       '<h3>Som</h3>' + seg('sound', snd.on ? '1' : '0', [['1', 'Ligado'], ['0', 'Desligado']]) + '</div>' +
       '<button class="link" data-act="rules">Como jogar</button></div>';
   }
@@ -823,6 +840,7 @@
 
   function render() {
     syncAwake();
+    if (typeof document !== 'undefined' && document.body) document.body.dataset.theme = app.theme;
     const root = $('#app');
     if (app.screen === 'menu') root.innerHTML = menuScreen();
     else if (app.screen === 'tour') root.innerHTML = tourScreen();
@@ -1709,6 +1727,13 @@
         app.speed = v;
         try { localStorage.setItem('manobra.speed', v); } catch (err) { /* ok */ }
         render(); break;
+      case 'theme':
+        if (['classic', 'fantasy', 'obsidian'].indexOf(v) >= 0) {
+          app.theme = v;
+          try { localStorage.setItem('manobra.theme', v); } catch (err) { /* ok */ }
+          render();
+        }
+        break;
       case 'sound':
         snd.on = v === '1';
         try { localStorage.setItem('manobra.sound', v); } catch (err) { /* ok */ }
