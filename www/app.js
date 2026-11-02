@@ -60,7 +60,7 @@
   function chatAllowed() { return (app.net === 'tour' && !!app.tour.role && ['tour', 'setup', 'game'].indexOf(app.screen) >= 0) || (app.net === 'direct' && app.screen === 'directChat' && app.btLinked) || (app.net === 'public' && app.screen === 'publicChat' && app.publicChat.connected) || (app.mode === 'bt' && app.screen === 'game' && app.btLinked && !app.game?.over); }
   function chatClean(s) { return String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120); }
   function chatPush(text, mine, quick, nick, av) {
-    const msg = { text: chatClean(text), mine: !!mine, quick: !!quick, nick: cleanNick(nick) || (mine ? myNick() : 'Participante'), av: AV[av] ? av : (mine ? app.me.av : ''), at: Date.now() };
+    const msg = { text: chatClean(text), mine: !!mine, quick: !!quick, nick: cleanNick(nick) || (mine ? myNick() : 'Participante'), av: avId(av) || (mine ? app.me.av : ''), at: Date.now() };
     if (!msg.text) return;
     app.chat.messages.push(msg);
     if (app.chat.messages.length > 30) app.chat.messages.splice(0, app.chat.messages.length - 30);
@@ -68,7 +68,7 @@
   }
   function chatPushVoice(data, mine, nick, av) {
     if (!data || typeof data !== 'string' || data.length > 500000) return;
-    app.chat.messages.push({ voice: data, mine: !!mine, nick: cleanNick(nick) || (mine ? myNick() : 'Participante'), av: AV[av] ? av : (mine ? app.me.av : ''), at: Date.now() });
+    app.chat.messages.push({ voice: data, mine: !!mine, nick: cleanNick(nick) || (mine ? myNick() : 'Participante'), av: avId(av) || (mine ? app.me.av : ''), at: Date.now() });
     if (app.chat.messages.length > 30) app.chat.messages.splice(0, app.chat.messages.length - 30);
     if (!mine && !app.chat.open) app.chat.unread++;
   }
@@ -301,8 +301,15 @@
   const AVATARS = Array.from({ length: 300 }, (_, i) => ['avatar-' + i, String.fromCodePoint(0x1F300 + i)]);
   const AV = {};
   AVATARS.forEach(a => { AV[a[0]] = a[1]; });
+  const LEGACY_AVATARS = { fox: 0, bear: 1, lion: 2, tiger: 3, wolf: 4, panda: 5, cat: 6, dog: 7, owl: 8, eagle: 9, shark: 10, dragon: 11, unicorn: 12, robot: 13, ninja: 14, king: 15, knight: 16, rocket: 17, fire: 18, star: 19 };
+  const avId = id => {
+    const v = String(id == null ? '' : id);
+    if (AV[v]) return v;
+    if (Object.prototype.hasOwnProperty.call(LEGACY_AVATARS, v)) return 'avatar-' + LEGACY_AVATARS[v];
+    return '';
+  };
   const usedAiBots = new Set();
-  const avOf = id => AV[id] || '🙂';
+  const avOf = id => AV[avId(id)] || '🙂';
   const avHtml = id => '<span class="av">' + avOf(id) + '</span>';
   function pickBot() {
     if (usedAiBots.size >= BOT_PROFILES.length) usedAiBots.clear();
@@ -718,7 +725,7 @@
       const gm = data.rt && data.rt[mine.id] && data.rt[mine.id].game;
       if (!gm) return false; // montagem em andamento: mantém o último salvamento bom
       const opp = s.players.find(p => p.id === (mine.a === 0 ? mine.b : mine.a)) || {};
-      local = { matchId: mine.id, humanSide: mine.a === 0 ? WHITE : BLACK, peer: { nick: opp.nick || 'Adversário', av: AV[opp.av] ? opp.av : 'robot' }, game: gm };
+      local = { matchId: mine.id, humanSide: mine.a === 0 ? WHITE : BLACK, peer: { nick: opp.nick || 'Adversário', av: avId(opp.av) || 'avatar-13' }, game: gm };
     }
     try { localStorage.setItem(TOUR_SAVE_KEY, JSON.stringify({ data: data, local: local, savedAt: Date.now() })); if (!silent) toast('Campeonato salvo neste celular.'); return true; }
     catch (e) { if (!silent) toast('Não há espaço suficiente para salvar o campeonato.'); return false; }
@@ -1279,7 +1286,7 @@
     if (!o || typeof o !== 'object') return;
     if (o.k === 'hello') {
       const nick = cleanNick(o.nick);
-      app.peer = { nick: nick || app.peer.nick || 'Adversário', av: AV[o.av] ? o.av : (app.peer.av || 'robot') };
+      app.peer = { nick: nick || app.peer.nick || 'Adversário', av: avId(o.av) || (app.peer.av || 'avatar-13') };
       if (app.screen === 'setup' || app.screen === 'game') render();
     } else if (o.k === 'setup') {
       if (!validPeerSetup(o.p)) { btError('O adversário enviou uma montagem inválida.'); return; }
@@ -1430,13 +1437,13 @@
     try { me = JSON.parse(lsGet('me')); } catch (e) { me = null; }
     if (!me || !/^[A-Z0-9]{6}$/.test(String(me.code))) me = { code: newMyCode(), nick: '' };
     me.nick = cleanNick(me.nick);
-    if (!AV[me.av]) me.av = AVATARS[Math.floor(Math.random() * AVATARS.length)][0];
+    me.av = avId(me.av) || AVATARS[Math.floor(Math.random() * AVATARS.length)][0];
     app.me = me;
     app.presence.visible = lsGet('visible') !== '0';
     saveMe();
     let fl = [];
     try { fl = JSON.parse(lsGet('friends')) || []; } catch (e) { fl = []; }
-    app.friends = Array.isArray(fl) ? fl.filter(x => x && /^[A-Z0-9]{6}$/.test(String(x.code))).map(x => ({ code: x.code, nick: cleanNick(x.nick) || x.code, av: AV[x.av] ? x.av : '' })).slice(0, 100) : [];
+    app.friends = Array.isArray(fl) ? fl.filter(x => x && /^[A-Z0-9]{6}$/.test(String(x.code))).map(x => ({ code: x.code, nick: cleanNick(x.nick) || x.code, av: avId(x.av) })).slice(0, 100) : [];
   }
   const myNick = () => app.me.nick || 'Jogador';
 
@@ -1536,7 +1543,7 @@
       toast(nick + ' tentou chamar você, mas você está ocupado.');
       return;
     }
-    app.inv = { nick: nick, code: cleanCode6(ev.code), av: AV[ev.av] ? ev.av : '', kind: ev.kind === 'tour' ? 'tour' : (ev.kind === 'chat' ? 'chat' : (ev.kind === 'public' ? 'public' : 'game')), tourCode: String(ev.tourCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) };
+    app.inv = { nick: nick, code: cleanCode6(ev.code), av: avId(ev.av), kind: ev.kind === 'tour' ? 'tour' : (ev.kind === 'chat' ? 'chat' : (ev.kind === 'public' ? 'public' : 'game')), tourCode: String(ev.tourCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) };
     sfx('f', 0);
     renderInvite();
   }
@@ -1736,7 +1743,7 @@
     } else if (o.k === 'start') {
       if (app.btLinked || app.tour.matchId) return;
       app.tour.matchId = o.m;
-      app.peer = { nick: cleanNick(o.opp) || 'Adversário', av: AV[o.oppAv] ? o.oppAv : 'robot' };
+      app.peer = { nick: cleanNick(o.opp) || 'Adversário', av: avId(o.oppAv) || 'avatar-13' };
       tourEmit('connected', { name: o.opp, role: o.side === 0 ? 'host' : 'guest' });
     } else if (o.k === 'relay') {
       if (o.m === app.tour.matchId && typeof o.d === 'string') tourEmit('message', { data: o.d });

@@ -451,7 +451,7 @@
     const tour = opts && opts.kind === 'tour';
     const chat = opts && opts.kind === 'chat';
     const pub = opts && opts.kind === 'public';
-    const tourCode = cleanCode(opts && opts.tournamentCode).slice(0, 4);
+    const tourCode = cleanCode(opts && opts.tournamentCode).slice(0, pub ? 6 : 4);
     if (code.length !== 6 || from.length !== 6) return Promise.reject(new Error('Código do amigo inválido.'));
     return loadLib().then(function () {
       return new Promise(function (resolve, reject) {
