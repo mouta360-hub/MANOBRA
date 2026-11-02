@@ -791,6 +791,7 @@
     }
     const s = t.snap;
     if (!s) return h + '<div class="hint">Conectando…</div></div>';
+    if (t.disconnected) h += '<div class="card"><p class="hint" style="margin:0 0 10px">A conexão com o organizador caiu. O campeonato foi mantido nesta tela.</p><button class="primary" data-act="tourReconnect">Reconectar ao campeonato</button></div>';
     const isOrg = t.myId === 0;
     h += tourFriendsCard();
     if (s.status === 'lobby') {
@@ -1669,7 +1670,7 @@
   };
   function tourEmit(ev, data) { (tourHandlers[ev] || []).slice().forEach(f => { try { f(data); } catch (e) { /* ok */ } }); }
   let tourWired = false;
-  const freshTour = () => ({ role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false, local: false });
+  const freshTour = () => ({ role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false, disconnected: false, local: false });
 
   function tourEnsure(allowOffline) {
     const l = window.ManobraTourLink;
@@ -1773,11 +1774,33 @@
     render();
   }
   function onTourClosed() {
-    toast('A conexão com o campeonato foi encerrada.');
+    const wasGuest = app.tour.role === 'guest' && !!app.tour.code;
+    toast(wasGuest ? 'A conexão caiu. Você pode reconectar ao campeonato.' : 'A conexão com o campeonato foi encerrada.');
     tourEndMatchLocal();
-    app.tour = freshTour();
-    if (app.screen === 'tour' || app.screen === 'game' || app.screen === 'setup') app.screen = 'menu';
+    if (wasGuest) {
+      app.tour.disconnected = true;
+      app.tour.connecting = false;
+      app.screen = 'tour';
+    } else {
+      app.tour = freshTour();
+      if (app.screen === 'tour' || app.screen === 'game' || app.screen === 'setup') app.screen = 'menu';
+    }
     render();
+  }
+  async function tourReconnect() {
+    if (app.tour.role !== 'guest' || !app.tour.code || app.tour.connecting) return;
+    const code = app.tour.code;
+    app.tour.connecting = true; app.tour.disconnected = false; app.tour.msg = ''; render();
+    try {
+      const l = tourEnsure(false);
+      const r = await l.join({ code: code, nick: myNick(), pid: app.me.code, avatar: app.me.av });
+      app.tour.connecting = false; app.tour.disconnected = false; app.tour.myId = r.you;
+      app.tour.snap = l.snapshot();
+      toast('Reconectado ao campeonato.');
+      render();
+    } catch (e) {
+      app.tour.connecting = false; app.tour.disconnected = true; app.tour.msg = errMsg(e); render();
+    }
   }
   // Limpa o que é da partida atual, sem sair do campeonato
   function tourEndMatchLocal() {
@@ -1935,6 +1958,7 @@
       case 'btOpen': app.net = 'bt'; app.bt = { stage: 'idle', devices: [], msg: '', code: '' }; app.screen = 'bt'; render(); break;
       case 'onOpen': app.net = 'online'; app.bt = { stage: 'idle', devices: [], msg: '', code: '' }; app.screen = 'online'; render(); break;
       case 'tourOpen': tourOpen(); break;
+      case 'tourReconnect': tourReconnect(); break;
       case 'tourCreate': tourCreate(); break;
       case 'tourResume': tourResume(); break;
       case 'tourClearSaved': tourClearSaved(); render(); break;
