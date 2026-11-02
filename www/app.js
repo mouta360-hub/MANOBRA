@@ -1682,6 +1682,16 @@
       tourWired = true;
       l.addListener('msg', o => onTourMsg(o));
       l.addListener('closed', () => onTourClosed());
+      l.addListener('promoted', ev => {
+        app.tour.role = 'host';
+        app.tour.disconnected = false;
+        app.tour.connecting = false;
+        if (ev && ev.code) app.tour.code = ev.code;
+        app.tour.myId = ev && ev.id != null ? ev.id : app.tour.myId;
+        toast('O juiz caiu. Você assumiu como juiz reserva.');
+        syncPresenceStatus();
+        render();
+      });
     }
     return l;
   }

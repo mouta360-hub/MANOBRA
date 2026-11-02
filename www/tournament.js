@@ -147,6 +147,10 @@
       this._simWorker = opts.simWorker || null; // roda robô x robô fora da tela principal (se existir)
       this._simFast = opts.simFast == null ? opts.botDelay === 0 : !!opts.simFast; // só os testes (botDelay 0)
       this._auto = false;
+      this.epoch = opts.epoch == null ? 1 : (opts.epoch | 0) || 1;
+      this.judgeId = opts.judgeId == null ? 0 : opts.judgeId;
+      this.judgePeer = opts.judgePeer || '';
+      this.originalJudgeId = opts.originalJudgeId == null ? this.judgeId : opts.originalJudgeId;
     }
 
     _p(id) { return this.players.find(p => p.id === id) || null; }
@@ -264,7 +268,9 @@
     snapshot() {
       return {
         status: this.status, format: this.format, rounds: this.rounds, champion: this.champion, botLevel: this.botLevel,
-        players: this.players.map(p => ({ id: p.id, nick: p.nick, av: p.av || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
+        judge: { id: this.judgeId, peer: this.judgePeer, epoch: this.epoch },
+        reserveOrder: this.players.filter(p => !p.bot && !p.eliminated && p.id !== this.judgeId && p.id !== this.originalJudgeId).map(p => p.id),
+        players: this.players.map(p => ({ id: p.id, pid: p.pid, nick: p.nick, av: p.av || '', peer: p.peer || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
           reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null,
@@ -282,8 +288,9 @@
         plies: g.plies, hist: Array.from(g.hist.entries())
       } : null;
       return {
-        version: 1, status: this.status, format: this.format, rounds: this.rounds,
+        version: 2, status: this.status, format: this.format, rounds: this.rounds,
         champion: this.champion, botLevel: this.botLevel, next: this._next, botN: this._botN,
+        epoch: this.epoch, judgeId: this.judgeId, judgePeer: this.judgePeer, originalJudgeId: this.originalJudgeId,
         usedBotProfiles: Array.from(this._usedBotProfiles), players: this.players,
         matches: this.matches, rt: Object.keys(this.rt).reduce((out, id) => {
           const r = this.rt[id];
@@ -294,11 +301,15 @@
       };
     }
     importState(data) {
-      if (!data || data.version !== 1 || !Array.isArray(data.players) || !Array.isArray(data.matches)) return false;
+      if (!data || (data.version !== 1 && data.version !== 2) || !Array.isArray(data.players) || !Array.isArray(data.matches)) return false;
       this.status = data.status; this.format = data.format; this.rounds = data.rounds;
       this.champion = data.champion; this.botLevel = data.botLevel || 'medium';
       this._next = data.next || 0; this._botN = data.botN || 0;
       this._usedBotProfiles = new Set(data.usedBotProfiles || []);
+      this.epoch = data.epoch == null ? 1 : (data.epoch | 0) || 1;
+      this.judgeId = data.judgeId == null ? 0 : data.judgeId;
+      this.judgePeer = data.judgePeer || '';
+      this.originalJudgeId = data.originalJudgeId == null ? 0 : data.originalJudgeId;
       this.players = data.players; this.matches = data.matches; this.rt = {};
       const restoreGame = x => {
         if (!x || !Array.isArray(x.b)) return null;
@@ -327,19 +338,20 @@
     }
 
     /* --- entrada e saída --- */
-    join(pid, nick, avatar) {
+    join(pid, nick, avatar, meta) {
       const av = cleanAv(avatar);
+      meta = meta || {};
       const old = this.players.find(p => p.pid === pid);
       if (old) {
         if (old.eliminated) return { ok: false, why: 'Você foi eliminado deste campeonato e não pode retornar.' };
-        old.connected = true; if (av) old.av = av; this.broadcast(); return { ok: true, id: old.id };
+        old.connected = true; if (av) old.av = av; if (meta.peer) old.peer = String(meta.peer); this.broadcast(); return { ok: true, id: old.id };
       }
       if (this.status !== 'lobby') return { ok: false, why: 'O campeonato já começou.' };
       if (this.players.length >= MAX_PLAYERS) return { ok: false, why: 'O campeonato está cheio (máximo ' + MAX_PLAYERS + ' jogadores).' };
       let name = clean(nick) || 'Jogador';
       const base = name;
       for (let n = 2; this.players.some(p => p.nick.toLowerCase() === name.toLowerCase()); n++) name = base.slice(0, 13) + ' ' + n;
-      const p = { id: this._next++, pid: String(pid), nick: name, av: av, connected: true, eliminated: false };
+      const p = { id: this._next++, pid: String(pid), nick: name, av: av, peer: String(meta.peer || ''), connected: true, eliminated: false };
       this.players.push(p);
       this.broadcast();
       return { ok: true, id: p.id };
@@ -377,6 +389,16 @@
         this._forfeitDisconnected();
       }
       this.broadcast();
+    }
+    promote(id, peer) {
+      const p = this._p(id);
+      if (!p || p.bot || p.eliminated || !p.connected) return false;
+      this.judgeId = id;
+      this.judgePeer = String(peer || p.peer || '');
+      this.epoch = Math.max(1, (this.epoch | 0) + 1);
+      p.peer = this.judgePeer;
+      this.broadcast();
+      return true;
     }
     withdraw(id) {
       const p = this._p(id);
