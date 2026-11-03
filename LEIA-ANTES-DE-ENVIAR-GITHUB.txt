@@ -1,0 +1,15 @@
+MANOBRA — PROJETO COMPLETO PARA GITHUB
+
+Envie o CONTEUDO desta pasta diretamente para a raiz do repositorio, incluindo .github (pasta oculta).
+Nao envie a pasta projeto como subpasta.
+
+Correcoes desta entrega:
+- Teste Bluetooth atualizado para 20 pecas por jogador (40 no tabuleiro).
+- Teste de montagem do campeonato atualizado para 20 pecas por jogador.
+- Configuracao de testes preservada, pois todos os arquivos listados existem nesta versao.
+- Layout Android aprovado e verificador de empacotamento incluidos.
+- Arquivos temporarios __pycache__ removidos.
+
+O teste npm test foi executado parcialmente: motor, Bluetooth, Online, montagem, persistencia e relogio passaram; a execucao completa excedeu o tempo disponivel, portanto NAO ha garantia de build completo ou APK validado.
+
+No GitHub, mantenha .github/workflows/build-apk.yml e inicie Actions > Gerar APK do Manobra.
