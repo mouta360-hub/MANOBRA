@@ -1,0 +1,2 @@
+# Revisão de compatibilidade com Manobra 1.0
+Movimentos especiais que não passam pelo motor original foram suspensos para preservar diagonais válidas, apoio obrigatório para peças de ataque, limite de defesa e histórico de jogadas. O contra-ataque do Javali de Ferro não modifica mais o tabuleiro após o registro da jogada. Limites das 30 peças continuam cadastrados, mas poderes pendentes ainda precisam de implementação individual e testes de partidas completas.

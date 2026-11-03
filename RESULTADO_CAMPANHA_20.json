@@ -1,0 +1,53 @@
+{
+  "masteryUpgrades": 0,
+  "maxMastery": 1,
+  "runs": 4,
+  "battles": 4,
+  "wins": 0,
+  "defeats": 4,
+  "draws": 0,
+  "completed": 0,
+  "shops": 0,
+  "purchases": 0,
+  "playerSpecialDeployments": 0,
+  "enemySpecialDeployments": 4,
+  "abilityTriggers": 1,
+  "abilityUses": 0,
+  "byAct": [
+    {
+      "b": 4,
+      "w": 0
+    },
+    {
+      "b": 0,
+      "w": 0
+    },
+    {
+      "b": 0,
+      "w": 0
+    }
+  ],
+  "safetyPlies": 300,
+  "playerLevel": "hard",
+  "searchDepth": 1,
+  "searchMs": 2,
+  "avoidCycles": true,
+  "decisiveWins": 0,
+  "adjudicatedWins": 0,
+  "decisiveLosses": 4,
+  "adjudicatedLosses": 0,
+  "blockedMoves": 1,
+  "shopOffers": 0,
+  "loopDraws": 0,
+  "inconclusive": 0,
+  "uniqueEnemyCompositions": 4,
+  "uniqueEnemyPositions": 4,
+  "limitations": [
+    "IA usa motor real e peças especiais com efeitos automáticos de beforeMove/afterMove",
+    "compras e implantação de peças especiais são reais, mas seleção de loadout é heurística",
+    "não reproduz interface, escolhas humanas ou todos os poderes acionados manualmente",
+    "não existe vitória/derrota por limite; looping é resolvido por Game.legal; limite de segurança gera inconclusivo",
+    "IA escolhe lances por busca limitada e evita repetir movimentos; poderes manuais ainda não são acionados",
+    "chefões variam por ato e recebem seus modificadores de habilidade quando acionados"
+  ]
+}
