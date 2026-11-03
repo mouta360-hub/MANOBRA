@@ -281,6 +281,7 @@
         const dark = ((r + c) & 1) === 0;
         // A linha vermelha (terreno neutro) só aparece na montagem
         let cls = 'cell ' + (dark ? 'dark' : 'light') + (r === 4 && app.screen === 'setup' ? ' neutral' : '');
+        const specialAttr = (window.RoguelikeRuntime && window.RoguelikeRuntime.cellMarkup) ? window.RoguelikeRuntime.cellMarkup(i) : '';
         if (dark) {
           if (marks.terr && marks.terr.has(i)) cls += ' can';
           if (marks.last && marks.last.indexOf(i) >= 0) cls += ' last';
@@ -288,7 +289,7 @@
           if (marks.dest && marks.dest.has(i)) cls += ' ' + marks.dest.get(i);
         }
         const piece = arr[i];
-        h += '<div class="' + cls + '"' + (dark ? ' data-i="' + i + '"' : '') + '>' +
+        h += '<div class="' + cls + '"' + (dark ? ' data-i="' + i + '"' : '') + specialAttr + '>' +
           (E.isMain(i) ? '<i class="mainsq"></i>' : '') + pieceSvg(piece) + '</div>';
       }
     }
@@ -418,6 +419,19 @@
     const setupOppReady = setupMatch && setupMatch.setupReady ? !!setupMatch.setupReady[app.humanSide ^ 1] : !!app.peerSetup;
     const tourTimerInfo = setupMatch && setupMatch.timer && setupMatch.timer.kind === 'setup'
       ? '<div class="countdown-panel"><b>Montagem</b><br>Você: ' + (setupMineReady ? 'pronto' : setupClock) + ' · Adversário: ' + (setupOppReady ? 'pronto' : setupClock) + '</div>' : '';
+    let roguelikeSkills = '';
+    if (window._roguelikePreparingSetup && window.RoguelikeRun) {
+      const rr = window.RoguelikeRun;
+      const skillKeys = Array.isArray(rr.activeTeam) ? rr.activeTeam : [];
+      const skillButtons = skillKeys.length ? skillKeys.map(key => {
+        const piece = typeof rogueCatalogPiece === 'function' ? rogueCatalogPiece(key) : (window.SPECIAL_PIECES_CATALOG || {})[key] || {};
+        const name = typeof rogueName === 'function' ? rogueName(key) : (piece.name || key);
+        const desc = typeof rogueDescription === 'function' ? rogueDescription(key) : (piece.description || 'Habilidade especial');
+        return '<button class="rogue-setup-skill-button" onclick="selectPieceToPlace(\'' + key + '\',\'' + (piece.symbol || '⭐') + '\',\'' + name.replace(/'/g, '') + '\')"><span>' + (piece.symbol || '⭐') + '</span><b>Adicionar habilidade</b><small>' + name + '</small><em>' + desc + '</em></button>';
+      }).join('') : '<div class="rogue-setup-empty">Nenhuma habilidade selecionada. Você pode começar sem habilidade, ou voltar ao conjunto para adicionar uma peça comprada.</div>';
+      roguelikeSkills = '<div class="rogue-setup-skills"><strong>✨ Habilidades especiais</strong><small>Escolha uma abaixo e, depois de tocar em Pronto, toque na sua peça no tabuleiro.</small><div class="rogue-setup-skill-list">' + skillButtons + '</div></div>';
+    }
+    const roguelikeReadyEnabled = app.mode === 'ai' && window._inRoguelikeBattle;
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
@@ -425,9 +439,9 @@
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
       '<div class="topbar"><b>Montagem: ' + NAMES[s] + '</b><span>' + total + '/' + PIECES + ' peças</span></div>' +
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
-      tourTimerInfo + '<div class="hint">' + hint + '</div>' +
+      tourTimerInfo + '<div class="hint">' + hint + '</div>' + roguelikeSkills +
       '<div class="bar"><button data-act="setupDefault"' + dis + '>Padrão</button><button data-act="setupRandom"' + dis + '>Aleatório</button><button data-act="setupClear"' + dis + '>Limpar</button></div>' +
-      '<div class="bar" style="margin-top:8px"><button data-act="menu">Menu</button><button class="hot" data-act="setupDone" ' + (total === PIECES && !lock ? '' : 'disabled') + '>Pronto</button></div></div></div>';
+      '<div class="bar" style="margin-top:8px"><button data-act="menu">Menu</button><button class="hot" data-act="setupDone" ' + ((roguelikeReadyEnabled || total === PIECES) && !lock ? '' : 'disabled') + '>Pronto</button></div></div></div>';
   }
 
   function statusText() {
@@ -511,6 +525,10 @@
     if (g.over) {
       const mine = app.mode === 'pvp' || g.over.winner === app.humanSide;
       sfx(mine ? 'win' : 'lose', 0);
+      if (window._inRoguelikeBattle) {
+        if (mine && typeof window.onRoguelikeVictory === 'function') window.onRoguelikeVictory();
+        if (!mine && typeof window.onRoguelikeDefeat === 'function') window.onRoguelikeDefeat();
+      }
     }
     afterMove(false);
   }
@@ -994,6 +1012,10 @@
       return;
     }
     if (app.mode === 'ai') {
+      if (window._inRoguelikeBattle && typeof window.finishRoguelikeNormalSetup === 'function') {
+        window.finishRoguelikeNormalSetup();
+        return;
+      }
       if (app.humanSide === WHITE) placeAI(BLACK);
       startGame();
     } else if (s === WHITE) {
@@ -1116,6 +1138,10 @@
     if (g.over) {
       const mine = app.mode === 'pvp' || g.over.winner === app.humanSide;
       sfx(mine ? 'win' : 'lose', 0);
+      if (window._inRoguelikeBattle) {
+        if (mine && typeof window.onRoguelikeVictory === 'function') window.onRoguelikeVictory();
+        if (!mine && typeof window.onRoguelikeDefeat === 'function') window.onRoguelikeDefeat();
+      }
     }
     afterMove(true);
     processBtQueue();
@@ -1126,7 +1152,9 @@
     const g = app.game;
     if (app.mode === 'bt' && !remote) btSend({ k: 'move', m: { t: mv.t, from: mv.from, to: mv.to, beyond: mv.beyond } });
     const cap = g.st.b[mv.to]; // peça que estava na casa de destino (para animar a eliminação)
+    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) return;
     g.play(mv);
+    if (window.RoguelikeRuntime && window.RoguelikeRuntime.afterMove) window.RoguelikeRuntime.afterMove(g, mv, cap);
     app.sel = -1; app.purge = false; app.choice = null;
     const token = ++app.animToken;
     app.animating = true;
@@ -1140,6 +1168,10 @@
   }
 
   function onGameCell(i) {
+    if (window._inRoguelikeBattle && window._roguelikePlacementPhase) {
+      toast('Escolha as habilidades, aplique-as se quiser e toque em Pronto para jogar.');
+      return;
+    }
     const g = app.game;
     if (!isHumanTurn() || app.choice) return;
     const s = g.st.turn, b = g.st.b;
@@ -1925,6 +1957,7 @@
       case 'rules': app.screen = 'rules'; render(); break;
       case 'publicOpen': app.net = 'public'; app.screen = 'publicChat'; app.publicChat = { code: '', connected: false, host: false }; render(); break;
       case 'menu':
+        if (typeof window.cancelRoguelikePreparation === 'function' && (window._inRoguelikeBattle || window._roguelikePreparingSetup || window._roguelikePlacementPhase)) window.cancelRoguelikePreparation();
         if (app.net === 'tour' && app.mode === 'bt' && (app.screen === 'game' || app.screen === 'setup')) { tourLeaveMatch(); break; }
         if (app.mode === 'bt') btLeave();
         app.screen = 'menu'; app.thinking = false; app.animating = false; app.animToken++; app.game = null; render(); break;
@@ -2099,6 +2132,27 @@
     render();
     tryStartBt();
   }
+
+  // Entradas públicas do Modo Roguelike: montagem normal e partida preparada.
+  window.startRoguelikeSetup = function () {
+    app.humanSide = WHITE; app.level = 'medium'; app.mode = 'ai';
+    window._roguelikePreparingSetup = true;
+    startSetup('ai');
+    placeAI(BLACK);
+    app.screen = 'setup';
+    render();
+  };
+  window.startRoguelikePreparedGame = function () {
+    window._roguelikePreparingSetup = false;
+    startGame();
+    const r = window.RoguelikeRun;
+    if (r && r.enemyTeam && r.enemyTeam.length) {
+      const spots = [];
+      for (let i = 0; i < N; i++) if (app.game && E.sideOf(app.game.st.b[i]) === BLACK) spots.push(i);
+      r.enemyTeam.forEach((key, n) => { if (spots[n] != null) r.enemyDeployed[String(spots[n])] = key; });
+    }
+    render();
+  };
 
   if (typeof document.addEventListener === 'function') document.addEventListener('visibilitychange', () => {
     if (document.hidden) return;
