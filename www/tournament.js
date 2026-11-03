@@ -393,10 +393,32 @@
     promote(id, peer) {
       const p = this._p(id);
       if (!p || p.bot || p.eliminated || !p.connected) return false;
+      const previous = this._p(this.judgeId);
+      if (previous && previous.id !== id) {
+        previous.connected = false;
+        this.matches.forEach(m => {
+          if (m.status === 'pending') {
+            if (m.a === previous.id) m.ready[0] = false;
+            if (m.b === previous.id) m.ready[1] = false;
+          }
+        });
+      }
       this.judgeId = id;
       this.judgePeer = String(peer || p.peer || '');
       this.epoch = Math.max(1, (this.epoch | 0) + 1);
       p.peer = this.judgePeer;
+      this.broadcast();
+      return true;
+    }
+    abandon(id, reason) {
+      const p = this._p(id);
+      if (!p || p.bot || p.eliminated) return false;
+      p.connected = false;
+      p.eliminated = true;
+      this.matches.filter(m => m.a === id || m.b === id).forEach(m => {
+        if (m.status === 'pending' || m.status === 'playing') this._forfeit(m, id, reason || 'jogador abandonou o campeonato');
+      });
+      this._forfeitDisconnected();
       this.broadcast();
       return true;
     }

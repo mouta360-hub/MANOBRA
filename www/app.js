@@ -1684,6 +1684,7 @@
       l.addListener('msg', o => onTourMsg(o));
       l.addListener('closed', () => onTourClosed());
       l.addListener('handoff', () => { app.tour.handoff = true; render(); });
+      l.addListener('abandoned', () => { toast('O juiz original não voltou em 15 segundos e foi eliminado. As partidas dele viraram W.O.'); render(); });
       l.addListener('promoted', ev => {
         app.tour.role = 'host';
         app.tour.disconnected = false;
@@ -1754,6 +1755,7 @@
   function onTourMsg(o) {
     if (!o || typeof o !== 'object') return;
     if (o.k === 'state') {
+      if (app.tour.handoff && o.s && o.s.judge && (!app.tour.snap || !app.tour.snap.judge || o.s.judge.epoch > app.tour.snap.judge.epoch)) app.tour.handoff = false;
       app.tour.snap = o.s;
       if (app.screen === 'tour') render();
     } else if (o.k === 'start') {

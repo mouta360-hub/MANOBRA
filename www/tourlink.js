@@ -153,6 +153,24 @@
     }});
     if (!h.importState(lastState.x) || !h.promote(myId, peer.id || '')) { promoting = false; return false; }
     h.players.forEach(p => { if (p.id === myId) { p.connected = true; p.peer = peer.id || p.peer; } });
+    const oldJudge = h._p(h.originalJudgeId);
+    if (oldJudge && oldJudge.id !== myId) {
+      oldJudge.connected = false;
+      h.matches.forEach(function (m) {
+        if (m.status === 'pending') {
+          if (m.a === oldJudge.id) m.ready[0] = false;
+          if (m.b === oldJudge.id) m.ready[1] = false;
+        }
+      });
+      const oldJudgeId = oldJudge.id;
+      const abandonTimer = setTimeout(function () {
+        if (hub === h && h._p(oldJudgeId) && !h._p(oldJudgeId).connected && h.abandon) {
+          h.abandon(oldJudgeId, 'juiz original abandonou o campeonato após 15 segundos');
+          emit('abandoned', { id: oldJudgeId });
+        }
+      }, 15000);
+      if (abandonTimer.unref) abandonTimer.unref();
+    }
     role = 'host'; hub = h; hostPeer = peer; client = null; conns = {}; localId = myId;
     installPeerForGuest(peer);
     h.players.forEach(p => {
