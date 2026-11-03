@@ -1,0 +1,13 @@
+MANOBRA - CORREÇÃO DO LAYOUT ANDROID
+
+Causa identificada: o visual aprovado só ativava até 680px e o aplicativo podia abrir em orientação diferente.
+
+Alterações:
+- Estilo Android agora ativa até 900px de largura.
+- O APK é configurado para abrir em retrato (portrait).
+- GitHub Actions verifica os arquivos em www e a cópia que o Capacitor coloca no APK.
+- CSS recebe marcador de versão android-menu-20261103b.
+
+IMPORTANTE: envie o CONTEÚDO da pasta projeto para a RAIZ do repositório, incluindo a pasta .github (oculta). Não envie apenas o ZIP para o GitHub. Gere um NOVO APK e reinstale-o.
+
+Ainda não foi possível executar o APK em um aparelho real.
