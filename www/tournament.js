@@ -17,7 +17,15 @@
   BOT_FIRST.forEach(first => BOT_LAST.forEach(last => BOT_PROFILES.push({ nick: first + ' ' + last, av: BOT_AVATARS[BOT_PROFILES.length % BOT_AVATARS.length] })));
   if (root) root.ManobraBotProfiles = BOT_PROFILES;
 
-  const cleanAv = s => String(s == null ? '' : s).replace(/[^a-z0-9-]/gi, '').slice(0, 12);
+  const LEGACY_AV = { fox: 0, bear: 1, lion: 2, tiger: 3, wolf: 4, panda: 5, cat: 6, dog: 7, owl: 8, eagle: 9, shark: 10, dragon: 11, unicorn: 12, robot: 13, ninja: 14, king: 15, knight: 16, rocket: 17, fire: 18, star: 19 };
+  const cleanAv = s => {
+    const v = String(s == null ? '' : s).replace(/[^a-z0-9-]/gi, '').toLowerCase().slice(0, 16);
+    if (Object.prototype.hasOwnProperty.call(LEGACY_AV, v)) return 'avatar-' + LEGACY_AV[v];
+    const m = /^avatar-?(\d+)$/.exec(v);
+    if (!m) return '';
+    const n = Number(m[1]);
+    return Number.isInteger(n) && n >= 0 && n < 300 ? 'avatar-' + n : '';
+  };
   const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16);
 
   function shuffle(arr, rnd) {

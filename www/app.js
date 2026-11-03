@@ -5,7 +5,7 @@
   const NAMES = ['Brancas', 'Pretas'];
   // Perfis fictícios: parecem jogadores, mas continuam sendo IA internamente.
   // O catálogo é criado pelo módulo do campeonato (mais de 6.000 combinações).
-  const BOT_PROFILES = window.ManobraBotProfiles || [{ nick: 'Rafael', av: 'eagle' }];
+  const BOT_PROFILES = window.ManobraBotProfiles || [{ nick: 'Rafael', av: 'avatar-9' }];
   const REASONS = {
     principal: 'alcançou a casa principal do oponente',
     eliminacao: 'eliminou todas as peças do oponente',
@@ -28,9 +28,9 @@
     avatarOpen: false,
     tourCode: '', directChat: { code: '', nick: '', connecting: false }, publicChat: { code: '', connected: false, host: false },
     tourInviteCode: '',
-    me: { code: '', nick: '', av: 'fox' },
-    ai: { nick: 'Rafael', av: 'eagle' },
-    peer: { nick: 'Adversário', av: 'robot' },
+    me: { code: '', nick: '', av: 'avatar-0' },
+    ai: { nick: 'Rafael', av: 'avatar-9' },
+    peer: { nick: 'Adversário', av: 'avatar-13' },
     friends: [],
     fr: { state: 'idle', msg: '', invite: null, target: null, newCode: '', newNick: '' },
     presence: { visible: true, state: 'off', msg: '' }, // 'off' | 'connecting' | 'ready' | 'error'
@@ -329,11 +329,11 @@
     if (app.mode === 'bt' || app.mode === 'tour') {
       return side === app.humanSide
         ? { nick: myNick(), av: app.me.av, me: true }
-        : { nick: app.peer.nick || 'Adversário', av: app.peer.av || 'robot' };
+        : { nick: app.peer.nick || 'Adversário', av: app.peer.av || 'avatar-13' };
     }
     return side === WHITE
-      ? { nick: 'Brancas', av: 'star' }
-      : { nick: 'Pretas', av: 'knight' };
+      ? { nick: 'Brancas', av: 'avatar-19' }
+      : { nick: 'Pretas', av: 'avatar-16' };
   }
   function playerScore(side, c, turn) {
     const p = playerForSide(side);
@@ -1227,7 +1227,7 @@
     app.btLinked = false; app.btReady = false; app.peerSetup = null; app.btQueue.length = 0;
     app.bt = { stage: 'idle', devices: [], msg: '', code: '' };
     app.chat = { open: false, draft: '', unread: 0, messages: [], muted: false, recording: false, recorder: null, chunks: [], stream: null, timer: null, seconds: 0 };
-    app.peer = { nick: 'Adversário', av: 'robot' };
+    app.peer = { nick: 'Adversário', av: 'avatar-13' };
   }
   function btConnected(role, name) {
     if (app.btLinked) return;
@@ -1236,7 +1236,7 @@
     app.mode = 'bt';
     app.humanSide = role === 'host' ? WHITE : BLACK;
     app.peerSetup = null;
-    app.peer = { nick: (name && String(name)) || app.peer.nick || 'Adversário', av: app.peer.av || 'robot' };
+    app.peer = { nick: (name && String(name)) || app.peer.nick || 'Adversário', av: avId(app.peer.av) || 'avatar-13' };
     app.bt.stage = 'idle';
     btSend({ k: 'hello', v: 1, nick: myNick(), av: app.me.av });
     toast('Conectado' + (name ? ' a ' + name : '') + '. Você joga de ' + NAMES[app.humanSide] + '.');
@@ -1248,7 +1248,7 @@
     app.btLinked = false;
     app.btReady = false;
     app.btQueue.length = 0;
-    app.peer = { nick: 'Adversário', av: 'robot' };
+    app.peer = { nick: 'Adversário', av: 'avatar-13' };
     toast('Conexão Bluetooth encerrada.');
     if (app.screen === 'game' && app.game && app.game.over) { render(); return; }
     app.screen = 'menu'; app.game = null; app.animating = false; app.animToken++;
@@ -1683,8 +1683,8 @@
       tourWired = true;
       l.addListener('msg', o => onTourMsg(o));
       l.addListener('closed', () => onTourClosed());
-      l.addListener('handoff', () => { app.tour.handoff = true; render(); });
-      l.addListener('abandoned', () => { toast('O juiz original não voltou em 15 segundos e foi eliminado. As partidas dele viraram W.O.'); render(); });
+      l.addListener('handoff', () => { app.tour.handoff = true; app.tour.msg = 'A conexão com o juiz caiu. Aguarde: tentando reconectar e transferir o campeonato.'; render(); });
+      l.addListener('abandoned', () => { app.tour.msg = 'O juiz original não voltou em 15 segundos. Foi eliminado e as partidas dele viraram W.O.'; toast(app.tour.msg); render(); });
       l.addListener('promoted', ev => {
         app.tour.role = 'host';
         app.tour.disconnected = false;
@@ -1692,7 +1692,8 @@
         app.tour.connecting = false;
         if (ev && ev.code) app.tour.code = ev.code;
         app.tour.myId = ev && ev.id != null ? ev.id : app.tour.myId;
-        toast('O juiz caiu. Você assumiu como juiz reserva.');
+        app.tour.msg = 'O juiz principal caiu. Você assumiu como juiz reserva e o campeonato continua.';
+        toast(app.tour.msg);
         syncPresenceStatus();
         render();
       });
@@ -1755,6 +1756,15 @@
   function onTourMsg(o) {
     if (!o || typeof o !== 'object') return;
     if (o.k === 'state') {
+      const before = app.tour.snap;
+      const dropped = before && before.players && o.s && o.s.players
+        ? o.s.players.filter(np => { const op = before.players.find(p => p.id === np.id); return op && op.connected && !np.connected; }) : [];
+      if (dropped.length) {
+        const oldJudge = before.judge && dropped.find(p => p.id === before.judge.id);
+        app.tour.msg = oldJudge
+          ? 'O juiz principal desconectou. Aguarde: estamos transferindo o campeonato para o próximo juiz.'
+          : 'O jogador ' + (dropped[0].nick || 'participante') + ' desconectou. Aguarde: tentando reconectar.';
+      }
       if (app.tour.handoff && o.s && o.s.judge && (!app.tour.snap || !app.tour.snap.judge || o.s.judge.epoch > app.tour.snap.judge.epoch)) app.tour.handoff = false;
       app.tour.snap = o.s;
       if (app.screen === 'tour') render();
@@ -1790,7 +1800,8 @@
   }
   function onTourClosed() {
     const wasGuest = app.tour.role === 'guest' && !!app.tour.code;
-    toast(wasGuest ? 'A conexão caiu. Você pode reconectar ao campeonato.' : 'A conexão com o campeonato foi encerrada.');
+    app.tour.msg = wasGuest ? 'A conexão caiu. Aguarde: tentando reconectar ao campeonato.' : 'A conexão com o campeonato foi encerrada.';
+    toast(app.tour.msg);
     tourEndMatchLocal();
     if (wasGuest) {
       app.tour.disconnected = true;
@@ -1822,7 +1833,7 @@
     app.btLinked = false; app.btReady = false; app.peerSetup = null; app.btQueue.length = 0;
     app.game = null; app.animating = false; app.animToken++; app.thinking = false; app.purge = false; app.choice = null; app.sel = -1;
     app.tour.matchId = null;
-    app.peer = { nick: 'Adversário', av: 'robot' };
+    app.peer = { nick: 'Adversário', av: 'avatar-13' };
   }
   function tourLeaveMatch() {
     const inGame = app.screen === 'game' && app.game && !app.game.over;
@@ -1993,7 +2004,7 @@
       case 'tourUnready': tourSend({ k: 'unready' }); break;
       case 'tourInviteFriend': tourInviteFriend(v); break;
       case 'avatar':
-        if (AV[v]) { app.me.av = v; app.avatarOpen = false; saveMe(); syncPresenceStatus(); render(); }
+        { const canonical = avId(v); if (canonical) { app.me.av = canonical; app.avatarOpen = false; saveMe(); syncPresenceStatus(); render(); } }
         break;
       case 'avatarToggle': app.avatarOpen = !app.avatarOpen; render(); break;
       case 'frVisible':
