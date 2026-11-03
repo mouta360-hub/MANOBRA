@@ -24,6 +24,13 @@
   let lossTimer = null;
   let localId = null;
 
+  // O estado completo (para o reserva assumir) é calculado uma vez por transmissão, não uma por jogador
+  function withState(h, obj, cache) {
+    if (obj.k !== 'state') return obj;
+    if (cache.s !== obj.s) { cache.s = obj.s; cache.x = h.exportState ? h.exportState({ public: true }) : null; }
+    return Object.assign({}, obj, { x: cache.x, epoch: h.epoch || 1 });
+  }
+
   function emit(ev, data) {
     (handlers[ev] || []).slice().forEach(function (f) { try { f(data); } catch (e) { /* ok */ } });
   }
@@ -79,7 +86,7 @@
   function reset() {
     closing = true;
     const hp = hostPeer, cl = client, cs = conns;
-    role = null; hub = null; hostPeer = null; client = null; conns = {}; localOnly = false; lastState = null; promoting = false; tournamentCode = ''; localId = null; if (lossTimer) { clearTimeout(lossTimer); lossTimer = null; }
+    role = null; hub = null; hostPeer = null; client = null; conns = {}; localOnly = false; lastState = null; promoting = false; handledEpoch = null; tournamentCode = ''; localId = null; if (lossTimer) { clearTimeout(lossTimer); lossTimer = null; }
     if (simWorker) { simWorker.terminate(); simWorker = null; }
     Object.keys(cs).forEach(function (k) { try { cs[k].close(); } catch (e) { /* ok */ } });
     try { if (hp) hp.destroy(); } catch (e) { /* ok */ }
@@ -97,36 +104,70 @@
       c.on('data', function (raw) {
         let o; try { o = JSON.parse(raw); } catch (e) { return; }
         if (!o || typeof o !== 'object') return;
-        if (o.k === 'state') { lastState = o; client = { peer: p, conn: c, pid: client && client.pid }; emit('msg', o); }
-        else if (o.k === 'joined') { client = { peer: p, conn: c, pid: client && client.pid }; }
+        if (o.k === 'state') { lastState = o; client = { peer: p, conn: c, pid: client && client.pid, nick: client && client.nick, av: client && client.av }; emit('msg', o); }
+        else if (o.k === 'joined') { client = { peer: p, conn: c, pid: client && client.pid, nick: client && client.nick, av: client && client.av }; }
+        else if (o.k !== 'rejected') emit('msg', o); // início de partida, jogadas, fim de partida, chat... do novo juiz
       });
-      c.on('close', function () { if (!closing && role === 'guest') emit('closed', { authority: true }); });
+      c.on('close', function () { authorityLost(c); });
+      c.on('error', function () { authorityLost(c); });
     });
   }
 
-  function tryPromote() {
+  // O juiz atual (a ligação `c`) caiu. Cada reserva espera a sua vez na fila (1º já, depois 3,5 s por posição);
+  // se nenhum antes assumiu (um novo juiz muda o "epoch"), assume. Sem sucesso, avisa que a conexão caiu.
+  let handledEpoch = null;
+  function authorityLost(c) {
+    if (closing || role !== 'guest') return;
+    if (client && client.conn && c && client.conn !== c) return; // já há outra ligação em uso (juiz novo): essa é velha
+    const lostEpoch = lastState && lastState.epoch;
+    if (handledEpoch !== null && handledEpoch === lostEpoch) return;
+    handledEpoch = lostEpoch;
+    if (tryPromote()) return;
+    const snap = (lastState && lastState.s) || {};
+    const order = snap.reserveOrder || [];
+    const mineP = (snap.players || []).find(function (p) { return p.id === localId; });
+    const rank = mineP ? order.indexOf(mineP.id) : -1;
+    if (lossTimer) clearTimeout(lossTimer);
+    lossTimer = setTimeout(function () {
+      lossTimer = null;
+      if (closing || role !== 'guest' || (lastState && lastState.epoch !== lostEpoch)) return;
+      if (rank > 0 && tryPromote(true)) return;
+      emit('closed', {});
+    }, rank > 0 ? rank * 3500 : 5000);
+  }
+
+  function tryPromote(force) {
     if (promoting || role !== 'guest' || !lastState || !lastState.x || !client || !client.peer) return false;
-    const snap = lastState.s || {}, pid = client.pid, mine = (snap.players || []).find(p => p.pid === String(pid));
+    const snap = lastState.s || {}, mine = (snap.players || []).find(p => p.id === localId);
     if (!mine || mine.bot || mine.eliminated) return false;
     const order = snap.reserveOrder || (snap.players || []).filter(p => !p.bot && !p.eliminated && p.connected).map(p => p.id);
-    if (order[0] !== mine.id) return false;
+    if (!force && order[0] !== mine.id) return false;
+    if (force && order.indexOf(mine.id) < 0) return false;
     promoting = true;
     const E = root.ManobraEngine, T = root.ManobraTournament, peer = client.peer, myId = mine.id;
+    const cache = {};
     const h = new T.Hub({ engine: E, simWorker: simWorker, send: function (id, obj) {
       if (id === localId) { later(function () { emit('msg', obj); }); return; }
       const c = conns[id];
-      if (c && c.open !== false) { try { c.send(JSON.stringify(obj.k === 'state' ? Object.assign({}, obj, { x: h.exportState(), epoch: h.epoch }) : obj)); } catch (e) {} }
+      if (c && c.open !== false) { try { c.send(JSON.stringify(withState(h, obj, cache))); } catch (e) {} }
     }});
     if (!h.importState(lastState.x) || !h.promote(myId, peer.id || '')) { promoting = false; return false; }
     h.players.forEach(p => { if (p.id === myId) { p.connected = true; p.peer = peer.id || p.peer; } });
     role = 'host'; hub = h; hostPeer = peer; client = null; conns = {}; localId = myId;
     installPeerForGuest(peer);
     h.players.forEach(p => {
-      if (p.bot || p.id === myId || p.eliminated || !p.peer) return;
+      if (p.bot || p.id === myId || p.eliminated || !p.connected || !p.peer) return;
       try {
         const c = peer.connect(p.peer, { reliable: true });
-        c.on('open', function () { conns[p.id] = c; try { c.send(JSON.stringify({ k: 'joined', you: p.id })); c.send(JSON.stringify({ k: 'state', s: h.snapshot(), x: h.exportState(), epoch: h.epoch })); } catch (e) {} });
-        c.on('close', function () { if (hub === h) h.leave(p.id, 'queda de internet'); });
+        c.on('open', function () { conns[p.id] = c; try { c.send(JSON.stringify({ k: 'joined', you: p.id })); c.send(JSON.stringify({ k: 'state', s: h.snapshot(), x: h.exportState({ public: true }), epoch: h.epoch })); } catch (e) {} });
+        c.on('data', function (raw) { // jogadas, "Jogar", chat... dos outros jogadores chegam por aqui
+          let o; try { o = JSON.parse(raw); } catch (e) { return; }
+          if (!o || typeof o !== 'object' || o.k === 'join') return;
+          if (hub === h) h.handle(p.id, o);
+        });
+        const gone = function () { if (conns[p.id] === c) delete conns[p.id]; if (hub === h && !closing) h.leave(p.id, 'queda de internet'); };
+        c.on('close', gone);
+        c.on('error', gone);
       } catch (e) {}
     });
     h.broadcast();
@@ -161,7 +202,7 @@
         conns[id] = c;
         if (old && old !== c) { try { old.close(); } catch (e) { /* ok */ } } // reentrada: a conexão antiga cai
         try { c.send(JSON.stringify({ k: 'joined', you: id })); } catch (e) { /* ok */ }
-        h.send(id, { k: 'state', s: h.snapshot(), x: h.exportState ? h.exportState() : null, epoch: h.epoch || 1 });
+        h.send(id, { k: 'state', s: h.snapshot(), x: h.exportState ? h.exportState({ public: true }) : null, epoch: h.epoch || 1 });
         return;
       }
       h.handle(id, o);
@@ -181,6 +222,7 @@
         const E = root.ManobraEngine, T = root.ManobraTournament;
         if (!E || !T) throw new Error('O módulo de campeonato não está disponível.');
         simWorker = makeSimWorker();
+        const hostCache = {};
         const h = new T.Hub({
           engine: E,
           simWorker: simWorker,
@@ -191,7 +233,7 @@
           send: function (id, obj) {
             if (id === localId) { later(function () { emit('msg', obj); }); return; }
             const c = conns[id];
-            if (c && c.open !== false) { try { c.send(JSON.stringify(obj.k === 'state' ? Object.assign({}, obj, { x: h.exportState ? h.exportState() : null, epoch: h.epoch || 1 }) : obj)); } catch (e) { /* ok */ } }
+            if (c && c.open !== false) { try { c.send(JSON.stringify(withState(h, obj, hostCache))); } catch (e) { /* ok */ } }
           }
         });
         hub = h;
@@ -257,14 +299,9 @@
           };
           const lost = function () {
             if (!done) { fail('A conexão com o organizador caiu.'); return; }
-            if (joined && !closing && !closedSent) {
-              closedSent = true;
-              const lostEpoch = lastState && lastState.epoch;
-              if (!tryPromote()) {
-                lossTimer = setTimeout(function () { lossTimer = null; if (!closing && role === 'guest' && (!lastState || lastState.epoch === lostEpoch) && !tryPromote()) emit('closed', {}); }, 5000);
-              }
-            }
+            if (joined) authorityLost(c0);
           };
+          let c0 = null;
           const timer = setTimeout(function () { fail('Tempo esgotado. Confira o código e a internet dos dois celulares.'); }, 25000);
           const p = new root.Peer();
           installPeerForGuest(p);
@@ -277,6 +314,7 @@
           });
           p.on('open', function () {
             const c = p.connect(TPREFIX + code, { reliable: true });
+            c0 = c;
             client.conn = c;
             c.on('open', function () {
               try { c.send(JSON.stringify({ k: 'join', nick: opts.nick, pid: String(opts.pid), av: opts.avatar || '', peer: p.id || '' })); }

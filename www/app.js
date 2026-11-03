@@ -122,7 +122,7 @@
     const unread = app.chat.unread ? '<b class="chat-unread">' + app.chat.unread + '</b>' : '';
     if (!full && !app.chat.open) return '<div class="chat-dock closed"><button class="chat-fab" data-act="chatOpen" aria-label="Abrir chat">💬' + unread + '</button></div>';
     const rows = app.chat.messages.length ? app.chat.messages.map(m => {
-      const author = '<div class="chat-author">' + avHtml(m.av) + '<b>' + esc(m.mine ? 'Você' : (m.nick || 'Participante')) + '</b></div>';
+      const author = '<div class="chat-author">' + avHtml(m.av, m.nick) + '<b>' + esc(m.mine ? 'Você' : (m.nick || 'Participante')) + '</b></div>';
       return m.voice
         ? '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<audio controls preload="none" src="' + esc(m.voice) + '"></audio></div>'
         : '<div class="chat-msg ' + (m.mine ? 'mine' : 'theirs') + '">' + author + '<span>' + esc(m.text) + '</span></div>';
@@ -305,14 +305,24 @@
   const avId = id => {
     const v = String(id == null ? '' : id);
     if (AV[v]) return v;
-    const compact = /^avatar(\d+)$/.exec(v);
+    const compact = /^avatar\D{0,2}(\d+)$/i.exec(v) || /^(\d{1,3})$/.exec(v);
     if (compact && AV['avatar-' + compact[1]]) return 'avatar-' + compact[1];
-    if (Object.prototype.hasOwnProperty.call(LEGACY_AVATARS, v)) return 'avatar-' + LEGACY_AVATARS[v];
+    if (Object.prototype.hasOwnProperty.call(LEGACY_AVATARS, v.toLowerCase())) return 'avatar-' + LEGACY_AVATARS[v.toLowerCase()];
+    // perfis/mensagens antigos podem guardar o próprio emoji em vez do id
+    const cp = v ? v.codePointAt(0) : 0;
+    if (cp >= 0x1F300 && cp < 0x1F300 + 300) return 'avatar-' + (cp - 0x1F300);
     return '';
   };
   const usedAiBots = new Set();
-  const avOf = id => AV[avId(id)] || '🙂';
-  const avHtml = id => '<span class="av">' + avOf(id) + '</span>';
+  // Nunca mostra a carinha amarela: sem avatar válido, escolhe um fixo a partir do texto/nome (sempre o mesmo para a mesma pessoa).
+  const avOf = (id, seed) => {
+    const k = avId(id);
+    if (k) return AV[k];
+    const t = String(id || '') + '|' + String(seed || '');
+    let h = 7; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+    return AV['avatar-' + (h % 300)];
+  };
+  const avHtml = (id, seed) => '<span class="av">' + avOf(id, seed) + '</span>';
   function pickBot() {
     if (usedAiBots.size >= BOT_PROFILES.length) usedAiBots.clear();
     let i;
@@ -339,7 +349,7 @@
     const p = playerForSide(side);
     const total = c[side][0] + c[side][1];
     return '<div class="player-score' + (turn === side ? ' turn' : '') + '">' +
-      '<div class="player-head">' + avHtml(p.av) + '<div class="player-name"><b>' + esc(p.nick) + '</b>' +
+      '<div class="player-head">' + avHtml(p.av, p.nick) + '<div class="player-name"><b>' + esc(p.nick) + '</b>' +
       (p.bot ? '<small>IA</small>' : (p.me ? '<small>Você</small>' : '')) + '</div></div>' +
       '<div class="player-pieces"><strong>' + total + '</strong><span>peças</span></div>' +
       '<div class="player-breakdown">Ataque ' + c[side][0] + ' · Defesa ' + c[side][1] + '</div></div>';
@@ -632,7 +642,7 @@
   function friendRowHtml(fr) {
     const st = app.fstat[fr.code];
     const canInv = app.fr.state !== 'inviting' && st !== 'offline' && st !== 'match' && st !== 'tour' && st !== 'chat';
-    return '<div class="frow"><div class="fwho">' + avHtml(fr.av) + '<div><b>' + esc(fr.nick) + '</b><br>' +
+    return '<div class="frow"><div class="fwho">' + avHtml(fr.av, fr.nick) + '<div><b>' + esc(fr.nick) + '</b><br>' +
       '<span class="muted"><i class="dot ' + (st || 'wait') + '" data-st="' + esc(fr.code) + '"></i><span data-stt="' + esc(fr.code) + '">' + statusTxt(fr.code) + '</span> · ' + esc(fr.code) + '</span></div></div><div>' +
       '<button data-act="frInvite" data-inv="' + esc(fr.code) + '" data-v="' + esc(fr.code) + '"' + (canInv ? '' : ' disabled') + '>Chamar</button>' +
       '<button data-act="frRemove" data-v="' + esc(fr.code) + '">Remover</button></div></div>';
@@ -705,13 +715,13 @@
   }
   function tourFormatName(f) { return f === 'knockout' ? 'Mata-mata' : 'Todos contra todos'; }
   const TOUR_SAVE_KEY = 'manobra.tour.bot.save.v1';
-  function tourBotOnly(s) { return !!(s && s.players && s.players.length && s.players.every(p => p.id === 0 || p.bot)); }
+  function tourBotOnly(s) { return !!(s && s.players && s.players.length && s.players.every(p => p.id === app.tour.myId || p.bot || p.eliminated || p.connected === false)); }
   function tourFriendsCard() {
     if (app.tour.local) return '';
     if (!app.friends.length) return '<div class="card"><h3>Convidar amigos</h3><p class="muted" style="margin:0">Você ainda não tem amigos salvos. Adicione-os em Amigos e convites.</p></div>';
     return '<div class="card"><h3>Convidar amigos</h3><p class="muted" style="margin:0 0 8px">Escolha um amigo online. Ele receberá um convite e poderá aceitar ou recusar.</p>' + app.friends.map(fr => {
       const st = app.fstat[fr.code] || 'wait', can = st === 'online' && !app.tourInviteCode;
-      return '<div class="frow"><div class="fwho">' + avHtml(fr.av) + '<div><b>' + esc(fr.nick) + '</b><br><span class="muted"><i class="dot ' + st + '"></i>' + statusTxt(fr.code) + '</span></div></div><button data-act="tourInviteFriend" data-v="' + esc(fr.code) + '"' + (can ? '' : ' disabled') + '>' + (app.tourInviteCode === fr.code ? 'Aguardando…' : 'Convidar') + '</button></div>';
+      return '<div class="frow"><div class="fwho">' + avHtml(fr.av, fr.nick) + '<div><b>' + esc(fr.nick) + '</b><br><span class="muted"><i class="dot ' + st + '"></i>' + statusTxt(fr.code) + '</span></div></div><button data-act="tourInviteFriend" data-v="' + esc(fr.code) + '"' + (can ? '' : ' disabled') + '>' + (app.tourInviteCode === fr.code ? 'Aguardando…' : 'Convidar') + '</button></div>';
     }).join('') + '</div>';
   }
   function tourSaved() { try { return JSON.parse(localStorage.getItem(TOUR_SAVE_KEY) || 'null'); } catch (e) { return null; } }
@@ -722,12 +732,12 @@
     const data = l.saveState && l.saveState();
     if (!data) { if (!silent) toast('Não foi possível salvar este campeonato.'); return false; }
     let local = null;
-    const mine = s.matches.find(m => m.status === 'playing' && (m.a === 0 || m.b === 0));
+    const mine = s.matches.find(m => m.status === 'playing' && (m.a === app.tour.myId || m.b === app.tour.myId));
     if (mine) {
       const gm = data.rt && data.rt[mine.id] && data.rt[mine.id].game;
       if (!gm) return false; // montagem em andamento: mantém o último salvamento bom
-      const opp = s.players.find(p => p.id === (mine.a === 0 ? mine.b : mine.a)) || {};
-      local = { matchId: mine.id, humanSide: mine.a === 0 ? WHITE : BLACK, peer: { nick: opp.nick || 'Adversário', av: avId(opp.av) || 'avatar-13' }, game: gm };
+      const opp = s.players.find(p => p.id === (mine.a === app.tour.myId ? mine.b : mine.a)) || {};
+      local = { matchId: mine.id, humanSide: mine.a === app.tour.myId ? WHITE : BLACK, peer: { nick: opp.nick || 'Adversário', av: avId(opp.av) || 'avatar-13' }, game: gm };
     }
     try { localStorage.setItem(TOUR_SAVE_KEY, JSON.stringify({ data: data, local: local, savedAt: Date.now() })); if (!silent) toast('Campeonato salvo neste celular.'); return true; }
     catch (e) { if (!silent) toast('Não há espaço suficiente para salvar o campeonato.'); return false; }
@@ -753,7 +763,7 @@
     const bots = !!(pa && pb && pa.bot && pb.bot);
     const ph = id => {
       const p = id == null ? null : s.players.find(x => x.id === id);
-      return p ? '<span class="fwho">' + avHtml(p.av) + '<b>' + esc(p.nick) + '</b></span>' : 'a definir';
+      return p ? '<span class="fwho">' + avHtml(p.av, p.nick) + '<b>' + esc(p.nick) + '</b></span>' : 'a definir';
     };
     let status;
     if (m.status === 'done') {
@@ -792,7 +802,7 @@
     const s = t.snap;
     if (!s) return h + '<div class="hint">Conectando…</div></div>';
     if (t.disconnected) h += '<div class="card"><p class="hint" style="margin:0 0 10px">A conexão com o organizador caiu. O campeonato foi mantido nesta tela.</p><button class="primary" data-act="tourReconnect">Reconectar ao campeonato</button></div>';
-    const isOrg = t.myId === 0;
+    const isOrg = t.role === 'host'; // o juiz atual (original ou reserva que assumiu)
     h += tourFriendsCard();
     if (s.status === 'lobby') {
       if (t.local) h += '<div class="card"><p style="margin:0;text-align:center"><b>Campeonato offline</b></p><p style="text-align:center;font-size:13px;margin:6px 0 0">Sem internet: só dá para jogar contra robôs. Adicione robôs abaixo. Use o botão Salvar para continuar depois.</p></div>';
@@ -800,7 +810,7 @@
         '<p style="text-align:center;font-size:13px;margin:0">' + (isOrg ? 'Passe este código para os jogadores (de 1 a 8, contando com você e os robôs).' : 'Aguardando o organizador iniciar.') + '</p></div>';
       h += '<div class="card"><h3>Jogadores (' + s.players.length + '/' + T.MAX_PLAYERS + ')</h3>';
       s.players.forEach(p => {
-        h += '<div class="mrow"><div class="fwho">' + avHtml(p.av) + '<span><b>' + esc(p.nick) + '</b>' + (p.id === 0 ? ' <span class="muted">(organizador)</span>' : '') +
+        h += '<div class="mrow"><div class="fwho">' + avHtml(p.av, p.nick) + '<span><b>' + esc(p.nick) + '</b>' + (s.judge && p.id === s.judge.id || (!s.judge && p.id === 0) ? ' <span class="muted">(juiz)</span>' : '') +
           (p.bot ? ' <span class="muted">(IA)</span>' : '') +
           (p.id === t.myId ? ' <span class="muted">(você)</span>' : '') + '</span></div><div class="btns">' +
           (p.eliminated ? '<span class="muted">eliminado</span>' : (p.bot && isOrg ? '<button data-act="tourRmBot" data-v="' + p.id + '">Tirar</button>' : '<span class="' + (p.connected ? 'live' : 'muted') + '">' + (p.connected ? 'online' : 'fora') + '</span>')) + '</div></div>';
@@ -868,7 +878,7 @@
     if (s.format === 'league') {
       const rows = T.standings(s);
       h += '<div class="card"><h3>Classificação</h3><table class="tbl"><tr><th>#</th><th>Jogador</th><th>J</th><th>V</th><th>D</th><th>Pts</th><th>Saldo</th></tr>' +
-        rows.map(r => { const p = s.players.find(x => x.id === r.id) || {}; return '<tr' + (r.id === t.myId ? ' class="me"' : '') + '><td>' + r.pos + '</td><td><span class="fwho">' + avHtml(p.av) + '<b>' + esc(r.nick) + '</b></span></td><td>' + r.played + '</td><td>' + r.wins + '</td><td>' + r.losses + '</td><td><b>' + r.points + '</b></td><td>' + (r.diff > 0 ? '+' : '') + r.diff + '</td></tr>'; }).join('') +
+        rows.map(r => { const p = s.players.find(x => x.id === r.id) || {}; return '<tr' + (r.id === t.myId ? ' class="me"' : '') + '><td>' + r.pos + '</td><td><span class="fwho">' + avHtml(p.av, p.nick) + '<b>' + esc(r.nick) + '</b></span></td><td>' + r.played + '</td><td>' + r.wins + '</td><td>' + r.losses + '</td><td><b>' + r.points + '</b></td><td>' + (r.diff > 0 ? '+' : '') + r.diff + '</td></tr>'; }).join('') +
         '</table><p class="muted" style="margin:6px 0 0">J = jogos, V = vitórias, D = derrotas, Saldo = peças a mais que o adversário.</p></div>';
     }
     // todas as partidas, por rodada / fase
@@ -1834,7 +1844,7 @@
     const l = window.ManobraTourLink;
     if (app.tour.role) {
       const running = app.tour.snap && app.tour.snap.status === 'running';
-      const msg = app.tour.role === 'host' ? 'Sair encerra o campeonato para todos. Deseja sair?' : 'Sair do campeonato elimina você e não permite retornar. Deseja continuar?';
+      const msg = app.tour.role === 'host' ? ((app.tour.snap && app.tour.snap.reserveOrder && app.tour.snap.reserveOrder.length) ? 'Ao sair, o próximo jogador assume como juiz e o campeonato continua sem você. Deseja sair?' : 'Sair encerra o campeonato para todos. Deseja sair?') : 'Sair do campeonato elimina você e não permite retornar. Deseja continuar?';
       if (running || app.tour.role === 'host' || app.tour.role === 'guest') {
         const ok = typeof confirm === 'function' ? confirm(msg) : true;
         if (!ok) return;

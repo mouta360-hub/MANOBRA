@@ -75,7 +75,14 @@ O app gira nos dois sentidos (retrato e paisagem, seguindo o sensor do celular).
 - Partidas entre dois robôs não são mais decididas por sorteio: os dois jogam lance a lance pelo mesmo motor do jogo, **uma partida por vez**, em segundo plano. A simulação não exibe o tabuleiro nem atrapalha quem está jogando uma partida humana. Quando uma termina, a próxima começa automaticamente. A contagem final de peças e o saldo são preservados normalmente.
 - O celular do organizador é o **juiz**: confere cada jogada com as regras e decide sozinho quem venceu. Ele também joga. Jogada inválida ou fora de hora = derrota por W.O.
 - Sair no meio de uma partida, não aparecer na partida atual ou cair a internet dá W.O. automático ao adversário. O resultado não pode ser alterado e a partida não pode ser refeita manualmente.
-- Se o organizador sair ou ficar sem internet, o campeonato termina para todos (não há servidor guardando nada). Quem cair pode voltar entrando com o mesmo código, desde que não tenha começado outra partida.
+- Se o juiz sair ou ficar sem internet, o próximo da fila assume (veja *Juiz reserva* abaixo). O campeonato só termina para todos se não houver ninguém para assumir. Não há servidor guardando nada.
+
+## Juiz reserva (troca de juiz)
+- Quando o juiz principal sai do campeonato, fecha o app ou fica sem internet, o **próximo jogador da fila** (2º, 3º, 4º… na ordem de entrada) vira o juiz automaticamente e o campeonato continua. Os outros celulares passam a falar com o novo juiz sozinhos.
+- Se o 2º também tiver caído, o 3º assume depois de uns segundos, e assim por diante; se o novo juiz cair, o seguinte assume de novo.
+- O novo juiz tem todos os poderes do organizador (escolher o formato, adicionar robôs, iniciar, pular simulação). O juiz que saiu deixa o campeonato: no saguão some da lista; com o campeonato em andamento perde as partidas pendentes por W.O.
+- As partidas em andamento continuam do mesmo ponto: o juiz manda uma cópia do campeonato (tabuleiros incluídos) aos jogadores a cada novidade e depois de cada lance. A cópia **não** leva o código pessoal dos jogadores.
+- Partidas entre robôs que estavam sendo simuladas recomeçam do zero com o novo juiz.
 
 ## Desempenho do juiz (partidas entre robôs)
 - As partidas **robô contra robô** rodam num **Web Worker** (`www/engine-worker.js`), fora da tela principal: o celular do organizador não trava e a rodada anda rápido (num campeonato de 8 jogadores com 7 robôs, as 21 partidas entre robôs terminam em poucos segundos; a tela principal nunca parou mais que alguns milissegundos).
@@ -109,3 +116,6 @@ O APK "debug" serve para instalar e testar. Para a loja é preciso gerar um app 
 - Objetivo 1: todas as peças de ataque do oponente sem nenhuma peça amiga ao lado e o oponente sem peças de defesa para reconectá-las.
 - Quem fica sem movimentos possíveis perde.
 - Efeito looping: posição repetida pela 3ª vez; quem perde o desempate (menos peças, mais peças em ataque, dono do terreno do lance) é proibido de repetir.
+
+## Avatares
+Perfis antigos (emoji salvo no lugar do id, nomes como "fox", números soltos) agora são reconhecidos; o avatar enviado pela rede/convites/campeonato é normalizado para `avatar-N`; e, se mesmo assim algum for desconhecido, o jogo escolhe um avatar fixo a partir do nome (nunca mais a carinha amarela).
