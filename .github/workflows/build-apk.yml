@@ -26,11 +26,16 @@ jobs:
       - name: Testar regras, sons e Bluetooth simulado
         run: npm test
 
+      - name: Verificar visual Android antes de empacotar
+        run: |
+          python3 tools/check_android_layout.py www
+
       - name: Criar projeto Android (Capacitor)
         run: |
           npx cap add android
           npx cap sync android
-          # horizontal + plugin de Bluetooth + permissões
+          python3 tools/check_android_layout.py android/app/src/main/assets/public
+          # retrato + plugin de Bluetooth + permissões
           python3 tools/patch_android.py android --bluetooth
           pip install pillow
           python3 tools/make_icons.py android/app/src/main/res
@@ -63,6 +68,7 @@ jobs:
         run: |
           python3 tools/patch_android.py android --no-bluetooth
           npx cap sync android
+          python3 tools/check_android_layout.py android/app/src/main/assets/public
           pip install pillow
           python3 tools/make_icons.py android/app/src/main/res
           python3 - <<'PY'
