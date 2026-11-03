@@ -37,9 +37,9 @@ BT_BLOCK = (
 with open(manifest_path, encoding="utf-8") as f:
     manifest = f.read()
 if "screenOrientation" not in manifest:
-    manifest = manifest.replace("<activity", '<activity android:screenOrientation="portrait"', 1)
+    manifest = manifest.replace("<activity", '<activity android:screenOrientation="fullUser"', 1)
 else:
-    manifest = re.sub(r'android:screenOrientation="[^"]+"', 'android:screenOrientation="portrait"', manifest, count=1)
+    manifest = re.sub(r'android:screenOrientation="[^"]+"', 'android:screenOrientation="fullUser"', manifest, count=1)
 manifest = re.sub(r"[ \t]*<!-- manobra-bluetooth -->.*?<!-- /manobra-bluetooth -->\n?", "", manifest, flags=re.S)
 manifest = re.sub(r"[ \t]*<!-- manobra-microphone -->.*?<!-- /manobra-microphone -->\n?", "", manifest, flags=re.S)
 if with_bt:
