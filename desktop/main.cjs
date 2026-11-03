@@ -15,7 +15,7 @@ function createWindow() {
       sandbox: true
     }
   });
-  win.loadFile(path.join(__dirname, '..', 'www', 'index.html'));
+  win.loadFile(path.join(__dirname, 'www', 'index.html'));
 }
 
 app.whenReady().then(() => {
