@@ -255,7 +255,7 @@ async function until(cond, ms) { const t = Date.now(); while (!cond()) { if (Dat
   const out = [];
   const hub = new T.Hub({ engine: E, send: (id, o) => out.push([id, o]), botDelay: 0 });
   hub.join('ORG', 'Solo', 'bear');
-  assert.strictEqual(hub.players[0].av, 'bear', 'avatar guardado');
+  assert.strictEqual(hub.players[0].av, 'avatar-1', 'avatar guardado');
   hub.handle(0, { k: 'botlevel', v: 'easy' });
   assert(hub.start());
   assert.strictEqual(hub.status, 'running');

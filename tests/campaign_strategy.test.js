@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {chooseTeam,planShop}=require('./campaign_strategy');
+const catalog={a:{category:'tank'},b:{category:'tank'},c:{category:'attacker'},d:{category:'attacker'},e:{category:'support'},f:{category:'attacker'},g:{category:'support'}};
+const team=chooseTeam(['a','b','c','d','e','f','g'],{a:2,b:1,c:3,d:1,e:2,f:1,g:3},catalog,6);
+assert.equal(team.length,6);assert.equal(team.filter(k=>catalog[k].category==='tank').length,2);
+assert.equal(team.filter(k=>catalog[k].category==='attacker').length,3);
+assert.equal(team.filter(k=>catalog[k].category==='support').length,1);
+assert.equal(new Set(team).size,6);
+assert.deepEqual(planShop({roster:[],gold:30,mastery:{}},['c','a'],catalog,()=>20,()=>25),{kind:'buy',key:'c'});
+assert.deepEqual(planShop({roster:['a','c','e'],gold:30,mastery:{a:1,c:2,e:1}},[],catalog,()=>20,()=>25),{kind:'upgrade',key:'c'});
+assert.equal(planShop({roster:['a'],gold:0,mastery:{a:1}},[],catalog,()=>20,()=>25),null);
+console.log('Estratégia de formação e compras: OK');

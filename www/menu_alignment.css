@@ -1,0 +1,68 @@
+/* Menu inicial: cartões alinhados sem alterar telas de jogo. */
+.menu-redesign .menu-options {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+  align-items:stretch;
+}
+.menu-redesign .menu-option {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  height:100%;
+  box-sizing:border-box;
+  border-radius:16px;
+  overflow:hidden;
+  padding-bottom:18px;
+}
+.menu-redesign .menu-option-banner {flex:0 0 112px;height:112px;}
+.menu-redesign .menu-option-title {min-height:58px;align-items:center;margin-bottom:12px;}
+.menu-redesign .menu-option-title h3 {line-height:1.2;}
+.menu-redesign .menu-option-title small {display:block;line-height:1.4;}
+.menu-redesign .menu-option .seg {width:100%;box-sizing:border-box;}
+.menu-redesign .menu-option .seg button {min-width:0;overflow-wrap:break-word;}
+.menu-redesign .menu-option .primary {
+  width:100%;
+  box-sizing:border-box;
+  min-height:43px;
+  flex-shrink:0;
+}
+/* O primeiro botão de ação fica na mesma base dos demais cartões. */
+.menu-redesign .menu-option > button.primary:first-of-type {margin-top:auto;}
+/* Checkbox acima da ação principal, para não deixar o botão solto. */
+.menu-redesign .menu-option:has(> .chk) > .chk {order:1;margin:12px 0 8px;}
+.menu-redesign .menu-option:has(> .chk) > button.primary {order:2;margin-top:auto;}
+.menu-redesign .menu-option .muted {overflow-wrap:anywhere;line-height:1.35;}
+.menu-redesign .menu-section-heading {text-align:left;}
+@media(max-width:680px){
+  .menu-redesign .menu-options {grid-template-columns:1fr;gap:13px;}
+  .menu-redesign .menu-option {height:auto;}
+  .menu-redesign .menu-option-banner {flex-basis:104px;height:104px;}
+  .menu-redesign .menu-option-title {min-height:0;}
+}
+
+/* Correção de layout: style.css aplica margin:auto aos .card no desktop.
+   Dentro de grid isso encolhe os cartões ao tamanho do conteúdo. */
+#app > .menu-redesign .menu-options {
+  width:100%;
+  max-width:none;
+  box-sizing:border-box;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:18px;
+  justify-items:stretch;
+  align-items:stretch;
+}
+#app > .menu-redesign .menu-options > .menu-option.card {
+  width:100%;
+  max-width:none;
+  min-width:0;
+  margin:0;
+  justify-self:stretch;
+  box-sizing:border-box;
+}
+#app > .menu-redesign .menu-options .menu-option-title {width:100%;}
+#app > .menu-redesign .menu-options .seg {display:flex;}
+#app > .menu-redesign .menu-options .seg > button {flex:1 1 0;}
+@media (max-width:680px) {
+  #app > .menu-redesign .menu-options {grid-template-columns:minmax(0,1fr);gap:14px;}
+}

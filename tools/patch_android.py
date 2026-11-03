@@ -2,7 +2,7 @@
 
 Uso: python3 tools/patch_android.py <pasta_android> [--bluetooth | --no-bluetooth]
 
-- trava o app na horizontal;
+- abre o app em retrato, adequado ao menu Android;
 - instala o plugin ManobraScreen (tela sempre acesa durante o jogo), com ou sem Bluetooth;
 - com --bluetooth (padrão): instala o plugin ManobraBluetooth, registra no MainActivity
   e pede as permissões de Bluetooth no manifesto;
@@ -37,7 +37,9 @@ BT_BLOCK = (
 with open(manifest_path, encoding="utf-8") as f:
     manifest = f.read()
 if "screenOrientation" not in manifest:
-    manifest = manifest.replace("<activity", '<activity android:screenOrientation="fullSensor"', 1)
+    manifest = manifest.replace("<activity", '<activity android:screenOrientation="portrait"', 1)
+else:
+    manifest = re.sub(r'android:screenOrientation="[^"]+"', 'android:screenOrientation="portrait"', manifest, count=1)
 manifest = re.sub(r"[ \t]*<!-- manobra-bluetooth -->.*?<!-- /manobra-bluetooth -->\n?", "", manifest, flags=re.S)
 manifest = re.sub(r"[ \t]*<!-- manobra-microphone -->.*?<!-- /manobra-microphone -->\n?", "", manifest, flags=re.S)
 if with_bt:

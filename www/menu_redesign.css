@@ -1,0 +1,93 @@
+/* Menu principal: a aventura é a entrada principal; regras e tabuleiro não são alterados. */
+#app:has(> .menu-redesign){max-width:1180px;width:100%;padding:clamp(12px,2.5vw,32px)}
+.menu-redesign{width:100%;max-width:none}
+.menu-hero{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(220px,.8fr);min-height:390px;overflow:hidden;border:1px solid #755d35;border-radius:24px;background:radial-gradient(ellipse at 80% 25%,#5c4532 0%,transparent 55%),linear-gradient(125deg,#252b35,#141921 70%);box-shadow:0 16px 50px #0007}
+.menu-hero-copy{position:relative;z-index:2;padding:clamp(24px,4vw,55px);display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.menu-eyebrow{font-size:11px;font-weight:800;letter-spacing:2.5px;color:#e8bf78}
+.menu-redesign .menu-hero h1{margin:10px 0 0;text-align:left;letter-spacing:5px;font-size:clamp(44px,6vw,78px);line-height:1;color:#fff0d4;text-shadow:0 3px 18px #0009}
+.menu-edition{font-size:clamp(18px,2vw,25px);color:#ffda91;font-weight:700;margin:15px 0 4px}
+.menu-intro{max-width:480px;line-height:1.6;color:#d0d3da;margin:8px 0 24px}
+.menu-adventure-button{display:flex;align-items:center;gap:14px;justify-content:space-between;min-width:min(100%,350px);padding:15px 18px;background:linear-gradient(135deg,#f4b847,#c88124);color:#1c1711;border:1px solid #ffda85;box-shadow:0 6px 22px #d58d3555;text-align:left;font-size:24px}
+.menu-adventure-button span:nth-child(1){display:flex;flex-direction:column;gap:2px;flex:1}.menu-adventure-button strong{font-size:18px}.menu-adventure-button small{font-size:11px;font-weight:600;color:#4a351e}
+.menu-adventure-button:hover{filter:brightness(1.1);transform:translateY(-2px)}
+.menu-hero-facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.menu-hero-facts span{border:1px solid #7b6549;background:#0004;border-radius:30px;padding:6px 11px;font-size:12px;color:#e8d8bd}
+.menu-hero-art{position:relative;min-height:300px;overflow:hidden}.menu-art-glow{position:absolute;inset:12% 8%;border-radius:50%;background:radial-gradient(circle,#d2a25e77,transparent 68%);filter:blur(18px)}
+.menu-art-main{position:absolute;bottom:-7%;left:10%;width:80%;height:108%;object-fit:contain;filter:drop-shadow(0 12px 20px #000a)}
+.menu-art-token{position:absolute;display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#4c4032,#1e2837);border:2px solid #b8965d;font-size:28px;box-shadow:0 8px 25px #0008}.token-one{top:12%;left:5%}.token-two{top:24%;right:7%}.token-three{bottom:12%;right:8%}
+.menu-section-heading{margin:30px 0 16px}.menu-section-heading h2{margin:0;font-size:23px;color:#f3e5c7}.menu-section-heading p{color:#aeb6c5;margin:5px 0 0}
+.menu-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.menu-option{margin:0;border:1px solid #3a4554;background:linear-gradient(145deg,#252d39,#1b222c);padding:22px}.menu-option-title{display:flex;align-items:center;gap:13px;margin-bottom:20px}.menu-option-title h3{margin:0 0 3px}.menu-option-title small{color:#aeb6c5}.menu-option-icon{display:grid;place-items:center;flex:none;width:54px;height:54px;border-radius:14px;background:#3b4555;font-size:28px}.menu-secondary-button{margin-top:9px}.menu-lower{max-width:850px;margin:0 auto 28px}.menu-lower .card{border:1px solid #343e4c}.menu-redesign .menu-lower .link{max-width:850px}
+@media(max-width:680px){.menu-hero{grid-template-columns:1fr;min-height:0}.menu-hero-copy{padding:26px 22px 18px}.menu-hero-art{min-height:210px}.menu-art-main{height:125%;bottom:-28%;left:24%;width:55%}.menu-art-token{width:44px;height:44px;font-size:21px}.menu-options{grid-template-columns:1fr}.menu-hero-facts{margin-top:14px}.menu-redesign .menu-hero h1{font-size:46px}.menu-option{padding:17px}}
+
+/* Ilustrações e organização dos modos secundários */
+.menu-options{align-items:stretch;gap:18px}
+.menu-option{display:flex;flex-direction:column;overflow:hidden;padding:0 20px 20px;min-width:0}
+.menu-option-banner{position:relative;height:152px;margin:0 -20px 19px;overflow:hidden;isolation:isolate;background:linear-gradient(115deg,#283e50,#111923);border-bottom:1px solid #566078}
+.menu-option-banner:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 75% 30%,#e9b97155,transparent 60%);z-index:-1}
+.menu-option-banner:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#0b1521 0%,#0b1521aa 45%,transparent 100%)}
+.menu-option-banner img{position:absolute;right:4%;top:-40%;width:50%;height:185%;object-fit:contain;filter:drop-shadow(0 8px 12px #000a)}
+.menu-banner-symbol{position:absolute;z-index:1;left:22px;top:24px;font-size:48px;color:#f6d08a;text-shadow:0 3px 15px #000}
+.menu-banner-label{position:absolute;z-index:1;bottom:18px;left:22px;font-size:12px;font-weight:900;letter-spacing:2px;color:#f8dfac}
+.banner-local{background:linear-gradient(120deg,#354c54,#141f2c)}
+.banner-friends{background:linear-gradient(120deg,#294e46,#14252c)}
+.banner-tournament{background:linear-gradient(120deg,#59402d,#24212b)}
+.menu-option-title{margin-bottom:14px}.menu-option .primary{margin-top:8px}.menu-option .chk,.menu-option .muted{margin-top:12px}
+@media(max-width:680px){.menu-option{padding:0 16px 18px}.menu-option-banner{margin:0 -16px 15px;height:132px}}
+
+/* Ajuste compacto do menu para telas de notebook e desktop.
+   Escopo exclusivo da tela inicial: não reduz o tabuleiro da partida. */
+#app:has(> .menu-redesign){max-width:1020px;padding:clamp(10px,1.6vw,20px)}
+.menu-hero{min-height:280px;grid-template-columns:minmax(0,1.25fr) minmax(190px,.75fr);border-radius:18px}
+.menu-hero-copy{padding:clamp(18px,2.5vw,32px)}
+.menu-redesign .menu-hero h1{font-size:clamp(38px,4.5vw,60px)}
+.menu-edition{font-size:clamp(16px,1.6vw,21px);margin:9px 0 2px}
+.menu-intro{font-size:14px;line-height:1.45;margin:6px 0 15px}
+.menu-adventure-button{padding:11px 15px;min-width:min(100%,310px)}
+.menu-adventure-button strong{font-size:16px}
+.menu-hero-facts{margin-top:12px}
+.menu-hero-art{min-height:250px}
+.menu-art-token{width:43px;height:43px;font-size:22px}
+.menu-section-heading{margin:19px 0 11px}
+.menu-section-heading h2{font-size:20px}
+.menu-options{gap:12px}
+.menu-option{padding:0 15px 14px}
+.menu-option-banner{height:104px;margin:0 -15px 12px}
+.menu-option-banner img{top:-48%;height:195%}
+.menu-banner-symbol{font-size:32px;top:15px;left:17px}
+.menu-banner-label{font-size:10px;bottom:12px;left:17px}
+.menu-option-title{gap:9px;margin-bottom:8px}
+.menu-option-title h3{font-size:17px}
+.menu-option-title small{font-size:12px}
+.menu-option-icon{width:40px;height:40px;font-size:21px}
+.menu-option .primary,.menu-option .menu-secondary-button{margin-top:6px}
+.menu-option .chk,.menu-option .muted{margin-top:7px}
+@media(max-width:680px){
+ #app:has(> .menu-redesign){padding:10px}
+ .menu-hero{grid-template-columns:1fr;min-height:0}
+ .menu-hero-copy{padding:20px 18px 14px}
+ .menu-redesign .menu-hero h1{font-size:42px}
+ .menu-hero-art{min-height:150px}
+ .menu-art-main{height:140%;bottom:-43%;left:30%;width:45%}
+ .menu-options{grid-template-columns:1fr}
+ .menu-option{padding:0 14px 13px}
+ .menu-option-banner{height:96px;margin:0 -14px 11px}
+}
+@media(min-width:681px) and (max-height:800px){
+ .menu-hero{min-height:245px}
+ .menu-hero-art{min-height:230px}
+ .menu-option-banner{height:90px}
+ .menu-section-heading{margin:13px 0 9px}
+}
+
+/* Acesso compacto às opções, fora dos cartões de modos de jogo. */
+.menu-options-entry{display:flex;justify-content:center;margin:22px 0 30px}
+.menu-settings-button{display:flex;align-items:center;gap:13px;width:min(100%,410px);padding:13px 18px;border:1px solid #806d50;border-radius:14px;background:linear-gradient(120deg,#343944,#232b37);color:#f6e6c9;text-align:left;font-size:22px;box-shadow:0 8px 22px #0004}
+.menu-settings-button span:nth-child(1){display:flex;flex:1;flex-direction:column;gap:3px}
+.menu-settings-button strong{font-size:17px}
+.menu-settings-button small{font-size:12px;color:#b9c3d0;font-weight:400}
+.menu-settings-button:hover{border-color:#d4a45f;filter:brightness(1.1)}
+.options-page{width:min(100%,760px);margin:auto}
+.options-page .options-section{margin:18px 0}
+.options-page .options-section h2{font-size:19px;margin:0 0 10px}
+.options-page .options-section .card{margin:0}
+.options-page .options-section .card h3:not(:first-child){margin-top:22px}
+.options-page .options-help{width:100%;max-width:420px}

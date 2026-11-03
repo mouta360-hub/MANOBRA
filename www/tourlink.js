@@ -140,7 +140,7 @@
 
   function tryPromote() {
     if (promoting || role !== 'guest' || !lastState || !lastState.x || !client || !client.peer) return false;
-    const snap = lastState.s || {}, pid = client.pid, mine = (snap.players || []).find(p => p.pid === String(pid));
+    const snap = lastState.s || {}, mine = (snap.players || []).find(p => p.id === localId);
     if (!mine || mine.bot || mine.eliminated) return false;
     const order = snap.reserveOrder || (snap.players || []).filter(p => !p.bot && !p.eliminated && p.connected).map(p => p.id);
     if (order[0] !== mine.id) return false;
@@ -344,7 +344,10 @@
               if (o.k === 'judgeBeat') { lastJudgeBeat = Date.now(); return; }
               if (o.k === 'joined' && !done) { done = true; joined = true; localId = o.you; clearTimeout(timer); startJudgeWatch(authorityLost); resolve({ you: o.you }); return; }
               if (o.k === 'rejected' && !done) { fail(o.why || 'O organizador não aceitou a sua entrada.'); return; }
-              if (joined) { if (o.k === 'state') lastState = o; emit('msg', o); }
+              if (joined) {
+                if (o.k === 'tournamentClosed') { closing = true; emit('closed', { authority: true, intentional: true }); reset(); return; }
+                if (o.k === 'state') lastState = o; emit('msg', o);
+              }
             });
             c.on('close', lost);
             c.on('error', lost);
@@ -374,7 +377,13 @@
     saveState: function () { return hub && role === 'host' && hub.exportState ? hub.exportState() : null; },
     role: function () { return role; },
     isLocal: function () { return localOnly; },
-    leave: function () { reset(); },
+    leave: function () {
+      if (role === 'host') Object.keys(conns).forEach(function (id) {
+        const c = conns[id];
+        if (c && c.open !== false) try { c.send(JSON.stringify({ k: 'tournamentClosed' })); } catch (e) {}
+      });
+      reset();
+    },
     addListener: function (ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return Promise.resolve({ remove: function () {} }); }
   };
 

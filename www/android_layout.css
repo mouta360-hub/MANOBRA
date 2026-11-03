@@ -1,0 +1,47 @@
+/* Manobra — camada responsiva para Android/WebView. Sem alterar regras. */
+@media (max-width: 899px) {
+  html { width:100%; overflow-x:hidden; -webkit-text-size-adjust:100%; }
+  body { width:100%; max-width:100%; margin:0; overflow-x:hidden; padding-left:env(safe-area-inset-left,0px); padding-right:env(safe-area-inset-right,0px); box-sizing:border-box; }
+  #app { width:100%; max-width:100%; min-width:0; box-sizing:border-box; }
+  #app > .menu-redesign { width:100%; min-width:0; }
+  #app:has(> .menu-redesign) { box-sizing:border-box; width:100%; max-width:100%; padding:12px; }
+  .menu-redesign .menu-hero { display:flex; flex-direction:column; width:100%; min-width:0; min-height:0; border-radius:17px; }
+  .menu-redesign .menu-hero-copy { padding:22px 18px 12px; }
+  .menu-redesign .menu-hero h1 { font-size:clamp(32px,10vw,49px); letter-spacing:2px; overflow-wrap:anywhere; }
+  .menu-redesign .menu-hero-art { min-height:145px; max-height:190px; }
+  .menu-redesign .menu-art-main { left:25%; width:50%; }
+  .menu-redesign .menu-adventure-button { min-width:0; width:100%; max-width:100%; box-sizing:border-box; min-height:52px; }
+  #app > .menu-redesign .menu-options { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; width:100%; }
+  #app > .menu-redesign .menu-options > .menu-option.card { min-width:0; width:100%; max-width:100%; margin:0; padding:0 15px 15px; box-sizing:border-box; }
+  .menu-redesign .menu-option-banner { margin:0 -15px 12px; height:105px; flex-basis:105px; }
+  .menu-redesign .menu-option-title { min-height:0; margin-bottom:10px; }
+  .menu-redesign .menu-option-title > div { min-width:0; }
+  .menu-redesign .menu-option .seg { width:100%; display:flex; flex-wrap:wrap; gap:6px; }
+  .menu-redesign .menu-option .seg > button { flex:1 1 95px; min-width:0; white-space:normal; }
+  .menu-redesign .menu-option button, .menu-redesign .menu-settings-button { min-height:44px; touch-action:manipulation; }
+  .menu-redesign .menu-option .primary { width:100%; }
+  .menu-redesign .menu-lower, .menu-redesign .menu-options-entry, .options-page { width:100%; max-width:100%; box-sizing:border-box; }
+  .menu-redesign .menu-settings-button { width:100%; min-width:0; }
+  .options-page .card { max-width:100%; box-sizing:border-box; }
+  /* O tabuleiro de 13 colunas cabe na largura útil, inclusive em WebView. */
+  :root { --cs: min(calc((100vw - 24px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)) / 13), calc((100dvh - 175px) / 11)); }
+  #app > .layout { display:flex; flex-direction:column; align-items:stretch; gap:12px; min-width:0; width:100%; box-sizing:border-box; }
+  #app > .layout > .bw { width:100%; max-width:100%; min-width:0; height:auto; min-height:0; display:flex; align-items:flex-start; justify-content:center; padding:0; overflow-x:auto; overscroll-behavior-x:contain; box-sizing:border-box; }
+  #app > .layout > .bw > #board { flex:0 0 auto; margin:0 auto; }
+  #app > .layout > .side { width:100%; max-width:100%; min-width:0; max-height:none; overflow:visible; box-sizing:border-box; }
+  #app > .layout > .side button { min-height:42px; touch-action:manipulation; }
+  .roguelike-modal-content { max-width:calc(100vw - 20px); max-height:calc(100dvh - 24px); overflow:auto; box-sizing:border-box; }
+  .roguelike-grid { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:899px) and (orientation:landscape) {
+  :root { --cs: min(calc((100vw - 245px) / 13), calc((100dvh - 28px) / 11)); }
+  #app > .layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,225px); gap:10px; }
+  #app > .layout > .bw { align-items:center; }
+  #app > .layout > .side { max-height:calc(100dvh - 12px); overflow-y:auto; }
+}
+@media (max-width:390px) and (orientation:portrait) {
+  :root { --cs: calc((100vw - 20px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)) / 13); }
+  .menu-redesign .menu-hero-copy { padding:17px 13px 10px; }
+  .menu-redesign .menu-hero-facts { gap:5px; }
+  .menu-redesign .menu-hero-facts span { font-size:10px; padding:5px 8px; }
+}

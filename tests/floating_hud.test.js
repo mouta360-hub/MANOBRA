@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync('www/roguelike_adventure.js', 'utf8');
+let removed = 0;
+const floating = {style: {}, innerHTML: '<button>Modo Aventura</button>', remove() { removed++; }};
+const document = {getElementById: id => id === 'roguelike-floating-btn-container' ? floating : null};
+const ctx = {window: {addEventListener() {}}, document, console, Math, Date, setTimeout() {}};
+vm.createContext(ctx);
+vm.runInContext(source, ctx);
+ctx.updateFloatingAdventureButton();
+assert.equal(floating.style.display, 'none');
+assert.equal(floating.innerHTML, '');
+assert.equal(removed, 1);
+console.log('OK: atalho lateral da aventura removido de todas as telas');

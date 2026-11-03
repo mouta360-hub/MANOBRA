@@ -31,7 +31,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🏰',
-        description: 'Cria uma zona de bloqueio. Inimigos não podem atravessar casas adjacentes.',
+        description: 'Bloqueia até 2 tentativas de entrada inimiga em casas adjacentes (recarga de 2 turnos).',
         passive: 'aura_block',
         getAuraArea: (r, c) => [
             {r: r-1, c}, {r: r+1, c}, {r, c: c-1}, {r, c: c+1}
@@ -43,7 +43,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🗿',
-        description: 'Ao avançar, empurra uma peça inimiga adjacente 1 casa para trás.',
+        description: 'Ao realizar empurrão legal, recebe 10 moedas (1 vez por combate).',
         onAfterMove: (from, to, board) => {
             // Lógica de empurrão (knockback)
         }
@@ -54,7 +54,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🧱',
-        description: 'Concede imunidade a captura frontal para peças aliadas adjacentes.',
+        description: 'Bloqueia uma tentativa de captura de aliado adjacente por combate.',
         passive: 'aura_front_defense'
     },
     muralha: {
@@ -63,7 +63,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🏯',
-        description: 'Inexpugnável na última fileira defensiva: ganha imunidade a ataques laterais.',
+        description: 'Bloqueia um ataque lateral na última fileira por combate.',
         passive: 'backrow_fortress'
     },
     javali_de_ferro: {
@@ -72,7 +72,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🐗',
-        description: 'Vingança: Ao ser capturado, destrói automaticamente a peça que o atacou.',
+        description: 'Ao realizar captura legal, recebe 10 moedas (1 vez por combate). Sem contragolpe automático.',
         onDestroyed: (attackerPiece) => {
             return { destroyAttacker: true, msg: 'Contragolpe do Javali de Ferro!' };
         }
@@ -83,7 +83,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '☸️',
-        description: 'Runa de Paralisia: Inimigos que param ao seu lado perdem o próximo turno.',
+        description: 'Ao realizar movimento legal, recebe 8 moedas (1 vez por combate). Sem paralisar turnos.',
         passive: 'stun_aura'
     },
     rebatedor: {
@@ -92,7 +92,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🪞',
-        description: 'Inverte o vetor de captura se for atacado em ângulo diagonal.',
+        description: 'Repele a primeira tentativa de captura diagonal por combate.',
         passive: 'reflect_diagonal'
     },
     tita_de_aco: {
@@ -101,7 +101,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🦾',
-        description: 'Ocupa o centro do bloqueio e reduz dano em área recebido por aliados.',
+        description: 'Protege uma vez por combate um aliado adjacente contra uma captura legal. Não cria movimentos extras.',
         passive: 'damage_reduction_zone'
     },
     baluarte: {
@@ -110,7 +110,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🔰',
-        description: 'Redireciona para si o primeiro ataque sofrido por qualquer aliado próximo.',
+        description: 'Bloqueia a primeira tentativa de captura de aliado adjacente por combate.',
         passive: 'intercept_damage'
     },
 
@@ -123,7 +123,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🗡️',
-        description: 'Carga Linear: Pode saltar 2 casas em linha reta se a intermediária estiver livre.',
+        description: 'Investida: ao capturar em linha reta, rompe uma proteção inimiga (3 usos, recarga 2).',
         getSpecialMoves: (r, c, player, board) => {
             const dir = player === 1 ? -1 : 1;
             const moves = [];
@@ -139,7 +139,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🥷',
-        description: 'Passos Sombrios: Atravessa 1 peça inimiga sem capturar para se posicionar atrás.',
+        description: 'Ataque furtivo: ao capturar na diagonal, rompe uma proteção inimiga (2 usos, recarga 2).',
         getSpecialMoves: (r, c, player, board) => {
             // Lógica de travessia fantasma
             return [];
@@ -151,7 +151,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🪓',
-        description: 'Fúria: Ganha +1 casa de alcance de movimento para cada 3 aliados eliminados.',
+        description: 'Fúria: ao capturar, rompe uma proteção inimiga (2 usos, recarga 3).',
         passive: 'fury_scaling'
     },
     executor: {
@@ -160,7 +160,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '⚔️',
-        description: 'Impulso Mortal: Ao realizar uma captura, ganha um movimento bônus imediato.',
+        description: 'Execução: uma captura pode romper uma proteção inimiga (1 uso).',
         onCaptureSuccess: (player) => {
             return { extraTurn: true };
         }
@@ -171,7 +171,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '♞',
-        description: 'Movimento em "L" (Salto de Cavalo): Quebra os padrões de bloqueio em grade.',
+        description: 'Carga: ao capturar mudando de fileira, rompe uma proteção (2 usos, recarga 2).',
         getSpecialMoves: (r, c, player, board) => {
             const offsets = [
                 {dr: -2, dc: -1}, {dr: -2, dc: 1}, {dr: -1, dc: -2}, {dr: -1, dc: 2},
@@ -187,7 +187,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '💀',
-        description: 'Ponto Cego: Capaz de capturar alvos na diagonal traseira.',
+        description: 'Colheita: captura na última fileira rompe uma proteção inimiga (2 usos, recarga 3).',
         passive: 'rear_capture'
     },
     predador: {
@@ -196,7 +196,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🐺',
-        description: 'Sede de Sangue: Ganha +1 casa de alcance quando avança contra a última peça inimiga.',
+        description: 'Caçada: captura adjacente rompe uma proteção inimiga (2 usos, recarga 2).',
         passive: 'hunt_mode'
     },
     duelista: {
@@ -205,7 +205,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🤺',
-        description: 'Isolamento: Quando não possui aliados adjacentes, ganha alcance de captura +1.',
+        description: 'Duelo: sem aliado adjacente, sua captura rompe uma proteção inimiga (2 usos, recarga 2).',
         passive: 'lone_wolf_boost'
     },
     vento_cortante: {
@@ -214,7 +214,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🌪️',
-        description: 'Projétil Tático: Percorre qualquer linha reta desocupada até encontrar obstáculo.',
+        description: 'Corte horizontal: captura na mesma fileira rompe uma proteção (2 usos, recarga 3).',
         passive: 'rook_slide'
     },
     cacador_cabecas: {
@@ -223,7 +223,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🎯',
-        description: 'Marca do Caçador: Escolhe um alvo na IA; ganha o dobro de pontos ao eliminar.',
+        description: 'Caça especial: captura de peça especial rompe uma proteção inimiga (2 usos, recarga 3).',
         passive: 'bounty_target'
     },
 
@@ -236,7 +236,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '⏳',
-        description: 'Dobra do Tempo: Concede um turno bônus para uma peça aliada adjacente (CD: 3T).',
+        description: 'Ritmo preciso: após um movimento legal sem captura, recebe +5 moedas (1 uso por combate). Não altera turnos.',
         cooldown: 3,
         activePower: (r, c, targetR, targetC) => {
             return { action: 'grant_extra_turn' };
@@ -248,7 +248,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '🎭',
-        description: 'Clone de Espelhos: Cria uma ilusão que força a IA a gastar um movimento atacando-a.',
+        description: 'Distração: após uma troca legal de posições, recebe +6 moedas (até 2 usos, recarga de 3 turnos).',
         activePower: (r, c) => {
             return { action: 'spawn_decoy' };
         }
@@ -258,8 +258,8 @@ const SPECIAL_PIECES_CATALOG = {
         name: 'Teleportador',
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
-        symbol: '🌀',
-        description: 'Permuta Quântica: Troca de posição instantaneamente com qualquer peça aliada.',
+        symbol: '🔄',
+        description: 'Troca estratégica: após uma troca legal de posições, recebe +8 moedas (até 2 usos, recarga de 3 turnos). Não teleporta.',
         activePower: (fromCoords, toCoords) => {
             return { action: 'swap_positions' };
         }
@@ -270,7 +270,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '🧲',
-        description: 'Atração Gravitacional: Puxa uma peça inimiga a até 2 casas para perto de si.',
+        description: 'Campo magnético: protege aliado adjacente quando o atacante está junto ao Ímã (2 usos, recarga 2).',
         activePower: (r, c, enemyR, enemyC) => {
             return { action: 'pull_enemy' };
         }
@@ -281,7 +281,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '💨',
-        description: 'Onda Repulsiva: Empurra todas as peças adjacentes 1 casa para longe.',
+        description: 'Rajada protetora: protege aliado adjacente na diagonal (1 uso).',
         activePower: (r, c) => {
             return { action: 'push_all_adjacent' };
         }
@@ -292,7 +292,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '🔮',
-        description: 'Ordem Forçada: Obriga uma peça inimiga de menor valor a dar 1 passo para trás.',
+        description: 'Desvio tático: protege aliado adjacente na mesma fileira (1 uso).',
         activePower: (enemyR, enemyC) => {
             return { action: 'force_enemy_retreat' };
         }
@@ -303,7 +303,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '👁️',
-        description: 'Visão do Futuro: Mostra o indicador do próximo movimento intencionado pela IA.',
+        description: 'Previsão: protege aliado adjacente na mesma coluna (2 usos, recarga 3).',
         passive: 'reveal_ai_intent'
     },
     alquimista: {
@@ -312,7 +312,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '🧪',
-        description: 'Transmutação: Peças inimigas capturadas por ele concedem +50 Moedas Bônus.',
+        description: 'Transmutação: Peças inimigas capturadas por ele concedem +20 moedas bônus (uma vez por combate).',
         passive: 'bonus_gold_on_capture'
     },
     sacerdote_da_luz: {
@@ -321,7 +321,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '✨',
-        description: 'Restauração: Recupera o escudo/vida de um aliado danificado a cada 2 turnos.',
+        description: 'Amparo: protege aliado adjacente de uma captura (2 usos, recarga 3).',
         cooldown: 2,
         activePower: (targetAlly) => {
             return { action: 'heal_ally' };
@@ -333,7 +333,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '👑',
-        description: 'Coringa Sincrônico: Copia a habilidade da peça especial aliada mais próxima.',
+        description: 'Maestria: após uma captura legal com apoio, recebe +15 moedas (1 uso por combate). Não copia poderes.',
         passive: 'copy_closest_special_power'
     }
 };

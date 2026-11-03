@@ -13,14 +13,14 @@ function mk(list, turn) {
 }
 const find = (moves, t, from, to) => moves.filter(m => m.t === t && m.from === idx(...from) && m.to === idx(...to));
 
-test('tabuleiro tem 117 casas, 59 escuras, casas principais escuras', () => {
-  assert.strictEqual(E.N, 117);
+test('tabuleiro tem 143 casas, 72 escuras, casas principais escuras', () => {
+  assert.strictEqual(E.N, 143);
   let dark = 0;
   for (let i = 0; i < E.N; i++) if (E.isDarkCell(i)) dark++;
-  assert.strictEqual(dark, 59);
+  assert.strictEqual(dark, 72);
   assert(E.isDarkCell(E.MAIN[0]) && E.isDarkCell(E.MAIN[1]));
-  assert.strictEqual(E.territoryCells(WHITE).length, 25);
-  assert.strictEqual(E.territoryCells(BLACK).length, 25);
+  assert.strictEqual(E.territoryCells(WHITE).length, 32);
+  assert.strictEqual(E.territoryCells(BLACK).length, 32);
 });
 
 test('ataque sozinho não se move; com peça amiga na diagonal volta a se mover', () => {
@@ -136,7 +136,7 @@ test('partidas IA x IA terminam sem erro', () => {
   for (let n = 0; n < 6; n++) {
     const pieces = new Int8Array(E.N);
     for (const s of [WHITE, BLACK]) for (const o of (n % 2 ? E.randomSetup(s) : E.presetSetup(s, Math.random))) pieces[o.i] = o.p;
-    assert.strictEqual(pieces.filter(x => x).length, 26);
+    assert.strictEqual(pieces.filter(x => x).length, E.PIECES * 2);
     const g = new E.Game(pieces);
     let guard = 0;
     while (!g.over && guard++ < 300) {

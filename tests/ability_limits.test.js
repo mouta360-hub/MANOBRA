@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const engine = require('../www/engine.js');
+const run = {active:true,deployed:{},enemyDeployed:{},abilityState:{}};
+const window = {ManobraEngine:engine,RoguelikeRun:run,addEventListener(){}};
+const context={window,document:{querySelectorAll(){return []}},setInterval(){},console};
+vm.createContext(context);
+vm.runInContext(fs.readFileSync('www/special_pieces.js','utf8'),context);
+vm.runInContext(fs.readFileSync('www/roguelike_runtime.js','utf8'),context);
+const rt=window.RoguelikeRuntime;
+assert.equal(Object.keys(rt.abilityLimits).length,30);
+assert.equal(rt.available(engine.WHITE,0,'lancer'),true);
+assert.equal(rt.available(engine.WHITE,0,'colosso'),true);
+assert.equal(rt.abilityLimits.lancer.uses,3);
+assert.equal(rt.abilityLimits.ceifador.cooldown,3);
+console.log('ok - limites e disponibilidade de habilidades');

@@ -18,16 +18,20 @@ const boardOf = p => Array.prototype.join.call(p.app.game.st.b, '');
   const codeA = A.app.me.code, codeB = B.app.me.code;
   assert(/^[A-HJ-NP-Z2-9]{6}$/.test(codeA) && /^[A-HJ-NP-Z2-9]{6}$/.test(codeB) && codeA !== codeB, 'códigos pessoais');
   assert(JSON.parse(A.store['manobra.me']).code === codeA, 'perfil salvo no aparelho');
-  assert(A.app.me.av && A.html().includes('avgrid'), 'o perfil tem avatar e escolha de avatar');
-  A.click({ act: 'avatar', v: 'bear' });
-  assert.strictEqual(A.app.me.av, 'bear'); assert.strictEqual(JSON.parse(A.store['manobra.me']).av, 'bear', 'avatar salvo');
+  A.click({ act: 'options' });
+  assert(A.app.me.av && A.html().includes('avatarToggle'), 'o perfil tem avatar e opção de escolha');
+  A.click({ act: 'avatarToggle' });
+  assert(A.html().includes('avgrid'), 'a grade de avatares abre');
+  A.click({ act: 'avatar', v: 'avatar-1' });
+  assert.strictEqual(A.app.me.av, 'avatar-1'); assert.strictEqual(JSON.parse(A.store['manobra.me']).av, 'avatar-1', 'avatar salvo');
   A.click({ act: 'avatar', v: 'hack<script>' });
-  assert.strictEqual(A.app.me.av, 'bear', 'avatar inválido é ignorado');
+  assert.strictEqual(A.app.me.av, 'avatar-1', 'avatar inválido é ignorado');
   console.log('ok - código pessoal fixo e avatar salvo: ' + codeA + ' e ' + codeB);
 
   // 2) a presença liga sozinha ao abrir o app (sem entrar em Amigos)
   await waitFor(() => A.app.presence.state === 'ready' && B.app.presence.state === 'ready', 'presença ligada');
-  A.click({ act: 'avatar', v: 'bear' }); // redesenha o menu
+  A.click({ act: 'avatar', v: 'avatar-1' }); // redesenha o menu
+  A.click({ act: 'menu' });
   assert(/Você está online/.test(A.html()), 'o menu mostra que está online');
   console.log('ok - o app já fica online ao abrir, sem precisar da tela Amigos');
 
@@ -48,9 +52,9 @@ const boardOf = p => Array.prototype.join.call(p.app.game.st.b, '');
 
   // 4) status do amigo na lista: online, com o avatar dele
   await waitFor(() => B.app.fstat[codeA] === 'online', 'A aparece online');
-  assert.strictEqual(B.app.friends[0].av, 'bear', 'avatar do amigo chega pelo status');
+  assert.strictEqual(B.app.friends[0].av, 'avatar-1', 'avatar do amigo chega pelo status');
   redraw(B);
-  assert(/Online/.test(B.html()) && B.html().includes('🐻'));
+  assert(/Online/.test(B.html()) && B.html().includes('🌁'));
   console.log('ok - amigo aparece como Online com o avatar dele');
 
   // 5) status muda: em partida, em campeonato, invisível, voltou

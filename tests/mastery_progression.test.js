@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const modal={innerHTML:'',remove(){}};
+const window={addEventListener(){},localStorage:{getItem(){return null},setItem(){}}};
+const catalog={escudeiro:{name:'Escudeiro',symbol:'🛡️'},lancer:{name:'Lanceiro',symbol:'⚔️'}};
+const ctx={window,Math,Date,console,setTimeout:()=>0,setInterval:()=>0,clearInterval(){},document:{getElementById:()=>modal,createElement:()=>modal,body:{appendChild(){}}},SPECIAL_PIECES_CATALOG:catalog};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('www/roguelike_adventure.js','utf8'),ctx);
+const r=window.RoguelikeRun;r.active=true;r.roster=['escudeiro'];r.mastery={escudeiro:1};r.gold=200;r.map=[[{id:'shop-test',type:'shop',row:0,col:0,cleared:true}]];r.pendingNode=r.map[0][0];r.mapRow=0;r.mapCol=0;r.visited=['shop-test'];
+assert.equal(ctx.rogueMasteryLevel('escudeiro'),1);
+ctx.upgradeRoguelikePiece('escudeiro');assert.equal(r.gold,175);assert.equal(ctx.rogueMasteryLevel('escudeiro'),2);
+ctx.upgradeRoguelikePiece('escudeiro');assert.equal(r.gold,130);assert.equal(ctx.rogueMasteryLevel('escudeiro'),3);
+ctx.upgradeRoguelikePiece('escudeiro');assert.equal(r.gold,130,'max cannot charge again');
+assert.equal(ctx.rogueMasteryLevel('lancer'),1,'unowned piece no mastery');
+r.pendingNode=null;ctx.upgradeRoguelikePiece('escudeiro');assert.equal(r.gold,130,'cannot upgrade outside shop');
+console.log('PASS mastery: purchase ownership, costs, levels, cap and shop restriction');

@@ -183,3 +183,70 @@
 @media (orientation: landscape) and (min-width: 760px) {
   .rogue-battle-tray { left:auto !important; right:12px !important; top:50% !important; bottom:auto !important; transform:translateY(-50%) !important; width:220px; max-height:78vh; }
 }
+
+/* Mapa da expedição: orientação, progresso e destinos clicáveis. */
+.rogue-route-guide{display:flex;flex-direction:column;gap:5px;margin:12px 0;padding:12px 16px;border:1px solid #2563eb88;border-radius:12px;background:linear-gradient(100deg,#17255499,#0f172a);color:#e2e8f0}
+.rogue-route-guide strong{color:#93c5fd;font-size:14px}.rogue-route-guide span{font-size:12px}
+.rogue-map-heading,.rogue-map-start{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-size:11px;font-weight:800;letter-spacing:.06em;color:#93c5fd}
+.rogue-map-start{justify-content:center;color:#94a3b8}
+.rogue-map{position:relative;gap:13px;background:radial-gradient(ellipse at 50% 40%,#1e3a5b55,transparent 70%),#0b1220}
+.rogue-map-row{position:relative;gap:12px;min-height:70px}
+.rogue-map-row:not(:first-child)::before{content:"";position:absolute;left:calc(24px + (100% - 24px)/2);top:-14px;height:14px;border-left:2px dashed #475569;pointer-events:none}
+.rogue-map-row.next{background:#1d4ed811;border-radius:14px}
+.rogue-map-floor{font-size:13px;color:#94a3b8;font-weight:900}
+.rogue-map-floor small{display:block;font-size:7px;letter-spacing:.04em;color:#64748b}
+.rogue-map-node{min-height:64px;border-radius:14px;position:relative}
+.rogue-map-node.locked{opacity:.42}.rogue-map-node.available{background:linear-gradient(160deg,#1e293b,#0f172a);outline:1px solid var(--node-color);animation:rogue-available-pulse 2.8s ease-in-out infinite}
+.rogue-map-node.current{outline:2px solid #fbbf24}.rogue-map-node.cleared{opacity:.75;background:#064e3b44;border-color:#059669}
+.rogue-map-node small{font-size:9px;color:#6ee7b7}
+@keyframes rogue-available-pulse{50%{box-shadow:0 0 22px color-mix(in srgb,var(--node-color),transparent 52%)}}
+.rogue-shop-list{max-height:none;overflow:visible;gap:12px}
+.rogue-shop-card{min-height:96px;padding:14px;grid-template-columns:50px minmax(0,1fr) auto;background:linear-gradient(110deg,#172033,#101827);border-color:#475569}
+.rogue-shop-card.purchased{border-color:#059669;background:#064e3b33}
+.rogue-shop-card strong{font-size:14px}.rogue-shop-card small{font-size:11px;margin-top:5px}
+.rogue-shop-card button:disabled{background:#475569;color:#cbd5e1}
+.rogue-shop-card.purchased button:disabled{background:#047857}
+@media(max-width:600px){.rogue-map-row{gap:5px}.rogue-map-node{min-height:57px}.rogue-shop-card{grid-template-columns:35px minmax(0,1fr);gap:8px}.rogue-shop-card button{grid-column:2;justify-self:start}}
+@media(prefers-reduced-motion:reduce){.rogue-map-node.available{animation:none}}
+
+/* Caminhos de masmorra: nós circulares e trilhas ramificadas, sem mudar as regras. */
+.rogue-map{display:flex;flex-direction:column-reverse;gap:0;padding:0 12px;min-height:784px;overflow:hidden;background:radial-gradient(ellipse at 50% 38%,#304a4366,transparent 65%),repeating-linear-gradient(115deg,#14241e 0px,#14241e 18px,#172921 19px,#172921 21px);border:2px solid #7b6240;border-radius:20px;box-shadow:inset 0 0 45px #030d0b,0 9px 30px #0005}
+.rogue-map-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));height:98px;min-height:98px;gap:0;align-items:center;z-index:1;position:relative;padding:0}
+.rogue-map-row:not(:first-child)::before{display:none}
+.rogue-map-row.next{background:transparent}
+.rogue-map-floor{position:absolute;left:2px;top:4px;font-size:10px;color:#d6c4a0;text-shadow:0 1px 4px #000;pointer-events:none;z-index:2}
+.rogue-map-floor small{font-size:7px;color:#c8a66a}
+.rogue-map-node{justify-self:center;width:78px;height:78px;min-height:0;padding:5px;border-radius:50%;border:3px solid #927b59;background:radial-gradient(circle at 40% 30%,#364b41,#15251e 75%);box-shadow:0 4px 10px #0008,inset 0 2px 8px #0007;opacity:.58;transition:transform .15s,box-shadow .15s;position:relative;z-index:2}
+.rogue-map-node.available{opacity:1;background:radial-gradient(circle at 40% 30%,#526a54,#192e26 75%);border-color:#f7d38b;outline:2px solid var(--node-color);box-shadow:0 0 22px #e5b65a88,0 4px 8px #0009}
+.rogue-map-node.current{border-color:#f8df8a;outline:3px solid #f7c95a}
+.rogue-map-node.cleared{opacity:.95;border-color:#63ae87;background:radial-gradient(circle,#2a5841,#10281e)}
+.rogue-map-node.locked{opacity:.58}
+.rogue-map-node .rogue-node-icon{font-size:24px;line-height:1}
+.rogue-map-node span:not(.rogue-node-icon){font-size:9px;line-height:1.1;color:#fff4d9}
+.rogue-map-node small{font-size:8px;line-height:1;color:#e9d9a8}
+.rogue-trail-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:visible}
+.rogue-trail-lines path{fill:none;stroke:#806d4d;stroke-width:2;stroke-dasharray:4 8;opacity:.5;vector-effect:non-scaling-stroke}
+.rogue-trail-lines path.traveled{stroke:#7ae2a0;stroke-width:4;stroke-dasharray:none;opacity:.95}
+.rogue-trail-lines path.reachable{stroke:#f6d07c;stroke-width:4;stroke-dasharray:6 5;opacity:1}
+.rogue-map-heading{color:#f4d99c}.rogue-map-start{color:#c6ad7c}
+@media(max-width:600px){.rogue-map{padding:0 5px}.rogue-map-row{height:98px;min-height:98px}.rogue-map-node{width:66px;height:66px}.rogue-map-node .rogue-node-icon{font-size:21px}.rogue-map-node span:not(.rogue-node-icon){font-size:8px}}
+
+/* Rotas variáveis: cada linha possui de um a três encontros reais. */
+.rogue-map-slot { display:flex; align-items:center; justify-content:center; min-width:0; }
+.rogue-map-row { grid-template-columns:repeat(3,minmax(0,1fr)); }
+
+/* Seleção de comandante: personagens separados das peças do tabuleiro */
+.rogue-commander-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:20px 0}
+.rogue-commander-card{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:210px;padding:20px 14px;border:2px solid #b69a5c;border-radius:18px;background:linear-gradient(145deg,#263a40,#15242e);color:#f9efd6;text-align:center;cursor:pointer;white-space:normal}
+.rogue-commander-card:hover:not(:disabled){border-color:#ffdf8d;transform:translateY(-2px)}
+.rogue-commander-card:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.65)}
+.rogue-commander-icon{font-size:48px}.rogue-commander-card strong{font-size:18px}.rogue-commander-card small{line-height:1.45}.rogue-commander-card b{margin-top:auto;color:#e6c877}
+
+/* Retratos individuais dos comandantes na seleção de aventura */
+.rogue-commander-card{overflow:hidden;padding:0 0 16px;gap:9px;transition:transform .15s ease,border-color .15s ease}
+.rogue-commander-portrait{display:block;width:100%;height:132px;object-fit:cover;object-position:center 27%;border-bottom:2px solid #b69a5c;background:#25303b}
+.rogue-commander-card strong,.rogue-commander-card small,.rogue-commander-card b{padding-left:12px;padding-right:12px}
+.rogue-commander-card:disabled{opacity:.76;filter:none}
+.rogue-commander-card:disabled .rogue-commander-portrait{filter:grayscale(.8) brightness(.7)}
+@media(max-width:550px){.rogue-commander-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.rogue-commander-portrait{height:105px}.rogue-commander-card strong{font-size:15px}.rogue-commander-card small{font-size:12px}}
+

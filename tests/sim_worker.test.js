@@ -55,9 +55,9 @@ async function run(workerOpts, label) {
   const pcs = new Int8Array(E.N); [0, 1].forEach(s => E.presetSetup(s).forEach(o => { pcs[o.i] = o.p; }));
   const g0 = new E.Game(pcs); g0.st.b[E.territoryCells(1).find(i => g0.st.b[i])] = 0; // as pretas ficam com uma peça a menos
   const adj = E.adjudicate(g0.st);
-  assert.strictEqual(adj.reason, 'limite_jogadas');
-  assert.strictEqual(adj.winner, 0, 'quem tem mais peças vence');
-  console.log('ok - limite de lances: partida que não acaba é decidida pelas peças');
+  assert.strictEqual(adj.reason, 'empate_limite_seguranca');
+  assert.strictEqual(adj.winner, null, 'limite técnico não pode declarar vencedor');
+  console.log('ok - limite de lances: partida que não acaba termina em empate técnico');
   let r = await run({}, 'com worker');
   assert(r.w.posted.some(d => d.k === 'p') && r.w.posted.some(d => d.k === 'done'), 'o worker trabalhou (progresso e resultado)');
   assert(r.w.stops.length >= 3, 'o juiz manda parar o worker ao encerrar cada partida');

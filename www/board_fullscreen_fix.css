@@ -1,0 +1,23 @@
+/* Tabuleiro clássico responsivo: mantém 13x9 e deixa a página rolar se necessário. */
+@media screen and (min-width:900px) {
+  :root { --cs: min(110px, calc((100vw - 445px) / 13)); }
+  #app > .layout { align-items: start; }
+  #app > .layout > .bw { min-height: 0; align-items: flex-start; padding-top: 10px; overflow: visible; }
+  #board { overflow: visible; position: relative; isolation: isolate; }
+}
+@media screen and (min-width:1900px) {
+  :root { --cs: min(138px, calc((100vw - 500px) / 13)); }
+}
+/* As casas não podem recortar nem isolar a peça enquanto ela cruza as casas. */
+#board .cell { isolation: auto; z-index: auto; }
+#board .cell.sel { z-index: 4; }
+#board .cell.is-animating-piece { z-index: 40 !important; isolation: auto; }
+#board .cell.is-animating-piece .pc { z-index: 41 !important; position: relative; }
+#board .cell.is-animating-piece .ghost { z-index: 42 !important; }
+#board { overflow: visible; }
+/* Manter os emblemas discretos no canto. */
+#board .rogue-special-badge { z-index: 6; }
+@media (max-width:899px) {
+  :root { --cs: min(calc((100vw - 22px) / 13), calc((100dvh - 165px) / 9)); }
+  #app > .layout > .bw { overflow: visible; }
+}

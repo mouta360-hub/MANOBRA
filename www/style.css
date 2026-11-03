@@ -46,7 +46,7 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 .cell { width: var(--cs); height: var(--cs); position: relative; display: flex; align-items: center; justify-content: center; }
 .cell.light { background: var(--light); }
 .cell.dark { background: var(--dark); }
-.cell.neutral { box-shadow: inset 0 2px 0 #e53935, inset 0 -2px 0 #e53935; }
+.cell.neutral::after { content:""; position:absolute; z-index:5; pointer-events:none; left:0; right:0; top:calc(50% - 2px); height:4px; background:#ef4040; box-shadow:0 0 3px #3b0707; }
 .cell.can { background: #23705f; }
 .cell.last { background: #3f6fb5; }
 .cell.sel { background: #5a4d12; }
@@ -78,7 +78,7 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 .layout { display: block; }
 .bw { display: flex; justify-content: center; }
 @media (orientation: landscape) {
-  :root { --cs: min(64px, calc((100vh - 34px) / 9), calc((100vw - 270px) / 13)); }
+  :root { --cs: min(64px, calc((100vh - 34px) / 11), calc((100vw - 270px) / 13)); }
   #app { max-width: none; padding: 8px 12px; }
   .layout { display: flex; gap: 14px; align-items: flex-start; }
   .bw { flex: 0 0 auto; }
@@ -169,24 +169,8 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
   .chat-panel { max-height: min(70vh, 390px); }
 }
 
-/* Temas visuais: aplicados somente ao tabuleiro e às peças. */
-body[data-theme="classic"] #board { box-shadow: 0 8px 24px #0008; }
-body[data-theme="fantasy"] { --bg: #101522; --panel: #1a2233; --dark: #263653; --light: #d9c39a; --accent: #f5c45d; --ok: #55d89b; --blue: #d89b52; }
-body[data-theme="fantasy"] #board { border: 4px solid #bd873d; border-radius: 10px; box-shadow: 0 0 0 3px #332617, 0 12px 30px #000b; }
-body[data-theme="fantasy"] .cell.light { background: linear-gradient(135deg, #ead6ad, #c9a875); }
-body[data-theme="fantasy"] .cell.dark { background: linear-gradient(135deg, #304869, #1d2d49); }
-body[data-theme="fantasy"] .cell.can { background: linear-gradient(135deg, #397b68, #205849); }
-body[data-theme="fantasy"] .cell .pc { filter: drop-shadow(0 3px 2px #0009); }
-body[data-theme="fantasy"] .cell.neutral { box-shadow: inset 0 3px 0 #b53f38, inset 0 -3px 0 #b53f38; }
-body[data-theme="obsidian"] { --bg: #0c1018; --panel: #151c29; --dark: #172232; --light: #b7c5d3; --accent: #68d7e8; --ok: #64e6ad; --blue: #a886ff; }
-body[data-theme="obsidian"] #board { border: 3px solid #5c718d; border-radius: 12px; box-shadow: 0 0 0 2px #111a27, 0 12px 34px #000d; }
-body[data-theme="obsidian"] .cell.light { background: linear-gradient(135deg, #d3e0ea, #8fa4b6); }
-body[data-theme="obsidian"] .cell.dark { background: linear-gradient(135deg, #263a52, #101b2b); }
-body[data-theme="obsidian"] .cell.can { background: linear-gradient(135deg, #267d78, #164d56); }
-body[data-theme="obsidian"] .cell .pc { filter: drop-shadow(0 2px 3px #000b); }
-body[data-theme="obsidian"] .cell.neutral { box-shadow: inset 0 3px 0 #e05268, inset 0 -3px 0 #e05268; }
-.fantasy-piece { filter: drop-shadow(0 2px 2px #0008); }
-
+/* Aparência clássica fixa. */
+#board { box-shadow: 0 8px 24px #0008; }
 /* Ajustes de legibilidade: o CSS original acima é preservado. */
 .piece-attack { filter: drop-shadow(0 0 2px #e33) drop-shadow(0 2px 2px #0009); }
 .piece-defense { filter: drop-shadow(0 0 2px #3189ef) drop-shadow(0 2px 2px #0009); }
@@ -207,7 +191,7 @@ body[data-theme="obsidian"] .cell.neutral { box-shadow: inset 0 3px 0 #e05268, i
 
 /* Layout desktop / Windows: preserva o layout móvel acima e amplia a área de jogo. */
 @media screen and (min-width: 900px) {
-  :root { --cs: min(108px, calc((100vh - 76px) / 9), calc((100vw - 390px) / 13)); }
+  :root { --cs: min(108px, calc((100dvh - 48px) / 11), calc((100vw - 410px) / 13)); }
   html, body { min-width: 900px; overflow-x: hidden; }
   body { min-height: 100vh; }
   #app { width: 100%; max-width: none; min-height: 100vh; padding: 18px 22px; }
@@ -229,7 +213,7 @@ body[data-theme="obsidian"] .cell.neutral { box-shadow: inset 0 3px 0 #e05268, i
   .overlay.center .sheet { width: min(520px, 70vw); }
 }
 @media screen and (min-width: 1400px) {
-  :root { --cs: min(116px, calc((100vh - 84px) / 9), calc((100vw - 420px) / 13)); }
+  :root { --cs: min(116px, calc((100dvh - 48px) / 11), calc((100vw - 460px) / 13)); }
   #app { padding-left: 32px; padding-right: 32px; }
   #app > .layout { grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; }
   #app > .layout > .side { width: 360px; }
@@ -239,3 +223,39 @@ body[data-theme="obsidian"] .cell.neutral { box-shadow: inset 0 3px 0 #e05268, i
   #app > .menu .card { max-width: 900px; margin-left: auto; margin-right: auto; }
   .public-chat-page { max-width: 1100px !important; }
 }
+
+/* Tabuleiro responsivo: usar a maior área segura disponível no desktop. */
+@media (min-width:900px) {
+  :root { --cs: min(calc((100dvh - 48px) / 11), calc((100vw - 410px) / 13)); }
+  #app > .layout > .bw { width:100%; max-width:none; }
+  #board { flex-shrink:0; }
+}
+@media (min-width:1400px) {
+  :root { --cs: min(calc((100dvh - 48px) / 11), calc((100vw - 470px) / 13)); }
+}
+
+/* Apresentação do comandante inimigo antes da batalha. */
+.rogue-boss-intro{display:flex;align-items:center;gap:14px;margin:12px 0;padding:14px;border:1px solid #a57935;border-radius:14px;background:linear-gradient(120deg,#30251b,#4b3022);color:#f8e8c8}
+.rogue-boss-intro .rogue-boss-icon{font-size:42px;flex-shrink:0}
+.rogue-boss-intro strong{display:block;font-size:1.15rem;margin-bottom:5px}
+.rogue-boss-intro small{display:block;line-height:1.45;margin-top:3px}
+
+/* Retratos dos chefões e comandante ativo */
+.rogue-boss-portrait {width:94px;height:110px;object-fit:cover;border-radius:12px;border:2px solid #b28b4d;flex-shrink:0;background:#261d29}
+.rogue-commander-hud {display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px;border:1px solid #ad884a;border-radius:12px;background:linear-gradient(110deg,#30251d,#1a202a);color:#f4e6c9;min-width:0}
+.rogue-commander-hud>img {width:58px;height:68px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.rogue-commander-hud>div {min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
+.rogue-commander-hud small {font-size:10px;color:#e2bb7d}
+.rogue-commander-hud strong {font-size:14px}
+.rogue-commander-hud span {font-size:11px;line-height:1.3;color:#d8d0c4}
+.rogue-commander-hud>img.rogue-hud-boss {width:48px;height:58px;border:1px solid #b65d53}
+.rogue-boss-effect {position:fixed;z-index:99999;top:14%;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;width:min(440px,90vw);padding:12px;border:2px solid #efbb66;border-radius:16px;background:linear-gradient(115deg,#231a2e,#573127);box-shadow:0 0 50px #ef7d4777;color:#fff;pointer-events:none;animation:rogueBossReveal 2.6s ease-in-out both}
+.rogue-boss-effect img {width:76px;height:90px;object-fit:cover;border-radius:9px}
+.rogue-boss-effect div {display:flex;flex-direction:column;gap:5px}
+.rogue-boss-effect b {font-size:17px}.rogue-boss-effect span {color:#ffe3a3}.rogue-boss-effect small {font-size:12px}
+@keyframes rogueBossReveal {0%{opacity:0;transform:translate(-50%,-18px) scale(.92)}15%,75%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-12px) scale(.98)}}
+@media (prefers-reduced-motion:reduce){.rogue-boss-effect{animation:none}}
+
+/* Codex alinhado aos controles normais, sem sobreposição no tabuleiro. */
+.roguelike-codex-control { display: inline-flex; align-items: stretch; }
+.roguelike-codex-control button { height: 100%; white-space: nowrap; }

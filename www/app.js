@@ -44,7 +44,6 @@
   window.__manobraApp = app; // gancho usado só pelos testes
   const DURS = { slow: 1100, medium: 650, fast: 280 }; // duração do movimento (ms)
   try { const sp = localStorage.getItem('manobra.speed'); if (DURS[sp]) app.speed = sp; } catch (e) { /* sem armazenamento */ }
-  try { const th = localStorage.getItem('manobra.theme'); if (['classic', 'fantasy', 'obsidian'].indexOf(th) >= 0) app.theme = th; } catch (e) { /* sem armazenamento */ }
 
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -232,24 +231,9 @@
   }
 
   /* ---------- Peças (como no manual) ---------- */
-  function fantasyPiece(p) {
-    const side = E.sideOf(p), attack = E.isAttack(p), dark = side === BLACK;
-    const body = dark ? '#26344c' : '#f6ead0', edge = dark ? '#8fb5e8' : '#a96b2d', shine = dark ? '#b9d8ff' : '#fff8e8';
-    const sword = '<path d="M61 23l8-8 5 5-8 8 13 13-5 5-13-13-16 16-5-5 16-16-8-8 5-5z" fill="' + shine + '" stroke="' + edge + '" stroke-width="2"/><path d="M39 68h23" stroke="' + edge + '" stroke-width="5" stroke-linecap="round"/>';
-    const shield = '<path d="M50 17l27 10v20c0 18-12 28-27 36-15-8-27-18-27-36V27z" fill="' + body + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 28v39M31 47h38" stroke="' + shine + '" stroke-width="4" opacity=".85"/>';
-    return '<svg class="pc fantasy-piece ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><defs><radialGradient id="g' + p + '"><stop stop-color="' + shine + '"/><stop offset="1" stop-color="' + body + '"/></radialGradient></defs><circle cx="50" cy="50" r="43" fill="url(#g' + p + ')" stroke="' + edge + '" stroke-width="4"/>' + (attack ? sword : shield) + '</svg>';
-  }
-  function obsidianPiece(p) {
-    const attack = E.isAttack(p), dark = E.sideOf(p) === BLACK, fill = dark ? '#101722' : '#f1f4ff', edge = dark ? '#72b8d8' : '#5967d9';
-    const sword = '<path d="M57 26l9-9 7 7-9 9 15 15-7 7-15-15-18 18-7-7 18-18-9-9 7-7z" fill="' + (dark ? '#f3b5c4' : '#e6f7ff') + '" stroke="' + edge + '" stroke-width="3"/><path d="M37 73h28" stroke="' + edge + '" stroke-width="7" stroke-linecap="round"/>';
-    const shield = '<path d="M50 16l29 11v22c0 19-13 31-29 39-16-8-29-20-29-39V27z" fill="' + (dark ? '#284c70' : '#d9e7ff') + '" stroke="' + edge + '" stroke-width="5"/><path d="M50 28v45M30 49h40" stroke="' + (dark ? '#b7eaff' : '#5368d8') + '" stroke-width="5" stroke-linecap="round"/>';
-    return '<svg class="pc ' + (attack ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100"><path d="M50 5l38 22v46L50 95 12 73V27z" fill="' + fill + '" stroke="' + edge + '" stroke-width="5"/>' + (attack ? sword : shield) + '</svg>';
-  }
   function pieceSvg(p) {
     const o = '<svg class="pc ' + (E.isAttack(p) ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100">';
     if (!p) return '';
-    if (app.theme === 'fantasy') return fantasyPiece(p);
-    if (app.theme === 'obsidian') return obsidianPiece(p);
     switch (p) {
       case WD: return o + '<circle cx="50" cy="50" r="40" fill="#fff" stroke="#8d96a8" stroke-width="4"/></svg>';
       case WA: return o + '<circle cx="50" cy="50" r="42" fill="#fff" stroke="#1a2433" stroke-width="5"/><circle cx="50" cy="50" r="22" fill="#111"/></svg>';
@@ -280,7 +264,7 @@
         const i = r * COLS + c;
         const dark = ((r + c) & 1) === 0;
         // A linha vermelha (terreno neutro) só aparece na montagem
-        let cls = 'cell ' + (dark ? 'dark' : 'light') + (r === 4 && app.screen === 'setup' ? ' neutral' : '');
+        let cls = 'cell ' + (dark ? 'dark' : 'light') + (r === Math.floor(ROWS / 2) && app.screen === 'setup' ? ' neutral' : '');
         const specialAttr = (window.RoguelikeRuntime && window.RoguelikeRuntime.cellMarkup) ? window.RoguelikeRuntime.cellMarkup(i) : '';
         if (dark) {
           if (marks.terr && marks.terr.has(i)) cls += ' can';
@@ -353,39 +337,46 @@
   function menuScreen() {
     const seg = (act, cur, items) => '<div class="seg">' + items.map(([v, label]) =>
       '<button data-act="' + act + '" data-v="' + v + '" class="' + (String(cur) === String(v) ? 'on' : '') + '">' + label + '</button>').join('') + '</div>';
-    return '<div class="menu"><h1>MANOBRA</h1><p class="sub">versão 1.0</p>' +
-      profileEditor() +
-      '<div class="card"><h3>Contra a IA</h3>' +
+    return '<div class="menu menu-redesign"><div class="android-brand"><span class="android-brand-crest">⚔️</span><strong>MANOBRA</strong><small>ROGUELIKE</small></div><div class="menu-hero"><div class="menu-hero-copy"><span class="menu-eyebrow">ESTRATÉGIA • AVENTURA • CONQUISTA</span><h1>MANOBRA</h1><p class="menu-edition">A aventura começa com uma decisão.</p><p class="menu-intro">Escolha seu comandante, explore mapas, enfrente chefões e monte um exército de peças especiais.</p><button class="menu-adventure-button" onclick="window.RoguelikeRun && window.RoguelikeRun.active ? openRoguelikeMap() : openRoguelikeCommanderSelection()">⚔️ <span><strong>' + (window.RoguelikeRun && window.RoguelikeRun.active ? 'Continuar aventura' : 'Começar aventura') + '</strong><small>' + (window.RoguelikeRun && window.RoguelikeRun.active ? 'Voltar ao mapa da campanha' : 'Modo principal • 3 mapas • 30 peças especiais') + '</small></span><span aria-hidden="true">➜</span></button><div class="menu-hero-facts"><span>🗺️ 3 mapas</span><span>👑 Chefões</span><span>✨ 30 especiais</span></div></div><div class="menu-hero-art" aria-hidden="true"><div class="menu-art-glow"></div><img class="menu-art-main" src="assets/commanders/novato.webp" alt=""><div class="menu-art-token token-one">⚔️</div><div class="menu-art-token token-two">🛡️</div><div class="menu-art-token token-three">♛</div></div></div><div class="menu-section-heading"><h2>Outras formas de jogar</h2><p>Partidas clássicas, amigos e campeonatos</p></div><div class="menu-options">' +
+      '<div class="card menu-option menu-option-ai"><div class="menu-option-banner banner-ai"><img src="assets/commanders/estrategista.webp" alt="Comandante estrategista" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">♟</span><span class="menu-banner-label">DESAFIO SOLO</span></div><div class="menu-option-title"><span class="menu-option-icon">🤖</span><div><h3>Contra a IA</h3><small>Desafie o computador</small></div></div>' +
       seg('side', app.humanSide, [[0, 'Brancas (começam)'], [1, 'Pretas']]) +
       seg('level', app.level, [['easy', 'Fácil'], ['medium', 'Médio'], ['hard', 'Difícil']]) +
       '<button class="primary" data-act="startAI">Jogar contra a IA</button></div>' +
-      '<div class="card"><h3>Dois jogadores</h3><button class="primary" data-act="startPVP">Jogar no mesmo celular</button>' +
+      '<div class="card menu-option"><div class="menu-option-banner banner-local"><img src="assets/commanders/guardiao.webp" alt="Comandante guardião" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">⚔</span><span class="menu-banner-label">DUELO LOCAL</span></div><div class="menu-option-title"><span class="menu-option-icon">👥</span><div><h3>Dois jogadores</h3><small>Partida local no mesmo dispositivo</small></div></div><button class="primary" data-act="startPVP">Jogar localmente</button>' +
       '<label class="chk"><input type="checkbox" id="rot" ' + (app.rotate ? 'checked' : '') + '> Girar o tabuleiro a cada vez</label></div>' +
-      '<div class="card"><h3>Chat público</h3><button class="primary public-menu-button" data-act="publicOpen">Entrar no chat público</button><p class="muted" style="margin:8px 0 0;text-align:center">Converse com outras pessoas e organize campeonatos.</p></div>' +
-      '<div class="card"><h3>Dois celulares</h3><button class="primary" data-act="btOpen">Jogar por Bluetooth</button>' +
-      '<button class="primary" style="margin-top:8px" data-act="onOpen">Jogar online (pela internet)</button>' +
-      '<button class="primary" style="margin-top:8px" data-act="frOpen">Amigos e convites</button>' +
-      '<p class="muted" style="margin:8px 0 0;text-align:center" data-presline>' + presenceLine() + '</p></div>' +
-      '<div class="card"><h3>Campeonato</h3><button class="primary" data-act="tourOpen">Criar ou entrar num campeonato</button></div>' +
-      '<div class="card"><h3>Velocidade das jogadas</h3>' +
-      seg('speed', app.speed, [['slow', 'Lenta'], ['medium', 'Média'], ['fast', 'Rápida']]) +
-      '<h3>Visual do tabuleiro e das peças</h3>' +
-      seg('theme', app.theme, [['classic', 'Clássico'], ['fantasy', 'Escudos e espadas'], ['obsidian', 'Obsidiana']]) +
+      '<div class="card menu-option"><div class="menu-option-banner banner-friends"><img src="assets/commanders/explorador.webp" alt="Comandante explorador" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">✉</span><span class="menu-banner-label">CONEXÃO ENTRE AMIGOS</span></div><div class="menu-option-title"><span class="menu-option-icon">🌐</span><div><h3>Jogar com amigos</h3><small>Conecte-se e organize partidas</small></div></div><button class="primary" data-act="btOpen">Bluetooth</button><button class="primary menu-secondary-button" data-act="onOpen">Jogar online</button><button class="primary menu-secondary-button" data-act="frOpen">Amigos e convites</button><p class="muted" data-presline>' + presenceLine() + '</p></div>' +
+      '<div class="card menu-option"><div class="menu-option-banner banner-tournament"><img src="assets/commanders/artifice.webp" alt="Comandante artífice" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">♛</span><span class="menu-banner-label">COMPETIÇÃO</span></div><div class="menu-option-title"><span class="menu-option-icon">🏆</span><div><h3>Campeonato</h3><small>Organize ou participe de torneios</small></div></div><button class="primary" data-act="tourOpen">Abrir campeonatos</button><button class="primary menu-secondary-button" data-act="publicOpen">Chat público</button></div></div><div class="menu-options-entry"><button class="menu-settings-button" data-act="options">⚙️ <span><strong>Opções</strong><small>Perfil, velocidade, áudio e como jogar</small></span><span aria-hidden="true">›</span></button></div><nav class="android-menu-nav" aria-label="Navegação do menu"><button class="active" data-act="menu">⌂ <span>Início</span></button><button data-act="options">⚙ <span>Opções</span></button><button data-act="rules">▣ <span>Como Jogar</span></button></nav></div>';
+  }
+
+  function optionsScreen() {
+    const seg = (act, cur, items) => '<div class="seg">' + items.map(([v, label]) =>
+      '<button data-act="' + act + '" data-v="' + v + '" class="' + (String(cur) === String(v) ? 'on' : '') + '">' + label + '</button>').join('') + '</div>';
+    return '<div class="rules options-page"><div class="topbar"><b>⚙️ Opções</b><button data-act="menu">Voltar ao menu</button></div>' +
+      '<p class="muted">Personalize seu perfil e as preferências das partidas.</p>' +
+      '<section class="options-section"><h2>👤 Seu perfil</h2>' + profileEditor() + '</section>' +
+      '<section class="options-section"><h2>🎮 Preferências</h2><div class="card">' +
+      '<h3>Velocidade das jogadas</h3>' + seg('speed', app.speed, [['slow', 'Lenta'], ['medium', 'Média'], ['fast', 'Rápida']]) +
       '<h3>Som das peças</h3>' + seg('sound', snd.on ? '1' : '0', [['1', 'Ligado'], ['0', 'Desligado']]) +
-      '<h3>Música das partidas</h3>' + seg('music', snd.music ? '1' : '0', [['1', 'Ligada'], ['0', 'Desligada']]) + '</div>' +
-      '<button class="link" data-act="rules">Como jogar</button></div>';
+      '<h3>Música das partidas</h3>' + seg('music', snd.music ? '1' : '0', [['1', 'Ligada'], ['0', 'Desligada']]) + '</div></section>' +
+      '<section class="options-section"><h2>📖 Ajuda</h2><button class="primary options-help" data-act="rules">Como jogar</button></section></div>';
   }
 
   function rulesScreen() {
-    return '<div class="rules"><div class="topbar"><b>Como jogar</b><button data-act="menu">Voltar</button></div>' +
-      '<h2>Tabuleiro</h2><p>13 × 9 = 117 casas. Só as casas escuras (azul-escuro) são usadas, sempre em diagonal. Cada jogador tem 13 peças e uma casa principal (o quadrado).</p>' +
+    return '<div class="rules"><div class="topbar"><b>Como jogar</b><button data-act="rulesBack">Voltar</button></div>' +
+      '<h2>Tabuleiro</h2><p>13 × 11 = 143 casas. Só as casas escuras (azul-escuro) são usadas, sempre em diagonal. Cada jogador tem 20 peças e uma casa principal (o quadrado).</p>' +
       '<h2>Como vencer (qualquer um)</h2><ul><li>Separar todas as peças de ataque do oponente, sem possibilidade de conectá-las.</li><li>Eliminar todas as peças do oponente.</li><li>Alcançar a casa principal do oponente.</li></ul>' +
-      '<h2>Montagem</h2><p>Cada jogador distribui as 13 peças no seu terreno (4 linhas). A linha vermelha na montagem é o terreno neutro: ninguém coloca peças nela no início. No máximo 6 peças em modo defesa; pode ter menos. Se um jogador ficar com a 7ª peça em defesa, o adversário pode eliminar uma defesa dele.</p>' +
+      '<h2>Montagem</h2><p>Cada jogador distribui as 20 peças no seu terreno (5 linhas). A linha vermelha na montagem é o terreno neutro: ninguém coloca peças nela no início. No máximo 6 peças em modo defesa; pode ter menos. Se um jogador ficar com a 7ª peça em defesa, o adversário pode eliminar uma defesa dele.</p>' +
       '<h2>Modos</h2><ul>' +
       '<li><b>Defesa</b> (branca lisa / preta lisa): anda sozinha 1 casa em qualquer diagonal. Não elimina: empurra a peça inimiga uma casa para trás dela ou troca de lugar com ela.</li>' +
       '<li><b>Ataque</b> (branca com bolinha / preta com anel): só se move se houver uma peça sua na diagonal ao lado. Elimina qualquer peça inimiga ocupando a casa dela. Se ficar sozinha, volta a andar quando outra peça sua chegar perto.</li></ul>' +
       '<h2>Sua vez</h2><p>Um movimento por turno: andar, ou virar uma peça de modo (conta como o movimento). Virar de ataque para defesa exige uma peça sua por perto. As brancas começam.</p>' +
-      '<h2>Efeito looping</h2><p>Se os dois repetem o mesmo movimento, quem tem menos peças leva vantagem; depois quem tem mais peças em ataque; depois o dono do terreno onde acontece. Quem perde o desempate é obrigado a fazer outro movimento.</p></div>';
+      '<h2>Efeito looping</h2><p>Se os dois repetem o mesmo movimento, quem tem menos peças leva vantagem; depois quem tem mais peças em ataque; depois o dono do terreno onde acontece. Quem perde o desempate é obrigado a fazer outro movimento.</p>' +
+      '<h2>Modo Aventura (Roguelike)</h2><p>Avance pelo mapa escolhendo os destinos disponíveis. A aventura possui três atos, cada um com oito etapas. Você começa com 30 moedas e sem peças especiais: compre peças na loja para formar seu quartel e selecione as que levará para cada combate.</p>' +
+      '<h3>🔥 Descanso</h3><p>É uma parada sem combate que concede 15 moedas. Com o comandante Campista, você recebe mais 25 moedas (40 no total). Atualmente, o descanso não recupera peças nem recarrega habilidades.</p>' +
+      '<h3>🛒 Loja</h3><p>Use moedas para comprar peças especiais e acrescentá-las ao quartel. As ofertas são aleatórias e permanecem as mesmas enquanto você visita aquela loja. Também é possível aprimorar peças que já possui: Maestria II custa 25 moedas e concede +1 uso de habilidade por combate; Maestria III custa 45 moedas, concede +2 usos e reduz a recarga em 1 turno. As melhorias valem durante a aventura atual.</p>' +
+      '<h3>💎 Tesouro e ❓ Evento</h3><p>Um tesouro concede 50 moedas; o tesouro da última etapa concede 100. O comandante Explorador recebe mais 15 moedas por tesouro. Eventos concedem uma quantia aleatória de 10 a 40 moedas, com bônus conforme o comandante.</p>' +
+      '<h3>⚔️ Batalhas, elites e 👑 chefões</h3><p>Vencer uma batalha comum rende 45 moedas; vencer um elite rende 90; vencer um chefão rende 130, antes de eventuais bônus do comandante. Chefões também podem conceder uma evolução gratuita de Maestria para uma peça elegível. Cada ato termina com um chefão; depois, a aventura continua no próximo ato.</p>' +
+      '<h3>🧩 Peças especiais e combinações</h3><p>As peças especiais têm habilidades próprias, com limites de uso e recarga. Algumas formam sinergias com duas ou três peças diferentes do mesmo conjunto, desde que estejam vivas e próximas durante o combate. A sinergia não substitui a habilidade individual e também pode ser usada pelos inimigos. Consulte o <b>📜 Codex</b> durante a aventura para ver todas as 30 peças, efeitos, cargas, recargas e combinações.</p></div>';
   }
 
   function tourTimerMatch() {
@@ -432,6 +423,7 @@
       roguelikeSkills = '<div class="rogue-setup-skills"><strong>✨ Habilidades especiais</strong><small>Escolha uma abaixo e, depois de tocar em Pronto, toque na sua peça no tabuleiro.</small><div class="rogue-setup-skill-list">' + skillButtons + '</div></div>';
     }
     const roguelikeReadyEnabled = app.mode === 'ai' && window._inRoguelikeBattle;
+    const readyControl = roguelikeReadyEnabled ? 'onclick="forceRoguelikeSetupReady()"' : 'data-act="setupDone"';
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
       'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
@@ -441,7 +433,7 @@
       '<div class="legend"><span>' + pieceSvg(E.makePiece(s, true)) + 'ataque: ' + c[0] + '</span><span>' + pieceSvg(E.makePiece(s, false)) + 'defesa: ' + c[1] + ' (máx. ' + MAX_DEF + ')</span></div>' +
       tourTimerInfo + '<div class="hint">' + hint + '</div>' + roguelikeSkills +
       '<div class="bar"><button data-act="setupDefault"' + dis + '>Padrão</button><button data-act="setupRandom"' + dis + '>Aleatório</button><button data-act="setupClear"' + dis + '>Limpar</button></div>' +
-      '<div class="bar" style="margin-top:8px"><button data-act="menu">Menu</button><button class="hot" data-act="setupDone" ' + ((roguelikeReadyEnabled || total === PIECES) && !lock ? '' : 'disabled') + '>Pronto</button></div></div></div>';
+      '<div class="bar" style="margin-top:8px"><button data-act="menu">Menu</button><button class="hot" ' + readyControl + ' ' + ((roguelikeReadyEnabled || total === PIECES) && !lock ? '' : 'disabled') + '>Pronto</button></div></div></div>';
   }
 
   function statusText() {
@@ -583,7 +575,7 @@
       h += '<div class="overlay center"><div class="sheet"><div class="result-winner">' + avHtml(winner.av) + '<div><h2>' + esc(who) + '</h2><p class="result-name">Vencedor: <b>' + esc(winner.nick) + '</b></p></div></div><p>Motivo: ' + REASONS[g.over.reason] + '.</p>' +
         (app.net === 'tour'
           ? '<button class="primary" data-act="tourBack">Voltar ao campeonato</button>'
-          : '<button class="primary" data-act="again">Jogar de novo</button><button data-act="menu">Menu</button>') +
+          : (window._roguelikeLastBattleResult === 'defeat' ? '<button class="primary" data-act="again">Nova aventura · escolher comandante</button><button data-act="menu">Menu</button>' : '<button class="primary" data-act="again">Jogar de novo</button><button data-act="menu">Menu</button>')) +
         '</div></div>';
     }
     return h + chatScreen();
@@ -944,9 +936,10 @@
     const focusedChat = typeof document !== 'undefined' && document.activeElement && document.activeElement.id === 'chatInput';
     const chatStart = focusedChat ? document.activeElement.selectionStart : null;
     const chatEnd = focusedChat ? document.activeElement.selectionEnd : null;
-    if (typeof document !== 'undefined' && document.body) document.body.dataset.theme = app.theme;
+    if (typeof document !== 'undefined' && document.body) document.body.dataset.theme = 'classic';
     const root = $('#app');
     if (app.screen === 'menu') root.innerHTML = menuScreen();
+    else if (app.screen === 'options') root.innerHTML = optionsScreen();
     else if (app.screen === 'tour') root.innerHTML = tourScreen();
     else if (app.screen === 'friends') root.innerHTML = friendsScreen();
     else if (app.screen === 'directChat') root.innerHTML = directChatScreen();
@@ -964,6 +957,7 @@
       }
     }
     syncPresenceStatus();
+    if (typeof window.updateRogueCommanderHUD === 'function') window.updateRogueCommanderHUD();
     scheduleChatCollapse();
   }
 
@@ -1025,6 +1019,8 @@
     } else startGame();
   }
 
+  window.forceRoguelikeSetupReady = function () { setupDone(); };
+
   /* ---------- Partida ---------- */
   function updateFlip() {
     if (app.mode === 'pvp' && app.rotate) app.flipped = app.game.st.turn === BLACK;
@@ -1079,7 +1075,8 @@
   function slide(el, dx, dy, dur) {
     el.style.transition = 'none';
     el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-    el.style.zIndex = 5;
+    el.style.zIndex = 41;
+    if (el.closest) { const movingCell = el.closest('.cell'); if (movingCell) movingCell.classList.add('is-animating-piece'); }
     void el.getBoundingClientRect();
     el.style.transition = 'transform ' + dur + 'ms ease-in-out';
     el.style.transform = 'translate(0px,0px)';
@@ -1091,6 +1088,7 @@
     gh.className = 'ghost';
     gh.innerHTML = pieceSvg(piece);
     cell.appendChild(gh);
+    cell.classList.add('is-animating-piece');
     void gh.offsetWidth;
     const delay = Math.round(dur * delayFrac);
     gh.style.transition = 'opacity ' + (dur - delay) + 'ms ease-in ' + delay + 'ms, transform ' + (dur - delay) + 'ms ease-in ' + delay + 'ms';
@@ -1714,7 +1712,7 @@
     if (!tourWired) {
       tourWired = true;
       l.addListener('msg', o => onTourMsg(o));
-      l.addListener('closed', () => onTourClosed());
+      l.addListener('closed', ev => onTourClosed(ev));
       l.addListener('handoff', () => { app.tour.handoff = true; app.tour.msg = 'A conexão com o juiz caiu. Aguarde: tentando reconectar e transferir o campeonato.'; render(); });
       l.addListener('abandoned', () => { app.tour.msg = 'O juiz original não voltou em 15 segundos. Foi eliminado e as partidas dele viraram W.O.'; toast(app.tour.msg); render(); });
       l.addListener('promoted', ev => {
@@ -1821,6 +1819,9 @@
   // O juiz encerrou a partida (vitória na mesa, W.O., decisão do organizador)
   function onTourMatchEnd(o, tries) {
     if (o.m !== app.tour.matchId) return;
+    // Vitória natural: o lance final chega pela fila de jogadas. Não
+    // interromper o processamento nem a animação do tabuleiro.
+    if (o.natural) return;
     // O juiz já encerrou a partida: não há contagem nem tela de espera.
     // Descarta qualquer animação restante e libera imediatamente o próximo jogo.
     app.btQueue.length = 0;
@@ -1830,7 +1831,15 @@
     app.screen = 'tour';
     render();
   }
-  function onTourClosed() {
+  function onTourClosed(ev) {
+    if (ev && ev.intentional) {
+      tourEndMatchLocal();
+      app.tour = freshTour();
+      app.screen = 'menu';
+      toast('O organizador encerrou o campeonato.');
+      render();
+      return;
+    }
     const wasGuest = app.tour.role === 'guest' && !!app.tour.code;
     app.tour.msg = wasGuest ? 'A conexão caiu. Aguarde: tentando reconectar ao campeonato.' : 'A conexão com o campeonato foi encerrada.';
     toast(app.tour.msg);
@@ -1954,7 +1963,9 @@
     switch (act) {
       case 'side': app.humanSide = +v; render(); break;
       case 'level': app.level = v; render(); break;
-      case 'rules': app.screen = 'rules'; render(); break;
+      case 'options': app.screen = 'options'; render(); break;
+      case 'rules': app.rulesReturn = app.screen === 'options' ? 'options' : 'menu'; app.screen = 'rules'; render(); break;
+      case 'rulesBack': app.screen = app.rulesReturn || 'menu'; render(); break;
       case 'publicOpen': app.net = 'public'; app.screen = 'publicChat'; app.publicChat = { code: '', connected: false, host: false }; render(); break;
       case 'menu':
         if (typeof window.cancelRoguelikePreparation === 'function' && (window._inRoguelikeBattle || window._roguelikePreparingSetup || window._roguelikePlacementPhase)) window.cancelRoguelikePreparation();
@@ -1965,13 +1976,6 @@
         app.speed = v;
         try { localStorage.setItem('manobra.speed', v); } catch (err) { /* ok */ }
         render(); break;
-      case 'theme':
-        if (['classic', 'fantasy', 'obsidian'].indexOf(v) >= 0) {
-          app.theme = v;
-          try { localStorage.setItem('manobra.theme', v); } catch (err) { /* ok */ }
-          render();
-        }
-        break;
       case 'sound':
         snd.on = v === '1';
         try { localStorage.setItem('manobra.sound', v); } catch (err) { /* ok */ }
@@ -1994,9 +1998,16 @@
         try { localStorage.setItem('manobra.music', snd.music ? '1' : '0'); } catch (err) { /* ok */ }
         if (snd.music) startBgm(); else stopBgm();
         render(); break;
-      case 'startAI': startSetup('ai'); break;
-      case 'startPVP': startSetup('pvp'); break;
+      case 'startAI': window._roguelikeLastBattleResult = null; startSetup('ai'); break;
+      case 'startPVP': window._roguelikeLastBattleResult = null; startSetup('pvp'); break;
       case 'again':
+        if (window._roguelikeLastBattleResult === 'defeat') {
+          window._roguelikeLastBattleResult = null;
+          app.screen = 'menu'; app.game = null; app.thinking = false; app.animating = false; app.animToken++;
+          render();
+          if (typeof window.openRoguelikeCommanderSelection === 'function') window.openRoguelikeCommanderSelection();
+          break;
+        }
         if (app.mode === 'bt' && !app.btLinked) { toast('A conexão foi encerrada.'); app.screen = 'menu'; app.game = null; render(); break; }
         startSetup(app.mode); break;
       case 'setupDefault': if (!(app.mode === 'bt' && app.btReady)) { placeList(app.setupSide, E.presetSetup(app.setupSide)); sendSetupProgress(); render(); } break;
@@ -2149,7 +2160,7 @@
     if (r && r.enemyTeam && r.enemyTeam.length) {
       const spots = [];
       for (let i = 0; i < N; i++) if (app.game && E.sideOf(app.game.st.b[i]) === BLACK) spots.push(i);
-      r.enemyTeam.forEach((key, n) => { if (spots[n] != null) r.enemyDeployed[String(spots[n])] = key; });
+      r.enemyDeployed = rogueRandomEnemyDeployment(spots, r.enemyTeam);
     }
     render();
   };

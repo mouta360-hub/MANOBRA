@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const window={addEventListener(){},localStorage:{getItem(){return null},setItem(){}}};
+const ctx={window,Math,Date,console,setTimeout:()=>0,setInterval:()=>0,clearInterval(){},document:{getElementById:()=>null,createElement:()=>({}),body:{appendChild(){}}},SPECIAL_PIECES_CATALOG:{escudeiro:{name:'Escudeiro'},lancer:{name:'Lanceiro'}}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('www/roguelike_adventure.js','utf8'),ctx);
+const r=window.RoguelikeRun;
+r.active=true;r.roster=['escudeiro','lancer'];r.mastery={escudeiro:2,lancer:1};r.gold=0;r.visited=[];r.floor=8;r.pendingNode={id:'boss-1',type:'boss'};window._inRoguelikeBattle=true;
+ctx.onRoguelikeVictory();
+assert.equal(r.mastery.lancer,2,'boss should improve least-developed owned piece');
+assert.equal(r.mastery.escudeiro,2);assert.equal(r.gold,130);assert.equal(r.floor,9);
+r.pendingNode={id:'boss-2',type:'boss'};r.floor=8;window._inRoguelikeBattle=true;ctx.onRoguelikeVictory();
+assert.equal(r.mastery.escudeiro,3,'second boss can advance to level III');
+r.pendingNode={id:'battle',type:'battle'};r.floor=3;window._inRoguelikeBattle=true;ctx.onRoguelikeVictory();
+assert.equal(r.mastery.lancer,2,'ordinary battles must not grant mastery');
+console.log('PASS boss mastery reward: lowest mastery, max cap, ordinary battle unaffected');

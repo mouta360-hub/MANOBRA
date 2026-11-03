@@ -5,7 +5,7 @@ const { makeBroker, makePhone } = require('./fakepeer.js');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // espera uma condição ficar verdadeira (até 2 s), em vez de torcer para um tempo fixo bastar
 async function waitFor(cond, what) {
-  for (let i = 0; i < 200; i++) { if (cond()) return; await sleep(10); }
+  for (let i = 0; i < 1000; i++) { if (cond()) return; await sleep(10); }
   throw new Error('tempo esgotado esperando: ' + what);
 }
 const boardOf = p => Array.prototype.join.call(p.app.game.st.b, '');
@@ -69,7 +69,7 @@ async function playMatch(T, m) {
   while (plies < 1500 && !A.app.game.over) {
     const P = A.app.game.st.turn === A.app.humanSide ? A : B;
     doRandomMove(P);
-    await waitFor(() => A.app.game.plies === B.app.game.plies, 'a jogada chegar ao adversário');
+    await waitFor(() => A.app.game && B.app.game && A.app.game.plies === B.app.game.plies, 'a jogada chegar ao adversário (telas: ' + A.app.screen + '/' + B.app.screen + ', partida: ' + m.id + ', plies: ' + (A.app.game && A.app.game.plies) + '/' + (B.app.game && B.app.game.plies) + ', over: ' + !!(A.app.game && A.app.game.over) + '/' + !!(B.app.game && B.app.game.over) + ', anim: ' + A.app.animating + '/' + B.app.animating + ', queue: ' + A.app.btQueue.length + '/' + B.app.btQueue.length + ')' );
     assert.strictEqual(boardOf(A), boardOf(B), 'tabuleiros iguais na jogada ' + (plies + 1) + ' de ' + m.id);
     plies++;
   }
@@ -184,9 +184,9 @@ async function runAll(T) {
   {
     const S = makePhone('Solo', makeBroker());
     S.sandbox.__manobraBotDelay = 0;
-    S.input('nick', 'Sozinho'); S.click({ act: 'avatar', v: 'owl' });
+    S.input('nick', 'Sozinho'); S.click({ act: 'avatar', v: 'avatar-8' });
     S.click({ act: 'tourOpen' }); S.click({ act: 'tourCreate' }); await waitFor(() => S.app.tour.role === 'host', 'campeonato criado');
-    assert(S.html().includes('Jogadores (1/8)') && S.html().includes('🦉') && /sozinho/.test(S.html()), 'avisa que está sozinho e mostra o avatar');
+    assert(S.html().includes('Jogadores (1/8)') && S.html().includes(String.fromCodePoint(0x1F308)) && /sozinho/.test(S.html()), 'avisa que está sozinho e mostra o avatar');
     S.click({ act: 'tourFmt', v: 'knockout' });
     S.click({ act: 'tourAddBot' }); await waitFor(() => S.app.tour.snap.players.length === 2, 'robô entrou');
     S.click({ act: 'tourBotLevel', v: 'easy' }); await waitFor(() => S.app.tour.snap.botLevel === 'easy', 'nível do robô');

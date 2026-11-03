@@ -54,94 +54,104 @@ function showRoguelikeToast(message, duration = 4000) {
     }, duration);
 }
 
-function inspectSpecialPiece(pieceKey) {
-    const data = SPECIAL_PIECES_PT_BR[pieceKey] || SPECIAL_PIECES_CATALOG[pieceKey];
-    if (!data) return;
-
-    const name = data.name || pieceKey;
-    const passive = data.passive || data.passiveDesc || 'N/A';
-    const active = data.active || data.activeDesc || 'N/A';
-
-    showRoguelikeToast(`[${name}] • Passiva: ${passive} | Hab: ${active}`);
+function codexEscape(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
-
+function codexExplanation(key, piece) {
+    if (key === 'escudeiro') return 'A primeira tentativa de captura válida é bloqueada: o escudo é consumido, mas nenhuma peça ocupa a casa do Escudeiro. Uma nova captura válida pode eliminá-lo.';
+    return piece.description || 'Consulte as regras desta habilidade no jogo.';
+}
+function inspectSpecialPiece(pieceKey) {
+    const piece = SPECIAL_PIECES_CATALOG[pieceKey];
+    if (!piece) return;
+    showRoguelikeToast(`${piece.name}: ${codexExplanation(pieceKey, piece)}`, 6500);
+}
 function openRoguelikeCodex() {
     if (document.getElementById('roguelike-codex-modal')) return;
-
     const modal = document.createElement('div');
     modal.id = 'roguelike-codex-modal';
-    modal.className = 'roguelike-modal-overlay';
-
-    let contentHTML = `
-    <div class="roguelike-modal-content">
-    <div class="roguelike-header">
-    <h2>📜 Codex Demonstrativo - 30 Peças Especiais</h2>
-    <button class="roguelike-close-btn" onclick="closeRoguelikeCodex()">×</button>
-    </div>
-    <div class="roguelike-body">
-    `;
-
+    modal.className = 'roguelike-modal-overlay roguelike-codex-floating';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Codex das 30 peças especiais');
+    modal.addEventListener('click', event => { if (event.target === modal) closeRoguelikeCodex(); });
+    const limits = window.MANOBRA_CODEX_ABILITY_LIMITS || {};
     const categories = [
-        { key: 'tank', title: '🛡️ Guardiões e Tanques (Resistência e Controle)' },
-        { key: 'attacker', title: '⚔️ Atacantes e Berserkers (Dano e Pressão)' },
-        { key: 'support', title: '🔮 Magos e Suportes (Utilidade e Magia)' }
+        { key: 'tank', title: '🛡️ Guardiões e tanques' },
+        { key: 'attacker', title: '⚔️ Atacantes' },
+        { key: 'support', title: '🔮 Magos e suportes' }
     ];
-
-    categories.forEach(cat => {
-        contentHTML += `<div class="roguelike-category-section"><h3>${cat.title}</h3><div class="roguelike-grid">`;
-
+    let html = `<div class="roguelike-modal-content"><div class="roguelike-header"><h2>📜 Codex — Peças e Sinergias</h2><button type="button" class="roguelike-close-btn" onclick="closeRoguelikeCodex()" aria-label="Fechar Codex">×</button></div><div class="roguelike-body"><p class="codex-intro">Descrições baseadas nas habilidades implementadas. As peças continuam obedecendo às regras normais de movimento e captura. Recargas contam turnos do próprio jogador; bônus do comandante podem alterar os valores.</p>`;
+    const synergySets = (window.RoguelikeRuntime && window.RoguelikeRuntime.synergySets) || [];
+    html += `<section class="roguelike-category-section" id="codex-synergies"><h3>🔗 Sinergias — duplas e trios</h3><p class="codex-intro">As habilidades individuais continuam funcionando sozinhas. A sinergia é um bônus adicional, válido para você e para os inimigos. É preciso ter duas peças diferentes do mesmo conjunto vivas e próximas no tabuleiro; comprar as peças não basta. O trio amplia o alcance, mas não substitui as habilidades individuais. Os bônus consomem usos da peça que os ativa e respeitam a recarga.</p><div class="roguelike-grid">`;
+    for (const group of synergySets) {
+        const names = group.keys.map(key => (SPECIAL_PIECES_CATALOG[key] || {}).name || key);
+        const defense = group.type === 'guard';
+        const pair = group.id === 'falange'
+            ? 'Uma peça do conjunto pode gastar 1 uso para impedir a captura de QUALQUER aliado na mesma linha ou coluna, a até 1 casa dela. Precisa ter outra peça diferente da Falange próxima.'
+            : group.id === 'juramento'
+            ? 'Uma peça do conjunto pode gastar 1 uso para impedir a captura de OUTRA integrante do Juramento a até 1 casa. Não protege peças de fora do conjunto.'
+            : 'Uma peça do conjunto que faz uma captura legal pode gastar 1 uso para ignorar a proteção especial do alvo se outra integrante diferente estiver a até 1 casa da atacante.';
+        const trio = group.id === 'falange'
+            ? 'Com as três integrantes diferentes próximas no tabuleiro, a Falange protege aliados na mesma linha ou coluna a até 2 casas da protetora.'
+            : group.id === 'juramento'
+            ? 'Com as três integrantes diferentes próximas no tabuleiro, uma peça do Juramento protege outra integrante a até 2 casas.'
+            : 'Com as três integrantes diferentes próximas no tabuleiro, a parceira que apoia a atacante pode ficar a até 2 casas. Continua exigindo captura legal e consumindo 1 uso da atacante.';
+        const example = group.id === 'falange'
+            ? `Exemplo: ${names[0]} protege um aliado comum na mesma coluna. ${names[1]} precisa estar próxima para ativar a Falange. Com ${names[2]} por perto, o alcance aumenta.`
+            : group.id === 'juramento'
+            ? `Exemplo: ${names[0]} está sendo capturada e ${names[1]} impede o ataque. ${names[2]} amplia o alcance se estiver próxima.`
+            : `Exemplo: ${names[0]} captura legalmente um inimigo com escudo. ${names[1]} dá apoio e permite ignorar a proteção. ${names[2]} amplia o alcance se estiver próxima.`;
+        html += `<article class="roguelike-card"><div class="roguelike-card-header"><strong class="roguelike-name">${defense ? '🛡️' : '⚔️'} ${codexEscape(group.name)}</strong></div><p class="codex-effect"><strong>Peças da combinação:</strong> ${names.map(codexEscape).join(' + ')}</p><p class="codex-effect"><strong>EFEITO COM 2 PEÇAS:</strong> ${codexEscape(pair)}</p><p class="codex-effect"><strong>EFEITO COM 3 PEÇAS:</strong> ${codexEscape(trio)}</p><p class="codex-effect"><strong>Exemplo de combate:</strong> ${codexEscape(example)}</p><p class="codex-usage"><strong>Como ativar:</strong> as peças precisam estar vivas e posicionadas perto umas das outras durante a batalha. A ativação é automática quando acontece a captura adequada e há cargas disponíveis. Comprar as peças, por si só, não ativa nada. Cada peça mantém sua habilidade individual. A combinação não permite movimentos proibidos pelo motor.</p></article>`;
+    }
+    html += '</div></section>';
+    for (const cat of categories) {
+        html += `<section class="roguelike-category-section"><h3>${cat.title}</h3><div class="roguelike-grid">`;
         for (const [key, piece] of Object.entries(SPECIAL_PIECES_CATALOG)) {
-            if (piece.category === cat.key) {
-                const translation = SPECIAL_PIECES_PT_BR[key] || {};
-                let passiveText = translation.passive || piece.description || 'Efeito tático passivo exclusivo.';
-                let activeText = translation.active || (piece.activePower ? 'Habilidade ativa disponível durante a batalha.' : piece.getSpecialMoves ? 'Movimento especial disponível no tabuleiro.' : 'Efeito automático durante a batalha.');
-                let pieceName = translation.name || piece.name || key;
-
-                contentHTML += `
-                <div class="roguelike-card" onclick="inspectSpecialPiece('${key}')" style="cursor: pointer;" title="Clique para testar aviso em jogo">
-                <div class="roguelike-card-header">
-                <span class="roguelike-symbol">${piece.symbol || '🔹'}</span>
-                <span class="roguelike-name">${pieceName}</span>
-                </div>
-                <div class="roguelike-card-desc" style="display: flex; flex-direction: column; gap: 6px;">
-                <div style="background: rgba(56, 189, 248, 0.1); padding: 6px 8px; border-radius: 6px; border-left: 3px solid #38bdf8;">
-                <strong style="color: #38bdf8;">Passiva:</strong> ${passiveText}
-                </div>
-                <div style="background: rgba(168, 85, 247, 0.1); padding: 6px 8px; border-radius: 6px; border-left: 3px solid #a855f7;">
-                <strong style="color: #c084fc;">Habilidade Ativa:</strong> ${activeText}
-                </div>
-                </div>
-                </div>
-                `;
-            }
+            if (piece.category !== cat.key) continue;
+            const limit = limits[key];
+            const usage = limit ? `${limit.uses} uso${limit.uses !== 1 ? 's' : ''} por combate · ${limit.cooldown ? `recarga de ${limit.cooldown} turno${limit.cooldown !== 1 ? 's' : ''}` : 'sem recarga'}` : 'Consulte os limites no combate';
+            const groupNames = synergySets.filter(group => group.keys.includes(key)).map(group => group.name);
+            html += `<article class="roguelike-card"><div class="roguelike-card-header"><span class="roguelike-symbol">${codexEscape(piece.symbol || '🔹')}</span><strong class="roguelike-name">${codexEscape(piece.name || key)}</strong></div><p class="codex-effect">${codexEscape(codexExplanation(key, piece))}</p><p class="codex-usage"><strong>Limites:</strong> ${codexEscape(usage)}</p>${groupNames.length ? `<p class="codex-usage"><strong>Sinergia:</strong> ${groupNames.map(codexEscape).join(', ')} (veja acima)</p>` : ''}</article>`;
         }
-        contentHTML += `</div></div>`;
-    });
-
-    contentHTML += `</div></div>`;
-    modal.innerHTML = contentHTML;
+        html += '</div></section>';
+    }
+    html += '</div></div>';
+    modal.innerHTML = html;
     document.body.appendChild(modal);
+    const closeOnEscape = event => { if (event.key === 'Escape') closeRoguelikeCodex(); };
+    modal._closeOnEscape = closeOnEscape;
+    document.addEventListener('keydown', closeOnEscape);
+    modal.querySelector('.roguelike-close-btn')?.focus();
 }
-
 function closeRoguelikeCodex() {
     const modal = document.getElementById('roguelike-codex-modal');
-    if (modal) modal.remove();
+    if (modal) { document.removeEventListener('keydown', modal._closeOnEscape); modal.remove(); }
 }
 
 // Garante que o botão reapareça sempre que o menu principal for atualizado
 function ensureCodexButton() {
     const appDiv = document.getElementById('app');
-    if (appDiv && !document.getElementById('roguelike-codex-btn-container')) {
-        const menuBar = document.createElement('div');
-        menuBar.id = 'roguelike-codex-btn-container';
-        menuBar.style.cssText = 'text-align: center; margin: 15px 0; z-index: 99; position: relative;';
-        menuBar.innerHTML = `
-        <button onclick="openRoguelikeCodex()" style="background: #2b3240; color: #f1f5f9; border: 1px solid #475569; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-        📜 Codex Roguelike (30 Peças)
-        </button>
-        `;
-        appDiv.prepend(menuBar);
+    if (!appDiv) return;
+    // O Codex acompanha os controles da partida, sem criar uma barra acima do tabuleiro.
+    const controls = appDiv.querySelector('.layout .side .bar');
+    const old = document.getElementById('roguelike-codex-btn-container');
+    if (!controls) {
+        if (old) old.remove();
+        return;
     }
+    if (old && old.parentElement === controls) return;
+    if (old) old.remove();
+    const holder = document.createElement('span');
+    holder.id = 'roguelike-codex-btn-container';
+    holder.className = 'roguelike-codex-control';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '📜 Codex';
+    btn.title = 'Consultar as 30 peças especiais';
+    btn.addEventListener('click', openRoguelikeCodex);
+    holder.appendChild(btn);
+    controls.appendChild(holder);
 }
 
 window.addEventListener('DOMContentLoaded', () => {

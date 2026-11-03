@@ -1,14 +1,14 @@
 /* Manobra 1.0 – motor de regras e IA
- * Tabuleiro 13 colunas x 9 linhas = 117 casas. Só as casas escuras (r+c par) são jogáveis.
- * Brancas ficam embaixo (linhas 5..8), Pretas em cima (linhas 0..3), linha 4 = terreno neutro.
+ * Tabuleiro 13 colunas x 11 linhas = 143 casas. Só as casas escuras (r+c par) são jogáveis.
+ * Brancas ficam embaixo (linhas 6..10), Pretas em cima (linhas 0..4), linha 5 = terreno neutro.
  */
 (function (root) {
   'use strict';
 
-  const COLS = 13, ROWS = 9, N = COLS * ROWS;
+  const COLS = 13, ROWS = 11, N = COLS * ROWS;
   const EMPTY = 0, WA = 1, WD = 2, BA = 3, BD = 4; // A = ataque, D = defesa
   const WHITE = 0, BLACK = 1;
-  const MAX_DEF = 6, PIECES = 13;
+  const MAX_DEF = 6, PIECES = 20;
   const WIN = 100000;
 
   const idx = (r, c) => r * COLS + c;
@@ -20,10 +20,10 @@
   const makePiece = (side, attack) => (side === WHITE ? (attack ? WA : WD) : (attack ? BA : BD));
 
   // Casa principal de cada jogador (a própria casa).
-  const MAIN = [idx(8, 6), idx(0, 6)];
+  const MAIN = [idx(10, 6), idx(0, 6)];
   const isMain = i => i === MAIN[0] || i === MAIN[1];
   // Dono do terreno por linha: topo = pretas, base = brancas, linha 4 = neutro.
-  const terrainOwner = r => (r <= 3 ? BLACK : r >= 5 ? WHITE : -1);
+  const terrainOwner = r => (r <= 4 ? BLACK : r >= 6 ? WHITE : -1);
 
   // Vizinhos diagonais (NB) e casas a duas diagonais de distância (FAR)
   const DR = [-1, -1, 1, 1], DC = [-1, 1, -1, 1];
@@ -246,7 +246,7 @@
 
   /* ---------- Montagem ---------- */
   function territoryCells(side) {
-    const r0 = side === WHITE ? 5 : 0, r1 = side === WHITE ? 8 : 3;
+    const r0 = side === WHITE ? 6 : 0, r1 = side === WHITE ? 10 : 4;
     const out = [];
     for (let r = r0; r <= r1; r++) for (let c = 0; c < COLS; c++) {
       const i = idx(r, c);
@@ -261,10 +261,12 @@
     [0, 4, 0], [0, 8, 0],
     [1, 3, 1], [1, 5, 1], [1, 7, 1], [1, 9, 1],
     [2, 2, 0], [2, 4, 1], [2, 6, 1], [2, 8, 1], [2, 10, 0],
-    [3, 5, 1], [3, 7, 1]
+    [3, 5, 1], [3, 7, 1],
+    [4, 4, 1], [4, 8, 1],
+    [0, 2, 1], [0, 10, 1], [2, 0, 1], [2, 12, 1], [4, 6, 1]
   ];
   function presetSetup(side, rnd) {
-    const out = PRESET.map(([r, c, a]) => ({ i: idx(side === BLACK ? r : 8 - r, c), a: !!a }));
+    const out = PRESET.map(([r, c, a]) => ({ i: idx(side === BLACK ? r : 10 - r, c), a: !!a }));
     if (rnd) { // pequena variação: troca o modo de até 2 peças, respeitando o limite de defesa
       for (let k = 0; k < 2; k++) {
         const x = out[Math.floor(rnd() * out.length)];
@@ -304,7 +306,7 @@
       if (!p) continue;
       const s = p <= 2 ? 0 : 1, atk = (p === 1 || p === 3);
       const r = (i / COLS) | 0, c = i - r * COLS;
-      const tr = s === 0 ? 0 : 8;
+      const tr = s === 0 ? 0 : 10;
       const d = Math.max(Math.abs(r - tr), Math.abs(c - 6)); // passos até a casa principal inimiga
       let v = atk ? 110 : 90;
       v += (9 - d) * 3;
@@ -402,18 +404,9 @@
     return best;
   }
 
-  // Partida simulada que não acaba (robôs repetindo lances): decide por peças.
-  // Menos peças perde; empate -> menos peças em ataque perde; empate total -> sorteio.
+  // Limite técnico de segurança: empate, nunca vitória ou derrota por contagem de peças.
   const SIM_MAX_PLIES = 240;
-  function adjudicate(st, rnd) {
-    const cnt = [0, 0], atk = [0, 0];
-    for (let i = 0; i < N; i++) { const p = st.b[i]; if (!p) continue; const sd = sideOf(p); cnt[sd]++; if (isAttack(p)) atk[sd]++; }
-    let winner;
-    if (cnt[0] !== cnt[1]) winner = cnt[0] > cnt[1] ? WHITE : BLACK;
-    else if (atk[0] !== atk[1]) winner = atk[0] > atk[1] ? WHITE : BLACK;
-    else winner = (rnd || Math.random)() < 0.5 ? WHITE : BLACK;
-    return { winner: winner, reason: 'limite_jogadas' };
-  }
+  function adjudicate() { return { winner: null, reason: 'empate_limite_seguranca' }; }
 
   const api = {
     SIM_MAX_PLIES, adjudicate,

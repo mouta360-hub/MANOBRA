@@ -278,7 +278,7 @@
         status: this.status, format: this.format, rounds: this.rounds, champion: this.champion, botLevel: this.botLevel,
         judge: { id: this.judgeId, peer: this.judgePeer, epoch: this.epoch },
         reserveOrder: this.players.filter(p => !p.bot && !p.eliminated && p.connected && p.id !== this.judgeId && p.id !== this.originalJudgeId).map(p => p.id),
-        players: this.players.map(p => ({ id: p.id, pid: p.pid, nick: p.nick, av: p.av || '', peer: p.peer || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
+        players: this.players.map(p => ({ id: p.id, nick: p.nick, av: p.av || '', peer: p.peer || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
           reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null,
@@ -596,7 +596,7 @@
         const E = this.E, c = [0, 0];
         for (let i = 0; i < E.N; i++) { const p = g.st.b[i]; if (p) c[E.sideOf(p)]++; }
         const dA = c[0] - c[1];
-        this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c);
+        this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c, true);
       } else this._turnStarted(m);
     }
     // Partidas entre dois robôs: jogadas pelo motor, uma por vez, para que o
@@ -796,7 +796,7 @@
     }
 
     /* --- resultados --- */
-    _finish(m, winnerId, reason, diff, silent, pieces) {
+    _finish(m, winnerId, reason, diff, silent, pieces, naturalFinish) {
       const wasSimulation = !!(this.rt[m.id] && this.rt[m.id].sim);
       this._clearTimer(this._entryTimers, m.id);
       this._clearTimer(this._setupTimers, m.id);
@@ -805,7 +805,10 @@
       m.status = 'done'; m.winner = winnerId; m.reason = reason; m.diff = diff; m.pieces = pieces ? pieces.slice() : null; m.sim = null; m.ready = [false, false];
       delete this.rt[m.id];
       if (wasSimulation) { this._botSimulationActive = false; if (this._simWorker) this._simWorker.stop(m.id); }
-      if (!silent) [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'matchEnd', m: m.id, winner: winnerId, reason: reason }); });
+      // Em vitória natural, o último lance já foi retransmitido: deixar os dois
+      // clientes aplicarem o lance e exibirem a tela de vitória. O aviso
+      // matchEnd imediato interrompia a animação e descartava o último lance.
+      if (!silent) [m.a, m.b].forEach(id => { if (id != null) this.send(id, { k: 'matchEnd', m: m.id, winner: winnerId, reason: reason, natural: !!naturalFinish }); });
       this._advance(m);
       this._forfeitDisconnected();
       this._autoBots();

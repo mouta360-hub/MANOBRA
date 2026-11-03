@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'); const fs=require('fs'),vm=require('vm');
+const modal={innerHTML:''}; const ctx={window:{addEventListener:()=>{},RoguelikeRun:{active:true,act:1,mapRow:0,mapCol:1,gold:100,roster:[],activeTeam:[],shopOffers:{},pendingNode:null,visited:[],map:[]}},document:{getElementById:()=>modal},SPECIAL_PIECES_CATALOG:Object.fromEntries(Array.from({length:30},(_,i)=>['piece'+i,{symbol:'★'}])),Math,console,showRoguelikeToast:()=>{}};ctx.window.window=ctx.window;vm.createContext(ctx);vm.runInContext(fs.readFileSync('www/roguelike_adventure.js','utf8'),ctx);
+const nodeA={id:'shop-A',type:'shop',row:0,col:1,cleared:true};ctx.window.RoguelikeRun.map=[[{},nodeA,{}]];ctx.window.RoguelikeRun.pendingNode=nodeA;ctx.window.RoguelikeRun.visited=[nodeA.id];
+const offers=Array.from(ctx.rogueShopSelection(ctx.rogueShopId()));assert.equal(offers.length,3);assert.equal(new Set(offers).size,3);assert.deepEqual(Array.from(ctx.rogueShopSelection(ctx.rogueShopId())),offers);
+ctx.openRoguelikeShop();assert.equal((modal.innerHTML.match(/rogue-shop-card/g)||[]).length,3);
+const price=ctx.getRoguelikePieceRarity(offers[0]).price;ctx.buyRoguelikePiece(offers[0],price,{});assert.equal(ctx.window.RoguelikeRun.gold,100-price);assert(ctx.window.RoguelikeRun.roster.includes(offers[0]));assert(ctx.window.RoguelikeRun.activeTeam.includes(offers[0]));
+ctx.buyRoguelikePiece(offers[0],price,{});assert.equal(ctx.window.RoguelikeRun.gold,100-price);
+ctx.buyRoguelikePiece(Array.from({length:30},(_,i)=>'piece'+i).find(k=>!offers.includes(k)),35,{});assert.equal(ctx.window.RoguelikeRun.roster.length,1);
+const nodeB={id:'shop-B',type:'shop',row:0,col:1,cleared:true};ctx.window.RoguelikeRun.map[0][1]=nodeB;ctx.window.RoguelikeRun.pendingNode=nodeB;ctx.window.RoguelikeRun.visited.push(nodeB.id);const other=Array.from(ctx.rogueShopSelection(ctx.rogueShopId()));assert.equal(other.length,3);assert(!other.includes(offers[0]));
+ctx.window.RoguelikeRun.gold=0;ctx.openRoguelikeShop();assert(modal.innerHTML.includes('Sem moedas'));
+console.log('PASS: 3 ofertas, sem repetição, estoque estável, compra, proteção contra compras inválidas, nova loja, saldo insuficiente');

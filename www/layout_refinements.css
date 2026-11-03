@@ -1,0 +1,26 @@
+/* Ajuste pontual: tabuleiro ligeiramente menor e centralizado na area util. */
+@media (min-width:900px) {
+  :root { --cs: min(86px, calc((100dvh - 132px) / 9), calc((100vw - 480px) / 13)); }
+  #app > .layout > .bw { align-items:center; justify-content:center; padding-top:0; min-height:calc(100dvh - 36px); }
+  #app > .layout { align-items:start; }
+}
+@media (min-width:1400px) {
+  :root { --cs: min(96px, calc((100dvh - 132px) / 9), calc((100vw - 530px) / 13)); }
+}
+@media (min-width:1900px) {
+  :root { --cs: min(106px, calc((100dvh - 132px) / 9), calc((100vw - 570px) / 13)); }
+}
+/* Cartoes: imagem sempre contida dentro da faixa ilustrada, sem recortes indevidos. */
+.menu-options { align-items:stretch; grid-auto-rows:auto; }
+.menu-option { min-width:0; box-sizing:border-box; }
+.menu-option-banner { display:block; height:138px; flex:none; overflow:hidden; isolation:isolate; }
+.menu-option-banner img { top:0; bottom:0; right:4%; width:48%; height:100%; object-fit:contain; object-position:center bottom; transform:none; }
+.menu-option-banner:after { pointer-events:none; }
+.menu-option-title { min-width:0; align-items:center; }
+.menu-option-title > div { min-width:0; }
+.menu-option-title h3,.menu-option-title small { overflow-wrap:anywhere; }
+.menu-option .primary { max-width:100%; }
+@media (max-width:680px) {
+  .menu-option-banner { height:120px; }
+  .menu-option-banner img { width:43%; right:5%; }
+}

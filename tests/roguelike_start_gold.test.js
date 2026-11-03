@@ -1,0 +1,18 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const src = fs.readFileSync('www/roguelike_adventure.js', 'utf8');
+const context = {window:{addEventListener:()=>{}},document:{getElementById:()=>null},Math,Date,console};
+vm.createContext(context);
+vm.runInContext(src,context);
+assert.equal(context.window.RoguelikeRun.gold,30,'initial state');
+context.generateRoguelikeMap=()=>[];
+context.openRoguelikeMap=()=>{};
+context.updateFloatingAdventureButton=()=>{};
+context.startRoguelikeAdventure();
+assert.equal(context.window.RoguelikeRun.gold,30,'new run');
+assert.equal(context.window.RoguelikeRun.mapRow,-1,'start before first node');
+context.window.RoguelikeRun.gold=250;
+context.startRoguelikeAdventure();
+assert.equal(context.window.RoguelikeRun.gold,30,'restart new run');
+console.log('PASS: starting gold 30, restart 30, initial map position');
