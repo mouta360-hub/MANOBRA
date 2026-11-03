@@ -17,7 +17,7 @@
   BOT_FIRST.forEach(first => BOT_LAST.forEach(last => BOT_PROFILES.push({ nick: first + ' ' + last, av: BOT_AVATARS[BOT_PROFILES.length % BOT_AVATARS.length] })));
   if (root) root.ManobraBotProfiles = BOT_PROFILES;
 
-  const cleanAv = s => { s = String(s == null ? '' : s); const cp = s ? s.codePointAt(0) : 0; if (cp >= 0x1F300 && cp < 0x1F300 + 300) return 'avatar-' + (cp - 0x1F300); return s.replace(/[^a-z0-9-]/gi, '').slice(0, 12); }
+  const cleanAv = s => String(s == null ? '' : s).replace(/[^a-z0-9-]/gi, '').slice(0, 12);
   const clean = s => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 16);
 
   function shuffle(arr, rnd) {
@@ -270,7 +270,7 @@
         status: this.status, format: this.format, rounds: this.rounds, champion: this.champion, botLevel: this.botLevel,
         judge: { id: this.judgeId, peer: this.judgePeer, epoch: this.epoch },
         reserveOrder: this.players.filter(p => !p.bot && !p.eliminated && p.connected && p.id !== this.judgeId && p.id !== this.originalJudgeId).map(p => p.id),
-        players: this.players.map(p => ({ id: p.id, nick: p.nick, av: p.av || '', peer: p.peer || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
+        players: this.players.map(p => ({ id: p.id, pid: p.pid, nick: p.nick, av: p.av || '', peer: p.peer || '', bot: !!p.bot, connected: p.connected, eliminated: !!p.eliminated, busy: this.busy(p.id) })),
         matches: this.matches.map(m => ({
           id: m.id, round: m.round, a: m.a, b: m.b, status: m.status, winner: m.winner,
           reason: m.reason, diff: m.diff.slice(), pieces: m.pieces ? m.pieces.slice() : null,
@@ -282,8 +282,7 @@
       };
     }
     // Estado persistente: usado somente para campeonatos locais do organizador com robôs.
-    // opts.public = true: cópia para os reservas. Esconde o código pessoal (pid) de cada jogador.
-    exportState(opts) {
+    exportState() {
       const gameState = g => g ? {
         b: Array.from(g.st.b), turn: g.st.turn, over: g.over, last: g.last,
         plies: g.plies, hist: Array.from(g.hist.entries())
@@ -292,8 +291,7 @@
         version: 2, status: this.status, format: this.format, rounds: this.rounds,
         champion: this.champion, botLevel: this.botLevel, next: this._next, botN: this._botN,
         epoch: this.epoch, judgeId: this.judgeId, judgePeer: this.judgePeer, originalJudgeId: this.originalJudgeId,
-        usedBotProfiles: Array.from(this._usedBotProfiles),
-        players: (opts && opts.public) ? this.players.map(p => (p.bot ? p : Object.assign({}, p, { pid: 'p' + p.id }))) : this.players,
+        usedBotProfiles: Array.from(this._usedBotProfiles), players: this.players,
         matches: this.matches, rt: Object.keys(this.rt).reduce((out, id) => {
           const r = this.rt[id];
           out[id] = { setups: r.setups, progress: r.progress, botSide: r.botSide,
@@ -327,17 +325,11 @@
           game: restoreGame(r.game), botSide: r.botSide == null ? null : r.botSide,
           pending: false, sim: !!r.sim };
       });
-      this._botSimulationActive = false;
-      this.matches.forEach(m => { // simulação robô x robô interrompida: volta a ser "pendente" e recomeça do zero
-        if (m.status === 'playing' && this.rt[m.id] && this.rt[m.id].sim) { delete this.rt[m.id]; m.status = 'pending'; m.sim = null; m.ready = [false, false]; }
-      });
       this.matches.forEach(m => {
         if (m.status === 'pending') this._armEntryTimer(m);
         else if (m.status === 'playing' && this.rt[m.id] && !this.rt[m.id].game) this._armSetupTimer(m);
         else if (m.status === 'playing' && this.rt[m.id] && this.rt[m.id].game && this.rt[m.id].botSide != null) this._turnStarted(m);
-        else if (m.status === 'playing' && this.rt[m.id] && this.rt[m.id].game) this._armMoveTimer(m); // humano x humano
       });
-      this._autoBots();
       return true;
     }
     broadcast() {
@@ -385,7 +377,7 @@
       const p = this._p(id);
       if (!p || p.bot) return;
       if (this.status === 'lobby') {
-        if (id === this.judgeId) return;
+        if (id === 0) return;
         this.players = this.players.filter(x => x.id !== id);
       } else {
         p.connected = false;
@@ -401,18 +393,10 @@
     promote(id, peer) {
       const p = this._p(id);
       if (!p || p.bot || p.eliminated || !p.connected) return false;
-      const old = this.judgeId;
       this.judgeId = id;
       this.judgePeer = String(peer || p.peer || '');
       this.epoch = Math.max(1, (this.epoch | 0) + 1);
       p.peer = this.judgePeer;
-      if (old !== id) { // o juiz que caiu deixa o campeonato: no saguão some da lista; em andamento, perde as partidas por W.O.
-        const o = this._p(old);
-        if (o && !o.bot) {
-          if (this.status === 'lobby') this.players = this.players.filter(x => x.id !== old);
-          else this.leave(old, 'o juiz saiu do campeonato');
-        }
-      }
       this.broadcast();
       return true;
     }
@@ -435,7 +419,7 @@
 
     handle(id, msg) {
       if (!msg || typeof msg !== 'object' || !this._p(id)) return;
-      const org = id === this.judgeId; // o juiz atual (o original ou o reserva que assumiu)
+      const org = id === 0;
       switch (msg.k) {
         case 'ready': this.ready(id, msg.m); break;
         case 'unready': this.unready(id); break;
@@ -577,13 +561,7 @@
         this._afterPlay(m, g);
       }, this.botDelay);
     }
-    _syncSoon() { // o reserva precisa do tabuleiro atual para assumir sem W.O.
-      if (this._syncT) return;
-      this._syncT = setTimeout(() => { this._syncT = null; this.broadcast(); }, 1000);
-      if (this._syncT && this._syncT.unref) this._syncT.unref();
-    }
     _afterPlay(m, g) {
-      this._syncSoon();
       if (g.over) {
         const E = this.E, c = [0, 0];
         for (let i = 0; i < E.N; i++) { const p = g.st.b[i]; if (p) c[E.sideOf(p)]++; }
