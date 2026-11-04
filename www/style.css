@@ -78,7 +78,7 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 .layout { display: block; }
 .bw { display: flex; justify-content: center; }
 @media (orientation: landscape) {
-  :root { --cs: min(64px, calc((100vh - 34px) / 11), calc((100vw - 270px) / 13)); }
+  :root { --cs: min(64px, calc((100vh - 34px) / 9), calc((100vw - 270px) / 13)); }
   #app { max-width: none; padding: 8px 12px; }
   .layout { display: flex; gap: 14px; align-items: flex-start; }
   .bw { flex: 0 0 auto; }
@@ -191,7 +191,7 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 
 /* Layout desktop / Windows: preserva o layout móvel acima e amplia a área de jogo. */
 @media screen and (min-width: 900px) {
-  :root { --cs: min(108px, calc((100dvh - 48px) / 11), calc((100vw - 410px) / 13)); }
+  :root { --cs: min(108px, calc((100dvh - 48px) / 9), calc((100vw - 410px) / 13)); }
   html, body { min-width: 900px; overflow-x: hidden; }
   body { min-height: 100vh; }
   #app { width: 100%; max-width: none; min-height: 100vh; padding: 18px 22px; }
@@ -213,7 +213,7 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
   .overlay.center .sheet { width: min(520px, 70vw); }
 }
 @media screen and (min-width: 1400px) {
-  :root { --cs: min(116px, calc((100dvh - 48px) / 11), calc((100vw - 460px) / 13)); }
+  :root { --cs: min(116px, calc((100dvh - 48px) / 9), calc((100vw - 460px) / 13)); }
   #app { padding-left: 32px; padding-right: 32px; }
   #app > .layout { grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; }
   #app > .layout > .side { width: 360px; }
@@ -226,12 +226,12 @@ button.primary { background: #3a6df0; width: 100%; font-weight: 600; }
 
 /* Tabuleiro responsivo: usar a maior área segura disponível no desktop. */
 @media (min-width:900px) {
-  :root { --cs: min(calc((100dvh - 48px) / 11), calc((100vw - 410px) / 13)); }
+  :root { --cs: min(calc((100dvh - 48px) / 9), calc((100vw - 410px) / 13)); }
   #app > .layout > .bw { width:100%; max-width:none; }
   #board { flex-shrink:0; }
 }
 @media (min-width:1400px) {
-  :root { --cs: min(calc((100dvh - 48px) / 11), calc((100vw - 470px) / 13)); }
+  :root { --cs: min(calc((100dvh - 48px) / 9), calc((100vw - 470px) / 13)); }
 }
 
 /* Apresentação do comandante inimigo antes da batalha. */

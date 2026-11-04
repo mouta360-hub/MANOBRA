@@ -1,6 +1,6 @@
 /* Manobra 1.0 – motor de regras e IA
- * Tabuleiro 13 colunas x 11 linhas = 143 casas. Só as casas escuras (r+c par) são jogáveis.
- * Brancas ficam embaixo (linhas 6..10), Pretas em cima (linhas 0..4), linha 5 = terreno neutro.
+ * Tabuleiro 13 colunas x 9 linhas = 117 casas. Só as casas escuras (r+c par) são jogáveis.
+ * Brancas ficam embaixo (linhas 5..8), Pretas em cima (linhas 0..3), linha 4 = terreno neutro.
  */
 (function (root) {
   'use strict';
@@ -20,10 +20,10 @@
   const makePiece = (side, attack) => (side === WHITE ? (attack ? WA : WD) : (attack ? BA : BD));
 
   // Casa principal de cada jogador (a própria casa).
-  const MAIN = [idx(10, 6), idx(0, 6)];
+  const MAIN = [idx(8, 6), idx(0, 6)];
   const isMain = i => i === MAIN[0] || i === MAIN[1];
   // Dono do terreno por linha: topo = pretas, base = brancas, linha 4 = neutro.
-  const terrainOwner = r => (r <= 4 ? BLACK : r >= 6 ? WHITE : -1);
+  const terrainOwner = r => (r <= 3 ? BLACK : r >= 5 ? WHITE : -1);
 
   // Vizinhos diagonais (NB) e casas a duas diagonais de distância (FAR)
   const DR = [-1, -1, 1, 1], DC = [-1, 1, -1, 1];
@@ -261,7 +261,7 @@
     [0, 4, 0], [0, 8, 0],
     [1, 3, 1], [1, 5, 1], [1, 7, 1], [1, 9, 1],
     [2, 2, 0], [2, 4, 1], [2, 6, 1], [2, 8, 1], [2, 10, 0],
-    [3, 5, 1], [3, 7, 1],
+    [3, 5, 1], [3, 7, 1]
   ];
   function presetSetup(side, rnd) {
     const out = PRESET.map(([r, c, a]) => ({ i: idx(side === BLACK ? r : 8 - r, c), a: !!a }));

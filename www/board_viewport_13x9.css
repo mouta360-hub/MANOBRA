@@ -3,7 +3,7 @@
 #app > .layout > .bw { min-width: 0; box-sizing: border-box; }
 #board { box-sizing: content-box; max-width: none; }
 @media (min-width:900px) {
-  :root { --cs: max(14px, min(calc((100vw - 455px) / 13), calc((100dvh - 85px) / 9), 110px)); }
+  :root { --cs: max(14px, min(calc((100vw - 455px) / 13), calc((100dvh - 85px) / 9), 78px)); }
   #app > .layout > .bw { min-height: 0; height: calc(100dvh - 36px); padding: 0; display: flex; align-items: center; justify-content: center; }
   #app > .layout > .side { max-height: calc(100dvh - 36px); overflow-y: auto; }
 }

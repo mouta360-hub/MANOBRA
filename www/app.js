@@ -363,9 +363,9 @@
 
   function rulesScreen() {
     return '<div class="rules"><div class="topbar"><b>Como jogar</b><button data-act="rulesBack">Voltar</button></div>' +
-      '<h2>Tabuleiro</h2><p>13 × 11 = 143 casas. Só as casas escuras (azul-escuro) são usadas, sempre em diagonal. Cada jogador tem 20 peças e uma casa principal (o quadrado).</p>' +
+      '<h2>Tabuleiro</h2><p>13 × 9 = 117 casas. Só as casas escuras (azul-escuro) são usadas, sempre em diagonal. Cada jogador tem 13 peças e uma casa principal (o quadrado).</p>' +
       '<h2>Como vencer (qualquer um)</h2><ul><li>Separar todas as peças de ataque do oponente, sem possibilidade de conectá-las.</li><li>Eliminar todas as peças do oponente.</li><li>Alcançar a casa principal do oponente.</li></ul>' +
-      '<h2>Montagem</h2><p>Cada jogador distribui as 20 peças no seu terreno (5 linhas). A linha vermelha na montagem é o terreno neutro: ninguém coloca peças nela no início. No máximo 6 peças em modo defesa; pode ter menos. Se um jogador ficar com a 7ª peça em defesa, o adversário pode eliminar uma defesa dele.</p>' +
+      '<h2>Montagem</h2><p>Cada jogador distribui as 13 peças no seu terreno (4 linhas). A linha vermelha na montagem é o terreno neutro: ninguém coloca peças nela no início. No máximo 6 peças em modo defesa; pode ter menos. Se um jogador ficar com a 7ª peça em defesa, o adversário pode eliminar uma defesa dele.</p>' +
       '<h2>Modos</h2><ul>' +
       '<li><b>Defesa</b> (branca lisa / preta lisa): anda sozinha 1 casa em qualquer diagonal. Não elimina: empurra a peça inimiga uma casa para trás dela ou troca de lugar com ela.</li>' +
       '<li><b>Ataque</b> (branca com bolinha / preta com anel): só se move se houver uma peça sua na diagonal ao lado. Elimina qualquer peça inimiga ocupando a casa dela. Se ficar sozinha, volta a andar quando outra peça sua chegar perto.</li></ul>' +
