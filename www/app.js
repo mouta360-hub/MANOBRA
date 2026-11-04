@@ -467,9 +467,6 @@
   }
   // Zera e reinicia o relógio a cada vez; sem relógio na vez do robô
   function startMoveClock() {
-    // Aventura é offline e sem limite de tempo por jogada.
-    // Mantém o cronômetro dos modos clássicos e campeonatos.
-    if (window._inRoguelikeBattle) { app.moveDeadline = 0; return; }
     const g = app.game;
     const humanToMove = g && !g.over && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
     app.moveDeadline = humanToMove ? Date.now() + moveMs() : 0;
@@ -806,7 +803,7 @@
     if (!s) return h + '<div class="hint">Conectando…</div></div>';
     if (t.disconnected) h += '<div class="card"><p class="hint" style="margin:0 0 10px">A conexão com o organizador caiu. O campeonato foi mantido nesta tela.</p><button class="primary" data-act="tourReconnect">Reconectar ao campeonato</button></div>';
     else if (t.handoff) h += '<div class="card"><p class="hint" style="margin:0">Reconectando o juiz… aguarde alguns segundos.</p></div>';
-    const isOrg = t.myId === 0;
+    const isOrg = !!(s.judge && t.myId === s.judge.id);
     h += tourFriendsCard();
     if (s.status === 'lobby') {
       if (t.local) h += '<div class="card"><p style="margin:0;text-align:center"><b>Campeonato offline</b></p><p style="text-align:center;font-size:13px;margin:6px 0 0">Sem internet: só dá para jogar contra robôs. Adicione robôs abaixo. Use o botão Salvar para continuar depois.</p></div>';
@@ -1153,7 +1150,14 @@
     const g = app.game;
     if (app.mode === 'bt' && !remote) btSend({ k: 'move', m: { t: mv.t, from: mv.from, to: mv.to, beyond: mv.beyond } });
     const cap = g.st.b[mv.to]; // peça que estava na casa de destino (para animar a eliminação)
-    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) return;
+    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) {
+      // Um ataque repelido é um turno gasto; uma jogada ilegal não é.
+      if (window.RoguelikeRuntime.resolveBlockedMove && window.RoguelikeRuntime.resolveBlockedMove(g)) {
+        app.sel = -1; app.purge = false; app.choice = null;
+        startMoveClock(); updateFlip(); render(); afterMove(true);
+      }
+      return;
+    }
     g.play(mv);
     if (window.RoguelikeRuntime && window.RoguelikeRuntime.afterMove) window.RoguelikeRuntime.afterMove(g, mv, cap);
     app.sel = -1; app.purge = false; app.choice = null;
@@ -1725,6 +1729,7 @@
         app.tour.connecting = false;
         if (ev && ev.code) app.tour.code = ev.code;
         app.tour.myId = ev && ev.id != null ? ev.id : app.tour.myId;
+        app.tour.snap = l.snapshot() || app.tour.snap;
         app.tour.msg = 'O juiz principal caiu. Você assumiu como juiz reserva e o campeonato continua.';
         toast(app.tour.msg);
         syncPresenceStatus();

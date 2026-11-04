@@ -11,7 +11,7 @@
   const sideAt = (board, i) => board && Number.isInteger(i) && i >= 0 && i < board.length && board[i] && E() ? E().sideOf(board[i]) : -1;
   const enemyOf = side => side === E().WHITE ? E().BLACK : E().WHITE;
   function announce(text) { if (typeof window.showRoguelikeToast === 'function') window.showRoguelikeToast(text); }
-  function state() { const r = run(); if (!r) return null; r.abilityState ||= {}; const s = r.abilityState; s.shield ||= {}; s.cooldown ||= {}; s.used ||= {}; s.captured ||= [0, 0]; s.stun ||= {}; s.pending ||= null; s.turnUsed ||= {}; s.charges ||= {}; s.abilityCooldown ||= {}; s.blockedTurn ||= false; return s; }
+  function state() { const r = run(); if (!r) return null; r.abilityState ||= {}; const s = r.abilityState; s.shield ||= {}; s.cooldown ||= {}; s.used ||= {}; s.captured ||= [0, 0]; s.stun ||= {}; s.pending ||= null; s.turnUsed ||= {}; s.charges ||= {}; s.abilityCooldown ||= {}; return s; }
   // Recarga em turnos do próprio jogador. O turno de ativação não conta.
   const ABILITY_LIMITS = Object.freeze({
     escudeiro: { uses: 1, cooldown: 0 },
@@ -85,7 +85,6 @@
     const id = abilityId(side,index,key), s = state(), rule = effectiveAbilityLimit(side, key);
     s.charges[id] = (s.charges[id] || 0) + 1;
     s.abilityCooldown[id] = rule.cooldown;
-    if (s.activeMover === side) (s.freshCooldowns ||= []).push(id);
     const r = run(), human = window.__manobraApp && window.__manobraApp.humanSide;
     if (r && r.active && side !== human && r.pendingNode && r.pendingNode.type === 'boss' && typeof window.rogueBossEffect === 'function' && typeof window.rogueBossFor === 'function') {
       const boss = window.rogueBossFor(r.pendingNode, r.act);
@@ -94,12 +93,10 @@
     return true;
   }
   function tickCooldown(side) {
-    const s = state(), prefix = `${side}:`, fresh = new Set(s.freshCooldowns || []);
+    const s = state(), prefix = `${side}:`;
     for (const id of Object.keys(s.abilityCooldown)) {
-      if (id.startsWith(prefix) && !fresh.has(id) && s.abilityCooldown[id] > 0) s.abilityCooldown[id]--;
+      if (id.startsWith(prefix) && s.abilityCooldown[id] > 0) s.abilityCooldown[id]--;
     }
-    s.freshCooldowns = [];
-    s.activeMover = null;
   }
   function specialAtBoard(board, i) {
     const side = sideAt(board, i), human = window.__manobraApp ? window.__manobraApp.humanSide : E().WHITE;
@@ -149,12 +146,11 @@
   }
 
   function beforeMove(game, mv) {
-    if (run() && run().active) { const s = state(); s.blockedTurn = false; s.freshCooldowns = []; s.activeMover = null; }
     if (!run() || !run().active || !mv) return true;
     // Não aplicar poderes a uma jogada inexistente no motor original.
+    state().blockedMove = false;
     const legal = game.legal();
     if (game.over || !legal || !Array.isArray(legal.moves) || !legal.moves.some(x => x.t === mv.t && x.from === mv.from && x.to === mv.to && (x.beyond ?? -1) === (mv.beyond ?? -1))) return false;
-    state().activeMover = game.st.turn;
     const board = game.st.b, mover = sideAt(board, mv.from), target = mv.to >= 0 ? specialEntry(board, mv.to) : null;
     if (mv.t !== 'x' && mover !== game.st.turn) return false;
     const moving = specialEntry(board, mv.from);
@@ -182,8 +178,8 @@
       cacador_cabecas: () => !!target
     };
     const protectedTarget = isCapture(mv, board) && target && (
-      (['escudeiro', 'rebatedor', 'muralha'].includes(target.key) && available(target.side, mv.to, target.key)) ||
-      allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) === 1 && available(e.side, e.i, e.key) &&
+      ['escudeiro', 'rebatedor', 'muralha'].includes(target.key) ||
+      allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) === 1 &&
         ['bastiao','tita_de_aco','baluarte','sentinela','ima_tatico','xama_dos_ventos','manipulador','oraculo','sacerdote_da_luz'].includes(e.key))
     );
     // Combinação ofensiva: a dupla pode romper uma proteção reativa
@@ -201,16 +197,16 @@
     if (piercing) { announce(`⚔️ ${moving.piece.name}: rompeu a proteção inimiga!`); return true; }
     // Escudeiro: o primeiro ataque é absorvido; não perde a peça nem permite combo.
     if (target && target.key === 'escudeiro' && isCapture(mv, board)) {
-      if (consume(target.side, mv.to, 'escudeiro')) { announce('🛡️ Escudeiro absorveu o primeiro impacto.'); return blockedByProtection(); }
+      if (consume(target.side, mv.to, 'escudeiro')) { announce('🛡️ Escudeiro absorveu o primeiro impacto.'); state().blockedMove = true; state().pending = null; return false; }
     }
     // Sentinela: bloqueia a entrada do adversário nas casas adjacentes.
     for (const e of allEntries(board)) if (e.key === 'sentinela' && e.side !== mover && mv.to >= 0 && distance(e.i, mv.to) === 1 && available(e.side, e.i, e.key)) {
-      consume(e.side, e.i, e.key); announce('🏰 Sentinela: zona adjacente bloqueada.'); return blockedByProtection();
+      consume(e.side, e.i, e.key); announce('🏰 Sentinela: zona adjacente bloqueada.'); state().blockedMove = true; state().pending = null; return false;
     }
     // Bastião/Titã/Baluarte: uma proteção por combate para um aliado adjacente.
-    if (isCapture(mv, board) && target && target.side !== mover) {
-      for (const e of allEntries(board)) if (['bastiao', 'tita_de_aco', 'baluarte'].includes(e.key) && e.side === target.side && distance(e.i, mv.to) === 1) {
-        if (consume(e.side, e.i, e.key)) { announce(`🧱 ${e.piece.name}: captura aliada bloqueada.`); return blockedByProtection(); }
+    if (isCapture(mv, board) && sideAt(board, mv.to) >= 0 && sideAt(board, mv.to) !== mover) {
+      for (const e of allEntries(board)) if (['bastiao', 'tita_de_aco', 'baluarte'].includes(e.key) && e.side === sideAt(board, mv.to) && distance(e.i, mv.to) === 1) {
+        if (consume(e.side, e.i, e.key)) { announce(`🧱 ${e.piece.name}: captura aliada bloqueada.`); state().blockedMove = true; state().pending = null; return false; }
       }
     }
     // Suportes oferecem proteção situacional. Só reagem a capturas legais.
@@ -221,12 +217,12 @@
       oraculo: (e) => rc(e.i).c === rc(mv.to).c,
       sacerdote_da_luz: () => true
     };
-    if (isCapture(mv, board) && target && target.side !== mover) {
+    if (isCapture(mv, board) && sideAt(board, mv.to) >= 0 && sideAt(board, mv.to) !== mover) {
       for (const e of allEntries(board)) {
-        if (e.side === target.side && e.i !== mv.to && distance(e.i, mv.to) === 1 &&
+        if (e.side === sideAt(board, mv.to) && e.i !== mv.to && distance(e.i, mv.to) === 1 &&
             supportGuard[e.key] && supportGuard[e.key](e) && consume(e.side, e.i, e.key)) {
           announce(`✨ ${e.piece.name}: protegeu um aliado da captura.`);
-          return blockedByProtection();
+          state().blockedMove = true; state().pending = null; return false;
         }
       }
     }
@@ -243,38 +239,32 @@
         if (distance(e.i, mv.to) > (synergy.tier === 3 ? 2 : 1)) continue;
         if (consume(e.side, e.i, e.key)) {
           announce(`🛡️ ${synergy.group.name}: ${synergy.tier} peças protegeram a aliada!`);
-          return blockedByProtection();
+          state().blockedMove = true; state().pending = null; return false;
         }
       }
     }
     // Muralha: não pode ser capturada lateralmente na fileira de defesa.
     if (target && target.key === 'muralha' && isCapture(mv, board) && isBackRow(mv.to) && rc(mv.from).r === rc(mv.to).r && consume(target.side, mv.to, 'muralha')) {
-      announce('🏯 Muralha: ataque lateral bloqueado.'); return blockedByProtection();
+      announce('🏯 Muralha: ataque lateral bloqueado.'); state().blockedMove = true; state().pending = null; return false;
     }
     // Rebatedor: primeiro ataque diagonal é repelido.
     if (target && target.key === 'rebatedor' && isCapture(mv, board) && isDiagonal(mv.from, mv.to)) {
-      if (consume(target.side, mv.to, 'rebatedor')) { announce('🪞 Rebatedor desviou o ataque diagonal.'); return blockedByProtection(); }
+      if (consume(target.side, mv.to, 'rebatedor')) { announce('🪞 Rebatedor desviou o ataque diagonal.'); state().blockedMove = true; state().pending = null; return false; }
     }
     // Guardião Rúnico: uma vez por combate, paralisa o próximo turno inimigo.
     // Nunca alterar o turno durante a validação: isso dessincronizava a interface e o motor.
     return true;
   }
 
-  // Proteções reativas consomem a tentativa de ataque: a peça permanece no lugar,
-  // mas o atacante perde a vez. Um lance ilegal não consome turno.
-  function blockedByProtection() {
+  // Proteções reativas anulam a captura, mas o ataque consome a vez.
+  // Jogadas ilegais não podem consumir o turno.
+  function resolveBlockedMove(game) {
     const s = state();
-    s.pending = null;
-    s.blockedTurn = true;
-    return false;
-  }
-  function onBlockedTurn(side) {
-    if (run() && run().active && side >= 0) tickCooldown(side);
-  }
-  function takeBlockedTurn() {
-    const s = state();
-    if (!s || !s.blockedTurn) return false;
-    s.blockedTurn = false;
+    if (!s || !s.blockedMove || !game || game.over || typeof game.pass !== 'function') return false;
+    s.blockedMove = false;
+    const attackerSide = game.st.turn;
+    game.pass();
+    tickCooldown(attackerSide);
     return true;
   }
 
@@ -425,6 +415,6 @@
   }
 
   patchLegal();
-  window.RoguelikeRuntime = { cellMarkup, beforeMove, takeBlockedTurn, onBlockedTurn, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
+  window.RoguelikeRuntime = { cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
   window.addEventListener('DOMContentLoaded', () => { patchLegal(); setInterval(renderBoardState, 700); });
 }());

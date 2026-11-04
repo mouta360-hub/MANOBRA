@@ -411,6 +411,11 @@
           }
         });
       }
+      // No saguão, o organizador desconectado deixa de ocupar uma vaga.
+      // Durante partidas, conservamos seu histórico para resultados e W.O.
+      if (previous && previous.id !== id && this.status === 'lobby') {
+        this.players = this.players.filter(player => player.id !== previous.id);
+      }
       this.judgeId = id;
       this.judgePeer = String(peer || p.peer || '');
       this.epoch = Math.max(1, (this.epoch | 0) + 1);
@@ -449,7 +454,7 @@
 
     handle(id, msg) {
       if (!msg || typeof msg !== 'object' || !this._p(id)) return;
-      const org = id === 0;
+      const org = id === this.judgeId;
       switch (msg.k) {
         case 'ready': this.ready(id, msg.m); break;
         case 'unready': this.unready(id); break;
@@ -597,7 +602,12 @@
         for (let i = 0; i < E.N; i++) { const p = g.st.b[i]; if (p) c[E.sideOf(p)]++; }
         const dA = c[0] - c[1];
         this._finish(m, g.over.winner === 0 ? m.a : m.b, g.over.reason, [dA, -dA], false, c, true);
-      } else this._turnStarted(m);
+      } else {
+        this._turnStarted(m);
+        // Atualiza o estado de recuperação a cada jogada validada. Sem isso,
+        // o juiz reserva restaura um tabuleiro antigo e aplica W.O. indevido.
+        this.broadcast();
+      }
     }
     // Partidas entre dois robôs: jogadas pelo motor, uma por vez, para que o
     // organizador consiga acompanhar e pular apenas a simulação atual.

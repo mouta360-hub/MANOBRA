@@ -103,10 +103,36 @@
       c.on('data', function (raw) {
         let o; try { o = JSON.parse(raw); } catch (e) { return; }
         if (!o || typeof o !== 'object') return;
-        if (o.k === 'state') { lastState = o; client = { peer: p, conn: c, pid: client && client.pid }; emit('msg', o); }
-        else if (o.k === 'joined') { client = { peer: p, conn: c, pid: client && client.pid }; }
+        // Depois da promoção, o novo juiz abre uma conexão de retorno.
+        // Ela precisa transportar TODAS as mensagens (inclusive start/relay),
+        // e não apenas os snapshots de estado.
+        if (o.k === 'joined') {
+          client = { peer: p, conn: c, pid: client && client.pid };
+          return;
+        }
+        if (o.k === 'state') {
+          const oldEpoch = lastState && lastState.epoch || 0;
+          if ((o.epoch || 0) < oldEpoch) return;
+          lastState = o;
+          client = { peer: p, conn: c, pid: client && client.pid };
+        }
+        if (o.k === 'judgeBeat') { lastJudgeBeat = Date.now(); return; }
+        if (o.k === 'tournamentClosed') { closing = true; emit('closed', { authority: true, intentional: true }); reset(); return; }
+        if (role === 'guest' && client && client.conn === c) emit('msg', o);
       });
-      c.on('close', function () { if (!closing && role === 'guest') emit('closed', { authority: true }); });
+      c.on('close', function () {
+        if (!closing && role === 'guest' && client && client.conn === c) {
+          emit('handoff', {});
+          if (!tryPromote()) {
+            const epoch = lastState && lastState.epoch;
+            const order = lastState && lastState.s && lastState.s.reserveOrder || [];
+            const rank = order.indexOf(localId);
+            setTimeout(function () {
+              if (role === 'guest' && !closing && lastState && lastState.epoch === epoch && !tryPromote(true)) emit('closed', { authority: true });
+            }, rank < 0 ? 8000 : 2000 + rank * 2500);
+          }
+        }
+      });
     });
   }
 
@@ -138,12 +164,13 @@
     if (judgeWatchTimer.unref) judgeWatchTimer.unref();
   }
 
-  function tryPromote() {
+  function tryPromote(allowFallback) {
     if (promoting || role !== 'guest' || !lastState || !lastState.x || !client || !client.peer) return false;
     const snap = lastState.s || {}, mine = (snap.players || []).find(p => p.id === localId);
     if (!mine || mine.bot || mine.eliminated) return false;
     const order = snap.reserveOrder || (snap.players || []).filter(p => !p.bot && !p.eliminated && p.connected).map(p => p.id);
-    if (order[0] !== mine.id) return false;
+    const rank = order.indexOf(mine.id);
+    if (rank < 0 || (rank !== 0 && !allowFallback)) return false;
     promoting = true;
     const E = root.ManobraEngine, T = root.ManobraTournament, peer = client.peer, myId = mine.id;
     const h = new T.Hub({ engine: E, simWorker: simWorker, send: function (id, obj) {
@@ -178,7 +205,15 @@
       try {
         const c = peer.connect(p.peer, { reliable: true });
         c.on('open', function () { conns[p.id] = c; try { c.send(JSON.stringify({ k: 'joined', you: p.id })); c.send(JSON.stringify({ k: 'state', s: h.snapshot(), x: h.exportState(), epoch: h.epoch })); } catch (e) {} });
-        c.on('close', function () { if (hub === h) h.leave(p.id, 'queda de internet'); });
+        // Conexão iniciada pelo juiz reserva: receber comandos dos jogadores
+        // como ready, setup e jogadas, além de enviar os eventos do campeonato.
+        c.on('data', function (raw) {
+          if (hub !== h || conns[p.id] !== c) return;
+          let msg;
+          try { msg = JSON.parse(raw); } catch (e) { return; }
+          if (msg && typeof msg === 'object') h.handle(p.id, msg);
+        });
+        c.on('close', function () { if (hub === h && conns[p.id] === c) { delete conns[p.id]; h.leave(p.id, 'queda de internet'); } });
       } catch (e) {}
     });
     h.broadcast();
@@ -315,7 +350,17 @@
               emit('handoff', {});
               const lostEpoch = lastState && lastState.epoch;
               if (!tryPromote()) {
-                lossTimer = setTimeout(function () { lossTimer = null; if (!closing && role === 'guest' && (!lastState || lastState.epoch === lostEpoch) && !tryPromote()) emit('closed', {}); }, 5000);
+                const snap = lastState && lastState.s || {};
+                const order = snap.reserveOrder || [];
+                const rank = order.indexOf(localId);
+                // Se o primeiro reserva também caiu, o seguinte assume em
+                // intervalos escalonados, desde que não tenha surgido novo juiz.
+                const delay = rank < 0 ? 8000 : 2000 + rank * 2500;
+                lossTimer = setTimeout(function () {
+                  lossTimer = null;
+                  if (closing || role !== 'guest' || (lastState && lastState.epoch !== lostEpoch)) return;
+                  if (!tryPromote(true)) emit('closed', {});
+                }, delay);
               }
             }
           };
@@ -378,10 +423,10 @@
     role: function () { return role; },
     isLocal: function () { return localOnly; },
     leave: function () {
-      if (role === 'host') Object.keys(conns).forEach(function (id) {
-        const c = conns[id];
-        if (c && c.open !== false) try { c.send(JSON.stringify({ k: 'tournamentClosed' })); } catch (e) {}
-      });
+      // A saída do juiz deve acionar o mecanismo de sucessão. Avisar
+      // 'tournamentClosed' antes de fechar a conexão impedia a eleição.
+      // Os convidados recebem o fechamento da conexão e usam o último
+      // snapshot para promover o próximo juiz da fila.
       reset();
     },
     addListener: function (ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return Promise.resolve({ remove: function () {} }); }
