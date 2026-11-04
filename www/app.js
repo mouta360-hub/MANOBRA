@@ -22,7 +22,7 @@
     // Bluetooth
     bt: { stage: 'idle', devices: [], msg: '', code: '' }, btLinked: false, btReady: false,
     peerSetup: null, btQueue: [],
-    net: 'bt',       // por onde o jogo remoto passa: 'bt' (Bluetooth) ou 'online' (internet)
+    net: 'online',   // partidas entre celulares somente pela internet
     onlineCode: '',  // código digitado para entrar numa partida online
     tour: { role: null, code: '', myId: null, snap: null, msg: '', matchId: null, connecting: false },
     avatarOpen: false,
@@ -346,7 +346,7 @@
       '<button class="primary" data-act="startAI">Jogar contra a IA</button></div>' +
       '<div class="card menu-option"><div class="menu-option-banner banner-local"><img src="assets/commanders/guardiao.webp" alt="Comandante guardião" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">⚔</span><span class="menu-banner-label">DUELO LOCAL</span></div><div class="menu-option-title"><span class="menu-option-icon">👥</span><div><h3>Dois jogadores</h3><small>Partida local no mesmo dispositivo</small></div></div><button class="primary" data-act="startPVP">Jogar localmente</button>' +
       '<label class="chk"><input type="checkbox" id="rot" ' + (app.rotate ? 'checked' : '') + '> Girar o tabuleiro a cada vez</label></div>' +
-      '<div class="card menu-option"><div class="menu-option-banner banner-friends"><img src="assets/commanders/explorador.webp" alt="Comandante explorador" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">✉</span><span class="menu-banner-label">CONEXÃO ENTRE AMIGOS</span></div><div class="menu-option-title"><span class="menu-option-icon">🌐</span><div><h3>Jogar com amigos</h3><small>Conecte-se e organize partidas</small></div></div><button class="primary" data-act="btOpen">Bluetooth</button><button class="primary menu-secondary-button" data-act="onOpen">Jogar online</button><button class="primary menu-secondary-button" data-act="frOpen">Amigos e convites</button><p class="muted" data-presline>' + presenceLine() + '</p></div>' +
+      '<div class="card menu-option"><div class="menu-option-banner banner-friends"><img src="assets/commanders/explorador.webp" alt="Comandante explorador" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">✉</span><span class="menu-banner-label">CONEXÃO ENTRE AMIGOS</span></div><div class="menu-option-title"><span class="menu-option-icon">🌐</span><div><h3>Jogar com amigos</h3><small>Conecte-se e organize partidas</small></div></div><button class="primary" data-act="onOpen">Jogar online (2 celulares)</button><button class="primary menu-secondary-button" data-act="frOpen">Amigos e convites</button><p class="muted" data-presline>' + presenceLine() + '</p></div>' +
       '<div class="card menu-option"><div class="menu-option-banner banner-tournament"><img src="assets/commanders/artifice.webp" alt="Comandante artífice" loading="lazy"><span class="menu-banner-symbol" aria-hidden="true">♛</span><span class="menu-banner-label">COMPETIÇÃO</span></div><div class="menu-option-title"><span class="menu-option-icon">🏆</span><div><h3>Campeonato</h3><small>Organize ou participe de torneios</small></div></div><button class="primary" data-act="tourOpen">Abrir campeonatos</button><button class="primary menu-secondary-button" data-act="publicOpen">Chat público</button></div></div><div class="menu-options-entry"><button class="menu-settings-button" data-act="options">⚙️ <span><strong>Opções</strong><small>Perfil, velocidade, áudio e como jogar</small></span><span aria-hidden="true">›</span></button></div><nav class="android-menu-nav" aria-label="Navegação do menu"><button class="active" data-act="menu">⌂ <span>Início</span></button><button data-act="options">⚙ <span>Opções</span></button><button data-act="rules">▣ <span>Como Jogar</span></button></nav></div>';
   }
 
@@ -2101,7 +2101,8 @@
         if (m) doMove(m);
         break;
       }
-      case 'btOpen': app.net = 'bt'; app.bt = { stage: 'idle', devices: [], msg: '', code: '' }; app.screen = 'bt'; render(); break;
+      case 'btOpen': // compatibilidade com botões antigos em cache
+        app.net = 'online'; app.bt = { stage: 'idle', devices: [], msg: '', code: '' }; app.screen = 'online'; render(); break;
       case 'onOpen': app.net = 'online'; app.bt = { stage: 'idle', devices: [], msg: '', code: '' }; app.screen = 'online'; render(); break;
       case 'tourOpen': tourOpen(); break;
       case 'tourReconnect': tourReconnect(); break;
