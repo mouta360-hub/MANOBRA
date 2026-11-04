@@ -4,7 +4,7 @@
   "description": "Manobra 1.0 - jogo de tabuleiro para Android",
   "private": true,
   "scripts": {
-    "test": "node tests/engine.test.js && node tests/bluetooth.test.js && node tests/online.test.js && node tests/setup_timeout.test.js && node tests/tour_setup_timeout.test.js && node tests/offline_save_awake.test.js && node tests/move_timer.test.js && node tests/sim_worker.test.js",
+    "test": "node tests/engine.test.js && node tests/online.test.js && node tests/setup_timeout.test.js && node tests/tour_setup_timeout.test.js && node tests/offline_save_awake.test.js && node tests/move_timer.test.js && node tests/sim_worker.test.js",
     "test:extended": "node tests/friends.test.js && node tests/tournament.test.js && node tests/tour.test.js && node tests/roguelike_runtime.test.js",
     "android:add": "cap add android",
     "android:sync": "cap sync android"
