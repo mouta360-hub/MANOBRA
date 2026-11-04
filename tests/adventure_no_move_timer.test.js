@@ -1,0 +1,14 @@
+'use strict';
+const assert = require('assert');
+const { makeBroker, makePhone } = require('./fakepeer.js');
+const P = makePhone('Aventura', makeBroker());
+P.sandbox.__manobraMoveMs = 200;
+P.sandbox._inRoguelikeBattle = true;
+P.click({ act: 'startAI' });
+P.click({ act: 'setupDefault' });
+P.click({ act: 'setupDone' });
+assert.strictEqual(P.app.screen, 'game', 'partida iniciada');
+assert.strictEqual(P.app.moveDeadline, 0, 'aventura sem prazo de jogada');
+assert(!P.html().includes('data-mclock'), 'aventura sem contador na tela');
+console.log('ok - aventura sem relógio por jogada');
+process.exit(0);
