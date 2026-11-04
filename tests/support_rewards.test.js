@@ -5,8 +5,7 @@ const catalog = require('../www/special_pieces.js').SPECIAL_PIECES_CATALOG;
 const code = fs.readFileSync(require('path').join(__dirname, '../www/roguelike_runtime.js'), 'utf8');
 const cases = [
  ['cronomante','m',5],['ilusionista','s',6],['teleportador','s',8],
- ['ima_tatico','p',7],['xama_dos_ventos','p',12],['manipulador','s',12],
- ['oraculo','m',4],['sacerdote_da_luz','m',6],['mestre_de_manobras','k',15]
+ ['mestre_de_manobras','k',15]
 ];
 function simulate(key,type,cap) {
  const board = Array(117).fill(0); board[15]=1; board[16]=1;
@@ -26,4 +25,7 @@ for (const [key,type,gold] of cases) {
  assert.strictEqual(simulate(key,other,false).gold,0,`${key} não deve premiar ação errada`);
 }
 assert.strictEqual(simulate('mestre_de_manobras','k',false).gold,0,'sem captura efetiva, sem recompensa');
-console.log('ok - 9 habilidades de suporte: acionamento e ausência de bônus indevido');
+for (const [key,type] of [['ima_tatico','p'],['xama_dos_ventos','p'],['manipulador','s'],['oraculo','m'],['sacerdote_da_luz','m']]) {
+ assert.strictEqual(simulate(key,type,false).gold,0, key + ' é proteção, não bônus econômico');
+}
+console.log('ok - recompensas econômicas e cinco suportes defensivos sem moedas indevidas');

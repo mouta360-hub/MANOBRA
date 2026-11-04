@@ -85,6 +85,7 @@
     const id = abilityId(side,index,key), s = state(), rule = effectiveAbilityLimit(side, key);
     s.charges[id] = (s.charges[id] || 0) + 1;
     s.abilityCooldown[id] = rule.cooldown;
+    if (s.activeMover === side) (s.freshCooldowns ||= []).push(id);
     const r = run(), human = window.__manobraApp && window.__manobraApp.humanSide;
     if (r && r.active && side !== human && r.pendingNode && r.pendingNode.type === 'boss' && typeof window.rogueBossEffect === 'function' && typeof window.rogueBossFor === 'function') {
       const boss = window.rogueBossFor(r.pendingNode, r.act);
@@ -93,10 +94,12 @@
     return true;
   }
   function tickCooldown(side) {
-    const s = state(), prefix = `${side}:`;
+    const s = state(), prefix = `${side}:`, fresh = new Set(s.freshCooldowns || []);
     for (const id of Object.keys(s.abilityCooldown)) {
-      if (id.startsWith(prefix) && s.abilityCooldown[id] > 0) s.abilityCooldown[id]--;
+      if (id.startsWith(prefix) && !fresh.has(id) && s.abilityCooldown[id] > 0) s.abilityCooldown[id]--;
     }
+    s.freshCooldowns = [];
+    s.activeMover = null;
   }
   function specialAtBoard(board, i) {
     const side = sideAt(board, i), human = window.__manobraApp ? window.__manobraApp.humanSide : E().WHITE;
@@ -146,11 +149,12 @@
   }
 
   function beforeMove(game, mv) {
-    if (run() && run().active) state().blockedTurn = false;
+    if (run() && run().active) { const s = state(); s.blockedTurn = false; s.freshCooldowns = []; s.activeMover = null; }
     if (!run() || !run().active || !mv) return true;
     // Não aplicar poderes a uma jogada inexistente no motor original.
     const legal = game.legal();
     if (game.over || !legal || !Array.isArray(legal.moves) || !legal.moves.some(x => x.t === mv.t && x.from === mv.from && x.to === mv.to && (x.beyond ?? -1) === (mv.beyond ?? -1))) return false;
+    state().activeMover = game.st.turn;
     const board = game.st.b, mover = sideAt(board, mv.from), target = mv.to >= 0 ? specialEntry(board, mv.to) : null;
     if (mv.t !== 'x' && mover !== game.st.turn) return false;
     const moving = specialEntry(board, mv.from);
@@ -178,8 +182,8 @@
       cacador_cabecas: () => !!target
     };
     const protectedTarget = isCapture(mv, board) && target && (
-      ['escudeiro', 'rebatedor', 'muralha'].includes(target.key) ||
-      allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) === 1 &&
+      (['escudeiro', 'rebatedor', 'muralha'].includes(target.key) && available(target.side, mv.to, target.key)) ||
+      allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) === 1 && available(e.side, e.i, e.key) &&
         ['bastiao','tita_de_aco','baluarte','sentinela','ima_tatico','xama_dos_ventos','manipulador','oraculo','sacerdote_da_luz'].includes(e.key))
     );
     // Combinação ofensiva: a dupla pode romper uma proteção reativa
