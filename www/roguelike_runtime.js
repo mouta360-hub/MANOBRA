@@ -73,6 +73,49 @@
     if (mastery >= 3) reduction += 1;
     return { uses: base.uses + extra, cooldown: Math.max(0, base.cooldown - reduction) };
   }
+  // Efeitos visuais leves, sem alterar regras, turnos ou consumo de cargas.
+  function pieceNotice(side, index, key, message) {
+    if (typeof document === 'undefined' || !document.querySelector || !document.createElement || !document.body) return;
+    const cell = document.querySelector(`[data-i="${index}"][data-special-piece="${key}"]`);
+    if (!cell || typeof cell.getBoundingClientRect !== 'function') return;
+    if (!document.getElementById('manobra-ability-fx-style')) {
+      const style = document.createElement('style');
+      style.id = 'manobra-ability-fx-style';
+      style.textContent = `
+        @keyframes manobraAbilityPop { 0% { opacity:0; transform:translate(-50%,-70%) scale(.65); } 18% { opacity:1; transform:translate(-50%,-125%) scale(1.12); } 30% { transform:translate(-50%,-120%) scale(1); } 78% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-175%) scale(.95); } }
+        @keyframes manobraAbilityPulse { 0%,100% { opacity:0; transform:scale(.85); } 20% { opacity:.9; transform:scale(1.1); } 65% { opacity:.5; transform:scale(1.35); } }
+        .manobra-ability-float { position:fixed; z-index:9999; pointer-events:none; padding:6px 10px; border-radius:9px; background:rgba(18,27,44,.96); color:#fff; font:bold 12px system-ui,sans-serif; text-align:center; white-space:nowrap; max-width:220px; box-shadow:0 4px 14px #0008; border:1px solid var(--ability-color,#9fb4d1); animation:manobraAbilityPop 2.2s ease-out both; }
+        .manobra-ability-ring { position:fixed; z-index:9998; pointer-events:none; border:3px solid var(--ability-color,#9fb4d1); border-radius:50%; box-shadow:0 0 16px var(--ability-color,#9fb4d1); animation:manobraAbilityPulse 1.1s ease-out both; }
+        @media (prefers-reduced-motion:reduce) { .manobra-ability-float,.manobra-ability-ring { animation:none; } }
+      `;
+      document.body.appendChild(style);
+    }
+    const rect = cell.getBoundingClientRect();
+    const notice = document.createElement('div');
+    const msg = String(message);
+    const color = /bloquead|perdid|esgotad/i.test(msg) ? '#fb7185' : /recarga/i.test(msg) ? '#fbbf24' : /pronta/i.test(msg) ? '#4ade80' : /proteç|defes/i.test(msg) ? '#60a5fa' : '#c084fc';
+    notice.className = 'manobra-ability-float';
+    notice.textContent = msg;
+    notice.style.cssText = `--ability-color:${color};left:${rect.left + rect.width / 2}px;top:${rect.top}px;`;
+    const ring = document.createElement('div');
+    ring.className = 'manobra-ability-ring';
+    ring.style.cssText = `--ability-color:${color};left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;box-sizing:border-box;`;
+    document.body.appendChild(ring);
+    document.body.appendChild(notice);
+    if (typeof setTimeout === 'function') setTimeout(() => {
+      if (notice.parentNode) notice.parentNode.removeChild(notice);
+      if (ring.parentNode) ring.parentNode.removeChild(ring);
+    }, 2200);
+  }
+  function abilityStatus(side, index, key) {
+    const rule = effectiveAbilityLimit(side, key);
+    if (!rule) return 'Sem habilidade';
+    const id = abilityId(side, index, key), s = state();
+    const used = s.charges[id] || 0, cd = s.abilityCooldown[id] || 0;
+    if (used >= rule.uses) return '🚫 Habilidade esgotada';
+    if (cd > 0) return `⏳ Recarga: ${cd} turno${cd === 1 ? '' : 's'}`;
+    return `✨ Pronta (${rule.uses - used} uso${rule.uses - used === 1 ? '' : 's'})`;
+  }
   function abilityId(side, index, key) { return `${side}:${index}:${key}`; }
   function available(side, index, key) {
     const rule = effectiveAbilityLimit(side, key);
@@ -85,6 +128,9 @@
     const id = abilityId(side,index,key), s = state(), rule = effectiveAbilityLimit(side, key);
     s.charges[id] = (s.charges[id] || 0) + 1;
     s.abilityCooldown[id] = rule.cooldown;
+    pieceNotice(side, index, key, `⚡ Habilidade usada · ${rule.uses - s.charges[id]} restante(s)`);
+    if (s.charges[id] >= rule.uses) pieceNotice(side, index, key, '🚫 Habilidade esgotada');
+    else if (rule.cooldown > 0) pieceNotice(side, index, key, `⏳ Recarga: ${rule.cooldown} turnos`);
     const r = run(), human = window.__manobraApp && window.__manobraApp.humanSide;
     if (r && r.active && side !== human && r.pendingNode && r.pendingNode.type === 'boss' && typeof window.rogueBossEffect === 'function' && typeof window.rogueBossFor === 'function') {
       const boss = window.rogueBossFor(r.pendingNode, r.act);
@@ -95,7 +141,12 @@
   function tickCooldown(side) {
     const s = state(), prefix = `${side}:`;
     for (const id of Object.keys(s.abilityCooldown)) {
-      if (id.startsWith(prefix) && s.abilityCooldown[id] > 0) s.abilityCooldown[id]--;
+      if (id.startsWith(prefix) && s.abilityCooldown[id] > 0) {
+        s.abilityCooldown[id]--;
+        const parts = id.split(':');
+        const index = Number(parts[1]), key = parts.slice(2).join(':');
+        if (s.abilityCooldown[id] === 0 && (s.charges[id] || 0) < (effectiveAbilityLimit(side, key)?.uses || 0)) pieceNotice(side, index, key, '✨ Habilidade pronta!');
+      }
     }
   }
   function specialAtBoard(board, i) {
@@ -154,6 +205,7 @@
     const board = game.st.b, mover = sideAt(board, mv.from), target = mv.to >= 0 ? specialEntry(board, mv.to) : null;
     if (mv.t !== 'x' && mover !== game.st.turn) return false;
     const moving = specialEntry(board, mv.from);
+    state().lastBlockedAt = mv.from; state().lastBlockedKey = moving && moving.key;
     state().pending = { victim: target && target.key, victimSide: target && target.side, attacker: moving && moving.key, attackerSide: mv.t === 'x' ? game.st.turn : mover, from: mv.from, to: mv.to };
     // A troca precisa guardar a identidade ANTES de game.play alterar o tabuleiro.
     if (mv.t === 's') {
@@ -177,9 +229,10 @@
       vento_cortante: () => rc(mv.from).r === rc(mv.to).r,
       cacador_cabecas: () => !!target
     };
-    const protectedTarget = isCapture(mv, board) && target && (
-      ['escudeiro', 'rebatedor', 'muralha'].includes(target.key) ||
-      allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) === 1 &&
+    const victimSide = sideAt(board, mv.to);
+    const protectedTarget = isCapture(mv, board) && victimSide >= 0 && victimSide !== mover && (
+      (target && ['escudeiro', 'rebatedor', 'muralha'].includes(target.key)) ||
+      allEntries(board).some(e => e.side === victimSide && distance(e.i, mv.to) === 1 &&
         ['bastiao','tita_de_aco','baluarte','sentinela','ima_tatico','xama_dos_ventos','manipulador','oraculo','sacerdote_da_luz'].includes(e.key))
     );
     // Combinação ofensiva: a dupla pode romper uma proteção reativa
@@ -265,6 +318,8 @@
     const attackerSide = game.st.turn;
     game.pass();
     tickCooldown(attackerSide);
+    if (s.lastBlockedAt != null && s.lastBlockedKey) pieceNotice(attackerSide, s.lastBlockedAt, s.lastBlockedKey, '⛔ Ataque bloqueado · turno perdido');
+    s.lastBlockedAt = null; s.lastBlockedKey = null;
     return true;
   }
 
@@ -404,7 +459,9 @@
       const key = el.dataset.specialPiece, piece = catalog()[key];
       el.classList.add('special-piece', `category-${piece && piece.category || 'support'}`);
       el.dataset.symbol = piece && piece.symbol || '★';
-      el.title = `${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}`;
+      const index = Number(el.dataset.i);
+      const side = Number.isInteger(index) ? sideAt(window.__manobraApp && window.__manobraApp.game && window.__manobraApp.game.st && window.__manobraApp.game.st.b, index) : -1;
+      el.title = `${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}` + (side >= 0 ? ` | ${abilityStatus(side, index, key)}` : '');
       if (!el.querySelector('.rogue-special-badge') && el.querySelector('.pc')) {
         const badge = document.createElement('div'); badge.className = `rogue-special-badge rogue-special-badge-${piece && piece.category || 'support'}`;
         badge.innerHTML = `<span>${piece && piece.symbol || '★'}</span><small>${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}</small>`;
@@ -414,6 +471,15 @@
     });
   }
 
+  if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('click', ev => {
+    const cell = ev.target && ev.target.closest && ev.target.closest('[data-special-piece][data-i]');
+    if (!cell || !run() || !run().active) return;
+    const index = Number(cell.dataset.i), key = cell.dataset.specialPiece;
+    const app = window.__manobraApp;
+    const board = app && app.game && app.game.st && app.game.st.b;
+    const side = sideAt(board, index);
+    if (side >= 0) pieceNotice(side, index, key, abilityStatus(side, index, key));
+  }, true);
   patchLegal();
   window.RoguelikeRuntime = { cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
   window.addEventListener('DOMContentLoaded', () => { patchLegal(); setInterval(renderBoardState, 700); });
