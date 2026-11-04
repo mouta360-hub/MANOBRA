@@ -34,7 +34,7 @@ async function scenario(label, prep) {
   await waitFor(() => A.app.screen === 'game' && B.app.screen === 'game', label + ': jogo começar ao fim do tempo');
   assert.strictEqual(boardOf(A), boardOf(B), label + ': tabuleiros iguais');
   const total = P => Array.prototype.filter.call(P.app.game.st.b, x => x).length;
-  assert.strictEqual(total(A), 40, label + ': 20 peças de cada lado');
+  assert.strictEqual(total(A), 26, label + ': 13 peças de cada lado');
   for (let i = 0; i < 12; i++) { // joga alguns lances: nada de W.O. por tabuleiros diferentes
     const P = A.app.game.st.turn === A.app.humanSide ? A : B;
     randomMove(P);
@@ -59,7 +59,7 @@ async function vsBot() {
   await waitFor(() => S.app.screen === 'setup', 'montagem');
   S.click({ i: String(require('../www/engine.js').territoryCells(S.app.humanSide)[0]) }); // só 1 peça colocada
   await waitFor(() => S.app.screen === 'game', 'jogo contra o robô começar ao fim do tempo');
-  assert.strictEqual(Array.prototype.filter.call(S.app.game.st.b, x => x).length, 40);
+  assert.strictEqual(Array.prototype.filter.call(S.app.game.st.b, x => x).length, 26);
   for (let i = 0; i < 30 && S.app.screen === 'game' && S.app.game && !S.app.game.over; i++) {
     if (S.app.game.st.turn === S.app.humanSide) randomMove(S);
     await sleep(60);

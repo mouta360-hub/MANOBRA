@@ -91,11 +91,11 @@ const boardOf = p => Array.prototype.join.call(p.app.game.st.b, '');
   A.click({ act: 'setupDefault' }); A.click({ act: 'setupDone' }); await sleep(10);
   assert(A.html().includes('Aguardando o adversário'), 'A espera B');
   assert(A.app.screen === 'setup', 'A ainda não começou');
-  assert.strictEqual(Array.prototype.filter.call(A.app.pieces, x => x).length, 20, 'A só vê as próprias peças');
+  assert.strictEqual(Array.prototype.filter.call(A.app.pieces, x => x).length, 13, 'A só vê as próprias peças');
   B.click({ act: 'setupDefault' }); B.click({ act: 'setupDone' }); await sleep(30);
   assert.strictEqual(A.app.screen, 'game'); assert.strictEqual(B.app.screen, 'game');
   assert.strictEqual(boardOf(A), boardOf(B));
-  assert.strictEqual(Array.prototype.filter.call(A.app.game.st.b, x => x).length, 40);
+  assert.strictEqual(Array.prototype.filter.call(A.app.game.st.b, x => x).length, 26);
   console.log('ok - montagem secreta e início da partida com tabuleiros iguais');
 
   // 3) jogadas alternadas, sempre conferindo se os dois tabuleiros ficam iguais

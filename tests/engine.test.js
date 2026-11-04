@@ -13,14 +13,14 @@ function mk(list, turn) {
 }
 const find = (moves, t, from, to) => moves.filter(m => m.t === t && m.from === idx(...from) && m.to === idx(...to));
 
-test('tabuleiro tem 143 casas, 72 escuras, casas principais escuras', () => {
-  assert.strictEqual(E.N, 143);
+test('tabuleiro tem 117 casas, 59 escuras, casas principais escuras', () => {
+  assert.strictEqual(E.N, 117);
   let dark = 0;
   for (let i = 0; i < E.N; i++) if (E.isDarkCell(i)) dark++;
-  assert.strictEqual(dark, 72);
+  assert.strictEqual(dark, 59);
   assert(E.isDarkCell(E.MAIN[0]) && E.isDarkCell(E.MAIN[1]));
-  assert.strictEqual(E.territoryCells(WHITE).length, 32);
-  assert.strictEqual(E.territoryCells(BLACK).length, 32);
+  assert.strictEqual(E.territoryCells(WHITE).length, 25);
+  assert.strictEqual(E.territoryCells(BLACK).length, 25);
 });
 
 test('ataque sozinho não se move; com peça amiga na diagonal volta a se mover', () => {
