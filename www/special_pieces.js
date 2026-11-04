@@ -205,7 +205,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🤺',
-        description: 'Duelo: sem aliado adjacente, sua captura rompe uma proteção inimiga (2 usos, recarga 2).',
+        description: 'Duelo: em ataque move e captura sem apoio; em defesa pode capturar, empurrar ou trocar. Sem especial aliada adjacente, sua captura pode ignorar uma proteção inimiga (2 usos, recarga 2).',
         passive: 'lone_wolf_boost'
     },
     vento_cortante: {

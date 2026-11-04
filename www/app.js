@@ -363,7 +363,7 @@
 
   function rulesScreen() {
     return '<div class="rules"><div class="topbar"><b>Como jogar</b><button data-act="rulesBack">Voltar</button></div>' +
-      '<h2>🎮 Controles da Aventura — leia primeiro</h2><p><b>Um toque ou clique:</b> consulte a habilidade de qualquer peça especial, sua ou inimiga, sem selecioná-la. Veja o estado de cargas e recarga no aviso sobre a peça.</p><p><b>Segure sua peça por 1 segundo:</b> ela fica selecionada para movimentar, atacar, empurrar ou trocar. Um destaque indica a seleção. Depois, <b>toque uma vez no destino</b> para executar a jogada permitida. Toque na peça selecionada para cancelar.</p><p>Uma peça comum sua também é selecionada segurando por 1 segundo. Se uma peça sua já estiver selecionada, o clique em outra casa é uma tentativa de jogada, não uma consulta. Esses controles são exclusivos da Aventura contra a IA; outros modos mantêm o clique normal.</p>' +
+      '<h2>🎮 Controles da Aventura — leia primeiro</h2><p><b>Um clique na sua peça:</b> seleciona a peça para jogar e, se for especial, mostra sua habilidade, cargas e recarga. <b>Um clique na peça inimiga sem seleção:</b> consulta a habilidade dela, sem atacar.</p><p><b>Depois de selecionar sua peça:</b> clique na casa de destino ou na peça inimiga para tentar mover, capturar, empurrar ou trocar, conforme as regras. A consulta não interfere nessa tentativa. <b>Para cancelar:</b> clique novamente na peça selecionada.</p><p>Se o destino não for permitido, sua peça permanece selecionada. Esses controles valem para a Aventura contra a IA; os outros modos mantêm seus controles normais.</p>' +
       '<h2>Tabuleiro</h2><p>13 × 9 = 117 casas. Só as casas escuras (azul-escuro) são usadas, sempre em diagonal. Cada jogador tem 13 peças e uma casa principal (o quadrado).</p>' +
       '<h2>Como vencer (qualquer um)</h2><ul><li>Separar todas as peças de ataque do oponente, sem possibilidade de conectá-las.</li><li>Eliminar todas as peças do oponente.</li><li>Alcançar a casa principal do oponente.</li></ul>' +
       '<h2>Montagem</h2><p>Cada jogador distribui as 13 peças no seu terreno (4 linhas). A linha vermelha na montagem é o terreno neutro: ninguém coloca peças nela no início. No máximo 6 peças em modo defesa; pode ter menos. Se um jogador ficar com a 7ª peça em defesa, o adversário pode eliminar uma defesa dele.</p>' +
@@ -1944,46 +1944,12 @@
       resetChatCollapse();
     }
   });
-  // Na Aventura: pressionar a propria peca por 1 segundo seleciona;
-  // toque curto apenas consulta habilidades (tratado pelo runtime).
-  let holdSelection = null;
-  let suppressHoldClick = false;
-  const isAdventureControl = () => app.screen === 'game' && app.mode === 'ai' && !!window._inRoguelikeBattle && !window._roguelikePlacementPhase;
-  document.addEventListener('pointerdown', e => {
-    if (!isAdventureControl() || app.sel >= 0 || !isHumanTurn() || app.choice || app.purge) return;
-    const cell = e.target && e.target.closest && e.target.closest('[data-i]');
-    if (!cell || e.target.closest('.overlay') || (e.button !== undefined && e.button !== 0)) return;
-    const i = Number(cell.dataset.i), b = app.game && app.game.st && app.game.st.b;
-    if (!b || !b[i] || E.sideOf(b[i]) !== app.game.st.turn) return;
-    const hold = { pointerId: e.pointerId, i, x: e.clientX, y: e.clientY, fired: false, timer: null };
-    holdSelection = hold;
-    hold.timer = setTimeout(() => {
-      if (holdSelection !== hold || !isAdventureControl() || !isHumanTurn() || app.sel >= 0) return;
-      hold.fired = true;
-      suppressHoldClick = true;
-      app.sel = i;
-      sfx('sel', 0);
-      render();
-    }, 1000);
-  }, true);
-  document.addEventListener('pointermove', e => {
-    const h = holdSelection;
-    if (h && e.pointerId === h.pointerId && (Math.abs(e.clientX - h.x) > 12 || Math.abs(e.clientY - h.y) > 12)) {
-      clearTimeout(h.timer); holdSelection = null;
-    }
-  }, true);
-  const endHold = e => {
-    const h = holdSelection;
-    if (h && e.pointerId === h.pointerId) { clearTimeout(h.timer); holdSelection = null; }
-  };
-  document.addEventListener('pointerup', endHold, true);
-  document.addEventListener('pointercancel', endHold, true);
+  // Na Aventura, clique simples seleciona a propria peca.
+  // Sem selecao, clicar em inimigo apenas consulta a habilidade.
   document.addEventListener('click', e => {
     actx(); startBgm(); // o navegador só libera o áudio depois de um toque
     const cell = e.target.closest('[data-i]');
-    if (suppressHoldClick) { suppressHoldClick = false; if (cell) return; }
     if (cell && !e.target.closest('.overlay')) {
-      if (isAdventureControl() && app.sel < 0 && !app.purge) return; // toque curto: somente consulta
       const i = +cell.dataset.i;
       if (app.screen === 'setup') onSetupCell(i);
       else if (app.screen === 'game') onGameCell(i);

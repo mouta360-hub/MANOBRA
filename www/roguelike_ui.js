@@ -40,7 +40,7 @@ const CODEX_COMBAT_EXAMPLES = Object.freeze({
     cavaleiro_errante: 'Ao capturar legalmente mudando de fileira, a Carga pode atravessar a proteção do inimigo.',
     ceifador: 'Se o alvo estiver na última fileira e a captura for legal, a Colheita pode superar a proteção.',
     predador: 'Ao capturar uma peça adjacente por um movimento permitido, a Caçada pode ignorar sua defesa.',
-    duelista: 'Se não houver aliado adjacente ao Duelista, uma captura legal pode romper a proteção do alvo.',
+    duelista: 'Em ataque, move e captura sem apoio. Em defesa, também pode capturar, além de empurrar e trocar. Sem especial aliada adjacente, uma captura pode ignorar uma proteção inimiga.',
     vento_cortante: 'Se a captura legal ocorrer na mesma fileira, o Corte Horizontal pode atravessar a proteção.',
     cacador_cabecas: 'Se o Caçador capturar legalmente uma peça especial protegida, pode ignorar a proteção. Não elimina o protetor automaticamente.',
     cronomante: 'Movimente o Cronomante legalmente sem capturar ninguém para ganhar 5 moedas uma vez. Ele não repete turnos.',

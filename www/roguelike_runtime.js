@@ -330,9 +330,43 @@
     const k = `${mv.t}:${mv.from}:${mv.to}:${mv.beyond == null ? '' : mv.beyond}`;
     if (!seen.has(k)) { seen.add(k); out.push(mv); }
   }
-  // Habilidades nunca criam lances que o motor original considera ilegais.
-  // Efeitos de suporte e proteção são resolvidos em beforeMove/afterMove.
-  function specialMoves(game, base) { return base; }
+  // Exceção exclusiva da Aventura: o Duelista em ataque dispensa apoio;
+  // em defesa pode capturar, além de empurrar e trocar como as demais defesas.
+  // Movimentos extras seguem a geometria diagonal e a regra de repetição do motor.
+  function specialMoves(game, base) {
+    if (!run() || !run().active || !game || game.over || !base || !Array.isArray(base.moves)) return base;
+    const engine = E(), board = game.st.b, side = game.st.turn;
+    const moves = base.moves.slice();
+    const seen = new Set(moves.map(m => `${m.t}:${m.from}:${m.to}`));
+    for (let from = 0; from < engine.N; from++) {
+      const piece = board[from];
+      if (!piece || engine.sideOf(piece) !== side || specialAtBoard(board, from) !== 'duelista') continue;
+      const attacking = engine.isAttack(piece);
+      const supported = engine.NB.slice(from * 4, from * 4 + 4).some(to => to >= 0 && engine.sideOf(board[to]) === side);
+      if (attacking && supported) continue; // motor já fornece estes movimentos
+      for (let d = 0; d < 4; d++) {
+        const to = engine.NB[from * 4 + d];
+        if (to < 0) continue;
+        const target = board[to];
+        if (target && engine.sideOf(target) === side) continue;
+        const t = target ? 'k' : 'm';
+        if (!attacking && !target) continue; // defesa já tem movimento normal
+        const id = `${t}:${from}:${to}`;
+        if (seen.has(id)) continue;
+        const mv = { t, from, to };
+        const log = engine.apply(game.st, mv);
+        const count = game.hist.get(engine.hashOf(game.st)) || 0;
+        engine.undo(game.st, log);
+        if (count >= 2) {
+          let loser = engine.loopLoser(game.st, mv);
+          if (loser < 0) loser = side;
+          if (loser === side && !base.forced) continue;
+        }
+        seen.add(id); moves.push(mv);
+      }
+    }
+    return { ...base, moves };
+  }
 
   function patchLegal() {
     const Game = E() && E().Game;
@@ -465,7 +499,7 @@
       if (!el.querySelector('.rogue-special-badge') && el.querySelector('.pc')) {
         const badge = document.createElement('div'); badge.className = `rogue-special-badge rogue-special-badge-${piece && piece.category || 'support'}`;
         badge.innerHTML = `<span>${piece && piece.symbol || '★'}</span><small>${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}</small>`;
-        // O selo acompanha o clique na casa: consultar nao deve impedir movimentos.
+        badge.onclick = ev => { ev.stopPropagation(); announce(`${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}`); };
         el.appendChild(badge);
       }
     });
@@ -478,11 +512,11 @@
     const app = window.__manobraApp;
     const board = app && app.game && app.game.st && app.game.st.b;
     const side = sideAt(board, index);
-    // Sem peca selecionada: consultar qualquer especial, amiga ou inimiga.
-    // Com peca selecionada: o clique pertence exclusivamente ao movimento.
-    if (!app || app.screen !== 'game' || !app.game || app.game.over || app.sel >= 0 || side < 0) return;
-    const piece = catalog()[key];
-    pieceNotice(side, index, key, `${piece && piece.name || key}: ${abilityStatus(side, index, key)}`);
+    // Consulta de status somente ao selecionar a propria peca; nunca ao clicar
+    // no alvo inimigo durante uma tentativa de captura/empurrao/troca.
+    if (!app || app.screen !== 'game' || !app.game || app.game.over || side !== app.game.st.turn || side !== app.humanSide) return;
+    if (app.sel >= 0) return;
+    if (side >= 0) pieceNotice(side, index, key, abilityStatus(side, index, key));
   }, true);
   patchLegal();
   window.RoguelikeRuntime = { cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
