@@ -465,7 +465,7 @@
       if (!el.querySelector('.rogue-special-badge') && el.querySelector('.pc')) {
         const badge = document.createElement('div'); badge.className = `rogue-special-badge rogue-special-badge-${piece && piece.category || 'support'}`;
         badge.innerHTML = `<span>${piece && piece.symbol || '★'}</span><small>${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}</small>`;
-        badge.onclick = ev => { ev.stopPropagation(); announce(`${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}`); };
+        // O selo acompanha o clique na casa: consultar nao deve impedir movimentos.
         el.appendChild(badge);
       }
     });
@@ -478,7 +478,11 @@
     const app = window.__manobraApp;
     const board = app && app.game && app.game.st && app.game.st.b;
     const side = sideAt(board, index);
-    if (side >= 0) pieceNotice(side, index, key, abilityStatus(side, index, key));
+    // Sem peca selecionada: consultar qualquer especial, amiga ou inimiga.
+    // Com peca selecionada: o clique pertence exclusivamente ao movimento.
+    if (!app || app.screen !== 'game' || !app.game || app.game.over || app.sel >= 0 || side < 0) return;
+    const piece = catalog()[key];
+    pieceNotice(side, index, key, `${piece && piece.name || key}: ${abilityStatus(side, index, key)}`);
   }, true);
   patchLegal();
   window.RoguelikeRuntime = { cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
