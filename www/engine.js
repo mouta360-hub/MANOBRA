@@ -108,22 +108,6 @@
   function apply(st, mv) {
     const b = st.b, log = [];
     const save = i => { log.push(i, b[i]); };
-    // Teletransporte Sombrio: ação legal de captura/troca com resultado alternativo.
-    // Aplicado aqui (antes de record/refresh) para preservar histórico e vitória.
-    if (mv.rogueTeleport && (mv.t === 'k' || mv.t === 's')) {
-      const landing = mv.rogueTeleport.landing;
-      if (Number.isInteger(landing) && landing >= 0 && landing < N &&
-          isDarkCell(landing) && !isMain(landing) && !b[landing] &&
-          b[mv.from] && b[mv.to] && sideOf(b[mv.from]) !== sideOf(b[mv.to])) {
-        save(mv.to); save(landing);
-        if (mv.t === 's') save(mv.from);
-        b[landing] = b[mv.to];
-        if (mv.t === 's') { b[mv.to] = b[mv.from]; b[mv.from] = 0; }
-        else b[mv.to] = 0; // ataque: o Assassino permanece na origem
-        st.turn ^= 1;
-        return log;
-      }
-    }
     switch (mv.t) {
       case 'm': case 'k':
         save(mv.from); save(mv.to);
@@ -250,7 +234,59 @@
     }
     play(mv) {
       const mover = this.st.turn;
-      apply(this.st, mv);
+      if (mv.rogueExecution && mv.t === 'k') {
+        const back = mv.rogueExecution.back, b = this.st.b;
+        const dr = rowOf(mv.to) - rowOf(mv.from), dc = colOf(mv.to) - colOf(mv.from);
+        const valid = Math.abs(dr) === 1 && Math.abs(dc) === 1 &&
+          back === idx(rowOf(mv.to) + dr, colOf(mv.to) + dc) &&
+          back >= 0 && back < N && isDarkCell(back) &&
+          sideOf(b[mv.from]) === mover && isAttack(b[mv.from]) &&
+          sideOf(b[mv.to]) === (mover ^ 1) && sideOf(b[back]) === (mover ^ 1) &&
+          this.legal().moves.some(x => x.t === 'k' && x.from === mv.from && x.to === mv.to);
+        if (!valid) return;
+        // Executa a peça de trás e empurra a da frente, sem avançar.
+        b[back] = b[mv.to];
+        b[mv.to] = 0;
+        this.st.turn ^= 1;
+        this.record();
+        this.last = mv;
+        this.plies++;
+        const w = winner(this.st, mover);
+        if (w) { this.over = { winner: mover, reason: w }; this.cur = null; return; }
+        this.refresh();
+        return;
+      }
+      if (mv.rogueWind && mv.t === 'k') {
+        const w = mv.rogueWind, b = this.st.b;
+        const valid = this.legal().moves.some(x => x.t === 'k' && x.from === mv.from && x.to === mv.to) &&
+          sideOf(b[mv.from]) === mover && sideOf(b[mv.to]) === (mover ^ 1) &&
+          w.target >= 0 && w.target < N && w.landing >= 0 && w.landing < N &&
+          Math.max(Math.abs(rowOf(w.target)-rowOf(mv.to)),Math.abs(colOf(w.target)-colOf(mv.to))) === 1 &&
+          w.landing === idx(rowOf(w.target)+Math.sign(rowOf(w.target)-rowOf(mv.to)),
+                            colOf(w.target)+Math.sign(colOf(w.target)-colOf(mv.to))) &&
+          isDarkCell(w.landing) && !isMain(w.landing) && !b[w.landing] && sideOf(b[w.target]) === (mover ^ 1);
+        if (!valid) return;
+        apply(this.st,mv);
+        if (!w.blocked) { b[w.landing] = b[w.target]; b[w.target] = 0; }
+        this.record(); this.last=mv; this.plies++;
+        const result=winner(this.st,mover);
+        if (result) { this.over={winner:mover,reason:result};this.cur=null;return; }
+        this.refresh();return;
+      }
+      if (mv.rogueCavalry && mv.t === 'k') {
+        const landing = mv.rogueCavalry.landing, b = this.st.b;
+        const dr = rowOf(mv.to) - rowOf(mv.from), dc = colOf(mv.to) - colOf(mv.from);
+        const valid = Math.abs(dr) === 1 && Math.abs(dc) === 1 &&
+          landing === idx(rowOf(mv.to) + dr, colOf(mv.to) + dc) &&
+          landing >= 0 && landing < N && isDarkCell(landing) && !isMain(landing) && !b[landing] &&
+          sideOf(b[mv.from]) === mover && isAttack(b[mv.from]) && sideOf(b[mv.to]) === (mover ^ 1) &&
+          this.legal().moves.some(x => x.t === 'k' && x.from === mv.from && x.to === mv.to);
+        if (!valid) return;
+        apply(this.st, mv);
+        b[landing] = b[mv.to]; b[mv.to] = 0;
+      } else {
+        apply(this.st, mv);
+      }
       this.record();
       this.last = mv;
       this.plies++;

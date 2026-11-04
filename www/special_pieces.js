@@ -63,7 +63,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🏯',
-        description: 'Bloqueia um ataque lateral na última fileira por combate.',
+        description: 'Mantém sua proteção original contra captura. Âncora de Ferro: protege a si ou um aliado nas 8 casas próximas contra empurrão da Rajada Cortante; escolha secreta, gasta carga mesmo se errar. 1/2/3 usos por Maestria, recarga obrigatória de 1 turno.',
         passive: 'backrow_fortress'
     },
     javali_de_ferro: {
@@ -157,10 +157,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '⚔️',
-        description: 'Execução: uma captura pode romper uma proteção inimiga (1 uso).',
-        onCaptureSuccess: (player) => {
-            return { extraTurn: true };
-        }
+        description: 'Execução em Cadeia: no ataque, com apoio aliado e duas peças inimigas consecutivas na mesma diagonal, elimina a de trás, empurra a da frente para a casa liberada e permanece parado. 1 uso por combate; Maestria amplia cargas.'
     },
     cavaleiro_errante: {
         id: 'cavaleiro_errante',
@@ -168,7 +165,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '♞',
-        description: 'Carga: ao capturar mudando de fileira, rompe uma proteção (2 usos, recarga 2).',
+        description: 'Carga de Cavalaria: após uma captura diagonal legal, pode avançar mais uma casa livre na mesma diagonal, sem turno adicional. Avanço opcional; 2 usos, recarga 2. Maestria amplia cargas e reduz recarga.',
         getSpecialMoves: (r, c, player, board) => {
             const offsets = [
                 {dr: -2, dc: -1}, {dr: -2, dc: 1}, {dr: -1, dc: -2}, {dr: -1, dc: 2},
@@ -184,7 +181,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '💀',
-        description: 'Colheita: captura na última fileira rompe uma proteção inimiga (2 usos, recarga 3).',
+        description: 'Pacto da Morte: quando um inimigo entra nas 8 casas próximas, pode marcá-lo. Se o Ceifador morrer, todas as peças marcadas por ele morrem junto. 1/2/3 marcas por Maestria.',
         passive: 'rear_capture'
     },
     predador: {
@@ -193,7 +190,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🐺',
-        description: 'Caçada: captura adjacente rompe uma proteção inimiga (2 usos, recarga 2).',
+        description: 'Emboscada Mortal: no ataque, gasta um turno e uma carga para armar. Até seu próximo turno, captura automaticamente inimigo que entrar em diagonal adjacente se houver apoio aliado. Maestria: 1/2/3 emboscadas por combate.',
         passive: 'hunt_mode'
     },
     duelista: {
@@ -202,7 +199,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🤺',
-        description: 'Duelo: sem aliado adjacente, sua captura rompe uma proteção inimiga (2 usos, recarga 2).',
+        description: 'Contra-Ataque: quando tentam capturá-lo, pode trocar de posição com o agressor, sem mortes. No próximo turno não pode capturar esse agressor, mas pode mover ou atacar outro inimigo. Maestria: 1/2/3 usos por combate. Recarga obrigatória de um turno entre ativações, inclusive na Maestria III.',
         passive: 'lone_wolf_boost'
     },
     vento_cortante: {
@@ -211,7 +208,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🌪️',
-        description: 'Corte horizontal: captura na mesma fileira rompe uma proteção (2 usos, recarga 3).',
+        description: 'Rajada Cortante: após captura diagonal, pode escolher secretamente um inimigo adjacente para empurrar. Defensor tenta adivinhar qual peça proteger; ambas as habilidades gastam carga quando ativadas, mesmo se a defesa errar. 2 usos, recarga 3.',
         passive: 'rook_slide'
     },
     cacador_cabecas: {
@@ -220,7 +217,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🎯',
-        description: 'Caça especial: captura de peça especial rompe uma proteção inimiga (2 usos, recarga 3).',
+        description: 'Recompensa pela Cabeça: marque um inimigo e capture-o com este Caçador para ganhar 20 moedas. 1/2/3 caçadas por combate conforme a Maestria; captura normal, sem ignorar proteções.',
         passive: 'bounty_target'
     },
 
@@ -233,11 +230,9 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '⏳',
-        description: 'Ritmo preciso: após um movimento legal sem captura, recebe +5 moedas (1 uso por combate). Não altera turnos.',
-        cooldown: 3,
-        activePower: (r, c, targetR, targetC) => {
-            return { action: 'grant_extra_turn' };
-        }
+        description: 'Atraso Temporal: gasta a jogada para paralisar um inimigo na diagonal durante a próxima ação adversária. Maestria I: 1 uso, recarga 2; II: 2 usos, recarga 2; III: 3 usos, recarga 1.',
+        cooldown: 2,
+        activePower: () => ({ action: 'freeze_adjacent_enemy' })
     },
     ilusionista: {
         id: 'ilusionista',
@@ -245,7 +240,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'support',
         categoryName: 'Mago / Estrategista / Suporte',
         symbol: '🎭',
-        description: 'Distração: após uma troca legal de posições, recebe +6 moedas (até 2 usos, recarga de 3 turnos).',
+        description: 'Ilusão Perfeita: cria uma cópia em casa diagonal vazia. A isca não age e desaparece quando atacada, consumindo a ação inimiga. Uma cópia ativa por Ilusionista. Maestria I/II/III: 1/2/3 usos e recarga 3/2/1 turnos.',
         activePower: (r, c) => {
             return { action: 'spawn_decoy' };
         }
