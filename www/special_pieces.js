@@ -72,10 +72,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🐗',
-        description: 'Ao realizar captura legal, recebe 10 moedas (1 vez por combate). Sem contragolpe automático.',
-        onDestroyed: (attackerPiece) => {
-            return { destroyAttacker: true, msg: 'Contragolpe do Javali de Ferro!' };
-        }
+        description: 'Ao realizar uma captura legal, recebe 10 moedas. Maestria I: até 10; II: até 20; III: até 30 moedas por combate (10 por captura).'
     },
     guardiao_runico: {
         id: 'guardiao_runico',
@@ -101,7 +98,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🦾',
-        description: 'Protege uma vez por combate um aliado adjacente contra uma captura legal. Não cria movimentos extras.',
+        description: 'Protege um aliado adjacente contra captura legal e repele o atacante uma casa para trás, se houver casa livre e jogável. Se não houver espaço, apenas bloqueia. Cargas aumentam com a Maestria.',
         passive: 'damage_reduction_zone'
     },
     baluarte: {
@@ -110,7 +107,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'tank',
         categoryName: 'Guardião / Tanque',
         symbol: '🔰',
-        description: 'Bloqueia a primeira tentativa de captura de aliado adjacente por combate.',
+        description: 'Bloqueia capturas contra aliados a até 2 casas de distância (inclusive diagonais), mas não protege a si mesmo. Cargas aumentam com a Maestria.',
         passive: 'intercept_damage'
     },
 
@@ -123,7 +120,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🗡️',
-        description: 'Investida: ao capturar em linha reta, rompe uma proteção inimiga (3 usos, recarga 2).',
+        description: 'Investida: ao realizar uma captura diagonal válida, rompe uma proteção inimiga (3 usos, recarga 2).',
         getSpecialMoves: (r, c, player, board) => {
             const dir = player === 1 ? -1 : 1;
             const moves = [];
@@ -139,7 +136,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🥷',
-        description: 'Ataque furtivo: ao capturar na diagonal, rompe uma proteção inimiga (2 usos, recarga 2).',
+        description: 'Teletransporte Sombrio: em captura diagonal no ataque, manda o alvo à última linha inimiga sem avançar. Na defesa, pode substituir a troca por teletransporte e ocupar a casa do alvo. Sem espaço livre, ação normal. 2 usos, recarga 2; Maestria amplia usos.',
         getSpecialMoves: (r, c, player, board) => {
             // Lógica de travessia fantasma
             return [];
@@ -151,7 +148,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🪓',
-        description: 'Fúria: ao capturar, rompe uma proteção inimiga (2 usos, recarga 3).',
+        description: 'Fúria Implacável: ao romper uma proteção e capturar, ganha uma ação extra imediata somente com o Berserker (movimento ou ataque legal, sem encadear). 2 usos, recarga 3; Maestria amplia cargas.',
         passive: 'fury_scaling'
     },
     executor: {
@@ -205,7 +202,7 @@ const SPECIAL_PIECES_CATALOG = {
         category: 'attacker',
         categoryName: 'Atacante / Berserker',
         symbol: '🤺',
-        description: 'Duelo: em ataque move e captura sem apoio; em defesa pode capturar, empurrar ou trocar. Sem especial aliada adjacente, sua captura pode ignorar uma proteção inimiga (2 usos, recarga 2).',
+        description: 'Duelo: sem aliado adjacente, sua captura rompe uma proteção inimiga (2 usos, recarga 2).',
         passive: 'lone_wolf_boost'
     },
     vento_cortante: {

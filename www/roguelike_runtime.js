@@ -73,49 +73,6 @@
     if (mastery >= 3) reduction += 1;
     return { uses: base.uses + extra, cooldown: Math.max(0, base.cooldown - reduction) };
   }
-  // Efeitos visuais leves, sem alterar regras, turnos ou consumo de cargas.
-  function pieceNotice(side, index, key, message) {
-    if (typeof document === 'undefined' || !document.querySelector || !document.createElement || !document.body) return;
-    const cell = document.querySelector(`[data-i="${index}"][data-special-piece="${key}"]`);
-    if (!cell || typeof cell.getBoundingClientRect !== 'function') return;
-    if (!document.getElementById('manobra-ability-fx-style')) {
-      const style = document.createElement('style');
-      style.id = 'manobra-ability-fx-style';
-      style.textContent = `
-        @keyframes manobraAbilityPop { 0% { opacity:0; transform:translate(-50%,-70%) scale(.65); } 18% { opacity:1; transform:translate(-50%,-125%) scale(1.12); } 30% { transform:translate(-50%,-120%) scale(1); } 78% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-175%) scale(.95); } }
-        @keyframes manobraAbilityPulse { 0%,100% { opacity:0; transform:scale(.85); } 20% { opacity:.9; transform:scale(1.1); } 65% { opacity:.5; transform:scale(1.35); } }
-        .manobra-ability-float { position:fixed; z-index:9999; pointer-events:none; padding:6px 10px; border-radius:9px; background:rgba(18,27,44,.96); color:#fff; font:bold 12px system-ui,sans-serif; text-align:center; white-space:nowrap; max-width:220px; box-shadow:0 4px 14px #0008; border:1px solid var(--ability-color,#9fb4d1); animation:manobraAbilityPop 2.2s ease-out both; }
-        .manobra-ability-ring { position:fixed; z-index:9998; pointer-events:none; border:3px solid var(--ability-color,#9fb4d1); border-radius:50%; box-shadow:0 0 16px var(--ability-color,#9fb4d1); animation:manobraAbilityPulse 1.1s ease-out both; }
-        @media (prefers-reduced-motion:reduce) { .manobra-ability-float,.manobra-ability-ring { animation:none; } }
-      `;
-      document.body.appendChild(style);
-    }
-    const rect = cell.getBoundingClientRect();
-    const notice = document.createElement('div');
-    const msg = String(message);
-    const color = /bloquead|perdid|esgotad/i.test(msg) ? '#fb7185' : /recarga/i.test(msg) ? '#fbbf24' : /pronta/i.test(msg) ? '#4ade80' : /proteç|defes/i.test(msg) ? '#60a5fa' : '#c084fc';
-    notice.className = 'manobra-ability-float';
-    notice.textContent = msg;
-    notice.style.cssText = `--ability-color:${color};left:${rect.left + rect.width / 2}px;top:${rect.top}px;`;
-    const ring = document.createElement('div');
-    ring.className = 'manobra-ability-ring';
-    ring.style.cssText = `--ability-color:${color};left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;box-sizing:border-box;`;
-    document.body.appendChild(ring);
-    document.body.appendChild(notice);
-    if (typeof setTimeout === 'function') setTimeout(() => {
-      if (notice.parentNode) notice.parentNode.removeChild(notice);
-      if (ring.parentNode) ring.parentNode.removeChild(ring);
-    }, 2200);
-  }
-  function abilityStatus(side, index, key) {
-    const rule = effectiveAbilityLimit(side, key);
-    if (!rule) return 'Sem habilidade';
-    const id = abilityId(side, index, key), s = state();
-    const used = s.charges[id] || 0, cd = s.abilityCooldown[id] || 0;
-    if (used >= rule.uses) return '🚫 Habilidade esgotada';
-    if (cd > 0) return `⏳ Recarga: ${cd} turno${cd === 1 ? '' : 's'}`;
-    return `✨ Pronta (${rule.uses - used} uso${rule.uses - used === 1 ? '' : 's'})`;
-  }
   function abilityId(side, index, key) { return `${side}:${index}:${key}`; }
   function available(side, index, key) {
     const rule = effectiveAbilityLimit(side, key);
@@ -128,9 +85,6 @@
     const id = abilityId(side,index,key), s = state(), rule = effectiveAbilityLimit(side, key);
     s.charges[id] = (s.charges[id] || 0) + 1;
     s.abilityCooldown[id] = rule.cooldown;
-    pieceNotice(side, index, key, `⚡ Habilidade usada · ${rule.uses - s.charges[id]} restante(s)`);
-    if (s.charges[id] >= rule.uses) pieceNotice(side, index, key, '🚫 Habilidade esgotada');
-    else if (rule.cooldown > 0) pieceNotice(side, index, key, `⏳ Recarga: ${rule.cooldown} turnos`);
     const r = run(), human = window.__manobraApp && window.__manobraApp.humanSide;
     if (r && r.active && side !== human && r.pendingNode && r.pendingNode.type === 'boss' && typeof window.rogueBossEffect === 'function' && typeof window.rogueBossFor === 'function') {
       const boss = window.rogueBossFor(r.pendingNode, r.act);
@@ -141,12 +95,7 @@
   function tickCooldown(side) {
     const s = state(), prefix = `${side}:`;
     for (const id of Object.keys(s.abilityCooldown)) {
-      if (id.startsWith(prefix) && s.abilityCooldown[id] > 0) {
-        s.abilityCooldown[id]--;
-        const parts = id.split(':');
-        const index = Number(parts[1]), key = parts.slice(2).join(':');
-        if (s.abilityCooldown[id] === 0 && (s.charges[id] || 0) < (effectiveAbilityLimit(side, key)?.uses || 0)) pieceNotice(side, index, key, '✨ Habilidade pronta!');
-      }
+      if (id.startsWith(prefix) && s.abilityCooldown[id] > 0) s.abilityCooldown[id]--;
     }
   }
   function specialAtBoard(board, i) {
@@ -200,12 +149,16 @@
     if (!run() || !run().active || !mv) return true;
     // Não aplicar poderes a uma jogada inexistente no motor original.
     state().blockedMove = false;
+    state().pendingRepel = null;
+    // A ação bônus é exclusiva do Berserker que a conquistou.
+    const bonus = state().berserkerBonus;
+    if (bonus && (game.st.turn !== bonus.side || mv.from !== bonus.at || !['m','k'].includes(mv.t))) return false;
+    delete mv.rogueTeleport;
     const legal = game.legal();
     if (game.over || !legal || !Array.isArray(legal.moves) || !legal.moves.some(x => x.t === mv.t && x.from === mv.from && x.to === mv.to && (x.beyond ?? -1) === (mv.beyond ?? -1))) return false;
     const board = game.st.b, mover = sideAt(board, mv.from), target = mv.to >= 0 ? specialEntry(board, mv.to) : null;
     if (mv.t !== 'x' && mover !== game.st.turn) return false;
     const moving = specialEntry(board, mv.from);
-    state().lastBlockedAt = mv.from; state().lastBlockedKey = moving && moving.key;
     state().pending = { victim: target && target.key, victimSide: target && target.side, attacker: moving && moving.key, attackerSide: mv.t === 'x' ? game.st.turn : mover, from: mv.from, to: mv.to };
     // A troca precisa guardar a identidade ANTES de game.play alterar o tabuleiro.
     if (mv.t === 's') {
@@ -215,11 +168,41 @@
     }
     // Remoção obrigatória da sétima defesa é regra do motor, não uma captura bloqueável.
     if (mv.t === 'x') return true;
+    // Assassino: no ataque, fica na origem; na defesa, ocupa a casa do alvo
+    // em vez de trocá-la. A vítima volta à última linha do próprio território.
+    // A habilidade só substitui uma ação legal e nunca consome carga sem destino.
+    if (moving && moving.key === 'assassino_sombras' &&
+        ((mv.t === 'k' && E().isAttack(board[mv.from])) ||
+         (mv.t === 's' && !E().isAttack(board[mv.from]))) &&
+        sideAt(board, mv.to) === enemyOf(mover) && available(mover, mv.from, moving.key)) {
+      const victimSide = enemyOf(mover);
+      const backRow = victimSide === E().WHITE ? E().ROWS - 1 : 0;
+      const candidates = [];
+      for (let col = 0; col < E().COLS; col++) {
+        const landing = idx(backRow, col);
+        if (E().isDarkCell(landing) && !E().isMain(landing) && !board[landing]) candidates.push(landing);
+      }
+      if (candidates.length) {
+        const human = window.__manobraApp ? window.__manobraApp.humanSide : E().WHITE;
+        const approved = mv.t !== 's' || mover !== human ||
+          (typeof window.confirm === 'function' && window.confirm('🥷 TELETRANSPORTE SOMBRIO\n\nOK: enviar o inimigo para o fundo do campo e ocupar a casa dele (gasta uma carga).\nCancelar: fazer a troca normal, sem gastar carga.'));
+        if (approved) {
+          // Preferir a casa mais próxima do centro; escolha determinística para IA.
+          candidates.sort((a,b) => Math.abs(rc(a).c - 6) - Math.abs(rc(b).c - 6) || a-b);
+          const landing = candidates[0];
+          if (consume(mover, mv.from, moving.key)) {
+            mv.rogueTeleport = { landing };
+            state().pending.teleport = { landing, victimSide, victimKey: target && target.key, attackerSide: mover, attackerFrom: mv.from, attackerTo: mv.to, mode: mv.t };
+            announce('🥷 Teletransporte Sombrio: inimigo enviado ao fundo do próprio campo!');
+            return true;
+          }
+        }
+      }
+    }
     // Ataque especial: rompe UMA proteção reativa, mas somente em captura
     // já autorizada pelo motor. Não cria movimentos, capturas ou turnos.
     const pierceConditions = {
-      lancer: () => rc(mv.from).c === rc(mv.to).c,
-      assassino_sombras: () => isDiagonal(mv.from, mv.to),
+      lancer: () => isDiagonal(mv.from, mv.to),
       berserker: () => true,
       executor: () => true,
       cavaleiro_errante: () => rc(mv.from).r !== rc(mv.to).r,
@@ -229,37 +212,72 @@
       vento_cortante: () => rc(mv.from).r === rc(mv.to).r,
       cacador_cabecas: () => !!target
     };
-    const victimSide = sideAt(board, mv.to);
-    const protectedTarget = isCapture(mv, board) && victimSide >= 0 && victimSide !== mover && (
-      (target && ['escudeiro', 'rebatedor', 'muralha'].includes(target.key)) ||
-      allEntries(board).some(e => e.side === victimSide && distance(e.i, mv.to) === 1 &&
+    const protectedTarget = isCapture(mv, board) && target && (
+      ['escudeiro', 'rebatedor', 'muralha'].includes(target.key) ||
+      allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) <= (e.key === 'baluarte' ? 2 : 1) && e.i !== mv.to &&
         ['bastiao','tita_de_aco','baluarte','sentinela','ima_tatico','xama_dos_ventos','manipulador','oraculo','sacerdote_da_luz'].includes(e.key))
     );
     // Combinação ofensiva: a dupla pode romper uma proteção reativa
-    // ao capturar legalmente; dupla e trio exigem parceiro a até 2 casas.
+    // ao capturar legalmente; o trio permite parceiro a até 2 casas.
     const offensiveSynergy = moving && synergyFor(board, mover, mv.from, 'pierce');
     const synergyPartner = offensiveSynergy && allEntries(board).some(e =>
       e.side === mover && e.i !== mv.from && e.key !== moving.key &&
       offensiveSynergy.group.keys.includes(e.key) &&
-      distance(e.i, mv.from) <= 2);
+      distance(e.i, mv.from) <= (offensiveSynergy.tier === 3 ? 2 : 1));
     const synergyPierce = protectedTarget && offensiveSynergy && synergyPartner &&
       consume(mover, mv.from, moving.key);
     if (synergyPierce) { announce(`⚔️ ${offensiveSynergy.group.name}: combinação de ${offensiveSynergy.tier} peças rompeu a proteção!`); return true; }
     const piercing = protectedTarget && moving && pierceConditions[moving.key] &&
       pierceConditions[moving.key]() && consume(mover, mv.from, moving.key);
-    if (piercing) { announce(`⚔️ ${moving.piece.name}: rompeu a proteção inimiga!`); return true; }
+    if (piercing) {
+      if (moving.key === 'berserker' && mv.t === 'k' && !state().berserkerBonus) state().pending.berserkerPierced = true;
+      announce(`⚔️ ${moving.piece.name}: rompeu a proteção inimiga!`); return true;
+    }
     // Escudeiro: o primeiro ataque é absorvido; não perde a peça nem permite combo.
     if (target && target.key === 'escudeiro' && isCapture(mv, board)) {
       if (consume(target.side, mv.to, 'escudeiro')) { announce('🛡️ Escudeiro absorveu o primeiro impacto.'); state().blockedMove = true; state().pending = null; return false; }
     }
-    // Sentinela: bloqueia a entrada do adversário nas casas adjacentes.
+    // Sentinela: a carga só é consumida com autorização do dono.
+    // A IA preserva cargas em avanços simples, priorizando capturas e ameaças diretas.
     for (const e of allEntries(board)) if (e.key === 'sentinela' && e.side !== mover && mv.to >= 0 && distance(e.i, mv.to) === 1 && available(e.side, e.i, e.key)) {
-      consume(e.side, e.i, e.key); announce('🏰 Sentinela: zona adjacente bloqueada.'); state().blockedMove = true; state().pending = null; return false;
+      const human = window.__manobraApp ? window.__manobraApp.humanSide : E().WHITE;
+      const capturing = isCapture(mv, board);
+      let block;
+      if (e.side === human) {
+        block = typeof window.confirm === 'function'
+          ? window.confirm('🏰 SENTINELA\n\nO inimigo quer entrar na sua área protegida.\n\nOK: gastar 1 carga e bloquear (o inimigo perde a jogada).\nCancelar: permitir a jogada e guardar a carga.')
+          : false; // Sem interface de confirmação, nunca gastar a carga do jogador automaticamente.
+      } else {
+        // IA: não desperdiça carga com avanço simples; protege contra captura.
+        block = capturing;
+      }
+      if (block && consume(e.side, e.i, e.key)) {
+        announce('🏰 Sentinela: bloqueio autorizado! Uma carga consumida.');
+        state().blockedMove = true; state().pending = null; return false;
+      }
+      announce('🏰 Sentinela: passagem permitida; carga preservada.');
     }
-    // Bastião/Titã/Baluarte: uma proteção por combate para um aliado adjacente.
+    // Bastião/Titã: alcance 1; Baluarte: alcance 2. Nunca protege a si mesmo.
     if (isCapture(mv, board) && sideAt(board, mv.to) >= 0 && sideAt(board, mv.to) !== mover) {
-      for (const e of allEntries(board)) if (['bastiao', 'tita_de_aco', 'baluarte'].includes(e.key) && e.side === sideAt(board, mv.to) && distance(e.i, mv.to) === 1) {
-        if (consume(e.side, e.i, e.key)) { announce(`🧱 ${e.piece.name}: captura aliada bloqueada.`); state().blockedMove = true; state().pending = null; return false; }
+      for (const e of allEntries(board)) if (['bastiao', 'tita_de_aco', 'baluarte'].includes(e.key) && e.side === sideAt(board, mv.to) && e.i !== mv.to && distance(e.i, mv.to) <= (e.key === 'baluarte' ? 2 : 1)) {
+        if (consume(e.side, e.i, e.key)) {
+          // Titã: o atacante recua uma casa na direção oposta ao alvo,
+          // somente se a casa for jogável, livre e não for uma base.
+          if (e.key === 'tita_de_aco') {
+            const origin = rc(mv.from), destination = rc(mv.to);
+            const retreat = idx(origin.r + Math.sign(origin.r - destination.r),
+                                origin.c + Math.sign(origin.c - destination.c));
+            if (retreat >= 0 && E().isDarkCell(retreat) && !E().isMain(retreat) && !board[retreat]) {
+              state().pendingRepel = { side: mover, from: mv.from, to: retreat };
+              announce('🦾 Titã de Aço: captura bloqueada! O atacante foi repelido uma casa.');
+            } else {
+              announce('🦾 Titã de Aço: captura bloqueada! Sem espaço livre para repelir.');
+            }
+          } else {
+            announce(`🧱 ${e.piece.name}: captura aliada bloqueada.`);
+          }
+          state().blockedMove = true; state().pending = null; return false;
+        }
       }
     }
     // Suportes oferecem proteção situacional. Só reagem a capturas legais.
@@ -316,10 +334,31 @@
     if (!s || !s.blockedMove || !game || game.over || typeof game.pass !== 'function') return false;
     s.blockedMove = false;
     const attackerSide = game.st.turn;
+    const repel = s.pendingRepel;
+    s.pendingRepel = null;
+    if (repel && repel.side === attackerSide && sideAt(game.st.b, repel.from) === attackerSide &&
+        repel.to >= 0 && E().isDarkCell(repel.to) && !E().isMain(repel.to) && !game.st.b[repel.to]) {
+      game.st.b[repel.to] = game.st.b[repel.from];
+      game.st.b[repel.from] = 0;
+      const bag = attackerSide === (window.__manobraApp && window.__manobraApp.humanSide)
+        ? run().deployed : run().enemyDeployed;
+      if (bag && bag[String(repel.from)]) {
+        const key = bag[String(repel.from)];
+        delete bag[String(repel.from)];
+        bag[String(repel.to)] = key;
+        for (const field of ['charges', 'abilityCooldown']) {
+          const a = abilityId(attackerSide, repel.from, key), b = abilityId(attackerSide, repel.to, key);
+          if (Object.prototype.hasOwnProperty.call(s[field], a)) {
+            s[field][b] = s[field][a]; delete s[field][a];
+          }
+        }
+      }
+      if (typeof game.record === 'function') game.record();
+    }
+    const wasBonus = !!s.berserkerBonus && s.berserkerBonus.side === attackerSide;
+    if (wasBonus) s.berserkerBonus = null;
     game.pass();
-    tickCooldown(attackerSide);
-    if (s.lastBlockedAt != null && s.lastBlockedKey) pieceNotice(attackerSide, s.lastBlockedAt, s.lastBlockedKey, '⛔ Ataque bloqueado · turno perdido');
-    s.lastBlockedAt = null; s.lastBlockedKey = null;
+    if (!wasBonus) tickCooldown(attackerSide);
     return true;
   }
 
@@ -330,42 +369,12 @@
     const k = `${mv.t}:${mv.from}:${mv.to}:${mv.beyond == null ? '' : mv.beyond}`;
     if (!seen.has(k)) { seen.add(k); out.push(mv); }
   }
-  // Exceção exclusiva da Aventura: o Duelista em ataque dispensa apoio;
-  // em defesa pode capturar, além de empurrar e trocar como as demais defesas.
-  // Movimentos extras seguem a geometria diagonal e a regra de repetição do motor.
+  // Habilidades nunca criam lances que o motor original considera ilegais.
+  // Efeitos de suporte e proteção são resolvidos em beforeMove/afterMove.
   function specialMoves(game, base) {
-    if (!run() || !run().active || !game || game.over || !base || !Array.isArray(base.moves)) return base;
-    const engine = E(), board = game.st.b, side = game.st.turn;
-    const moves = base.moves.slice();
-    const seen = new Set(moves.map(m => `${m.t}:${m.from}:${m.to}`));
-    for (let from = 0; from < engine.N; from++) {
-      const piece = board[from];
-      if (!piece || engine.sideOf(piece) !== side || specialAtBoard(board, from) !== 'duelista') continue;
-      const attacking = engine.isAttack(piece);
-      const supported = engine.NB.slice(from * 4, from * 4 + 4).some(to => to >= 0 && engine.sideOf(board[to]) === side);
-      if (attacking && supported) continue; // motor já fornece estes movimentos
-      for (let d = 0; d < 4; d++) {
-        const to = engine.NB[from * 4 + d];
-        if (to < 0) continue;
-        const target = board[to];
-        if (target && engine.sideOf(target) === side) continue;
-        const t = target ? 'k' : 'm';
-        if (!attacking && !target) continue; // defesa já tem movimento normal
-        const id = `${t}:${from}:${to}`;
-        if (seen.has(id)) continue;
-        const mv = { t, from, to };
-        const log = engine.apply(game.st, mv);
-        const count = game.hist.get(engine.hashOf(game.st)) || 0;
-        engine.undo(game.st, log);
-        if (count >= 2) {
-          let loser = engine.loopLoser(game.st, mv);
-          if (loser < 0) loser = side;
-          if (loser === side && !base.forced) continue;
-        }
-        seen.add(id); moves.push(mv);
-      }
-    }
-    return { ...base, moves };
+    const bonus = state() && state().berserkerBonus;
+    if (!bonus || game.st.turn !== bonus.side || !base || !Array.isArray(base.moves)) return base;
+    return { ...base, moves: base.moves.filter(m => m.from === bonus.at && ['m','k'].includes(m.t)) };
   }
 
   function patchLegal() {
@@ -383,7 +392,9 @@
     // Só uma jogada efetivamente realizada consome a habilidade e avança a recarga.
     const originSide = mv.from >= 0 ? sideAt(board, mv.from) : -1;
     const turnSide = pending.attackerSide >= 0 ? pending.attackerSide : originSide;
-    if (turnSide >= 0) tickCooldown(turnSide);
+    const usingBonus = !!s.berserkerBonus && s.berserkerBonus.side === turnSide;
+    if (usingBonus) s.berserkerBonus = null;
+    if (turnSide >= 0 && !usingBonus) tickCooldown(turnSide);
     if (mv.rogueAbility && pending.from >= 0 && turnSide >= 0) consume(turnSide, pending.from, mv.rogueAbility);
     const victimSpecial = captured ? pending.victim : null;
     const destinationAfter = mv.to;
@@ -408,6 +419,26 @@
         }
       }
     };
+    // A vítima do teletransporte continua viva, com identidade, cargas e recarga.
+    // O motor já aplicou o lance completo antes de registrar o histórico.
+    if (pending.teleport && mv.rogueTeleport) {
+      const t = pending.teleport;
+      const victimBag = bagForSide(t.victimSide);
+      if (t.victimKey && victimBag) {
+        delete victimBag[String(mv.to)];
+        victimBag[String(t.landing)] = t.victimKey;
+        const oldId = abilityId(t.victimSide, mv.to, t.victimKey);
+        const newId = abilityId(t.victimSide, t.landing, t.victimKey);
+        for (const field of ['charges', 'abilityCooldown']) {
+          if (Object.prototype.hasOwnProperty.call(s[field], oldId)) {
+            s[field][newId] = s[field][oldId]; delete s[field][oldId];
+          }
+        }
+      }
+      if (t.mode === 's') relocate(t.attackerSide, t.attackerFrom, t.attackerTo);
+      delete mv.rogueTeleport;
+      return;
+    }
     // Limpar a vítima antes de mover o atacante: evita apagar a peça vencedora.
     if ((captured || mv.t === 'x') && (mv.t === 'k' || mv.t === 'x') && pending.victimSide >= 0) {
       const victimBag = bagForSide(pending.victimSide);
@@ -456,9 +487,6 @@
     }
     // Não alterar diretamente o tabuleiro após game.play(): o histórico, o resultado
     // e o estado de repetição do motor ficariam inconsistentes.
-    if (victimSpecial === 'javali_de_ferro' && mv.t === 'k') {
-      announce('🐗 Javali de Ferro foi capturado; contra-ataque automático desativado por segurança.');
-    }
     if (!piece) return;
     // Suportes: benefícios econômicos após ações que o motor já validou.
     // Nenhum destes efeitos modifica peças, turno, apoio ou histórico da partida.
@@ -481,7 +509,22 @@
         announce(bonus.message);
       }
     }
-    if (key === 'berserker' && mv.t === 'k' && captured) { s.captured[movedSide] = (s.captured[movedSide] || 0) + 1; }
+    if (key === 'berserker' && mv.t === 'k' && captured) {
+      s.captured[movedSide] = (s.captured[movedSide] || 0) + 1;
+      if (pending.berserkerPierced && !usingBonus && !game.over) {
+        // game.play já trocou a vez; devolver somente uma ação ao Berserker.
+        game.st.turn = turnSide;
+        s.berserkerBonus = { side: turnSide, at: mv.to };
+        game.refresh();
+        if (!game.cur || !game.cur.moves.length) {
+          s.berserkerBonus = null;
+          game.over = null; // Sem jogada bônus não é derrota: encerra o bônus.
+          game.st.turn = turnSide ^ 1;
+          game.refresh();
+          announce('🪓 Fúria Implacável: sem movimento ou ataque extra disponível.');
+        } else announce('🪓 Fúria Implacável: Berserker ganhou uma ação extra!');
+      }
+    }
     if (key === 'alquimista' && movedSide === humanSide && (mv.t === 'k' || mv.t === 'x') && captured && consume(movedSide, destinationAfter, 'alquimista')) { run().gold += 20; announce('🧪 Alquimista: +20 moedas.'); }
 
 
@@ -493,9 +536,7 @@
       const key = el.dataset.specialPiece, piece = catalog()[key];
       el.classList.add('special-piece', `category-${piece && piece.category || 'support'}`);
       el.dataset.symbol = piece && piece.symbol || '★';
-      const index = Number(el.dataset.i);
-      const side = Number.isInteger(index) ? sideAt(window.__manobraApp && window.__manobraApp.game && window.__manobraApp.game.st && window.__manobraApp.game.st.b, index) : -1;
-      el.title = `${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}` + (side >= 0 ? ` | ${abilityStatus(side, index, key)}` : '');
+      el.title = `${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}`;
       if (!el.querySelector('.rogue-special-badge') && el.querySelector('.pc')) {
         const badge = document.createElement('div'); badge.className = `rogue-special-badge rogue-special-badge-${piece && piece.category || 'support'}`;
         badge.innerHTML = `<span>${piece && piece.symbol || '★'}</span><small>${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}</small>`;
@@ -505,19 +546,6 @@
     });
   }
 
-  if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('click', ev => {
-    const cell = ev.target && ev.target.closest && ev.target.closest('[data-special-piece][data-i]');
-    if (!cell || !run() || !run().active) return;
-    const index = Number(cell.dataset.i), key = cell.dataset.specialPiece;
-    const app = window.__manobraApp;
-    const board = app && app.game && app.game.st && app.game.st.b;
-    const side = sideAt(board, index);
-    // Consulta de status somente ao selecionar a propria peca; nunca ao clicar
-    // no alvo inimigo durante uma tentativa de captura/empurrao/troca.
-    if (!app || app.screen !== 'game' || !app.game || app.game.over || side !== app.game.st.turn || side !== app.humanSide) return;
-    if (app.sel >= 0) return;
-    if (side >= 0) pieceNotice(side, index, key, abilityStatus(side, index, key));
-  }, true);
   patchLegal();
   window.RoguelikeRuntime = { cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
   window.addEventListener('DOMContentLoaded', () => { patchLegal(); setInterval(renderBoardState, 700); });

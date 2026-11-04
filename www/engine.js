@@ -108,6 +108,22 @@
   function apply(st, mv) {
     const b = st.b, log = [];
     const save = i => { log.push(i, b[i]); };
+    // Teletransporte Sombrio: ação legal de captura/troca com resultado alternativo.
+    // Aplicado aqui (antes de record/refresh) para preservar histórico e vitória.
+    if (mv.rogueTeleport && (mv.t === 'k' || mv.t === 's')) {
+      const landing = mv.rogueTeleport.landing;
+      if (Number.isInteger(landing) && landing >= 0 && landing < N &&
+          isDarkCell(landing) && !isMain(landing) && !b[landing] &&
+          b[mv.from] && b[mv.to] && sideOf(b[mv.from]) !== sideOf(b[mv.to])) {
+        save(mv.to); save(landing);
+        if (mv.t === 's') save(mv.from);
+        b[landing] = b[mv.to];
+        if (mv.t === 's') { b[mv.to] = b[mv.from]; b[mv.from] = 0; }
+        else b[mv.to] = 0; // ataque: o Assassino permanece na origem
+        st.turn ^= 1;
+        return log;
+      }
+    }
     switch (mv.t) {
       case 'm': case 'k':
         save(mv.from); save(mv.to);
