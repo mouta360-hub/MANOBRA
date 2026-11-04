@@ -11,7 +11,7 @@
   const sideAt = (board, i) => board && Number.isInteger(i) && i >= 0 && i < board.length && board[i] && E() ? E().sideOf(board[i]) : -1;
   const enemyOf = side => side === E().WHITE ? E().BLACK : E().WHITE;
   function announce(text) { if (typeof window.showRoguelikeToast === 'function') window.showRoguelikeToast(text); }
-  function state() { const r = run(); if (!r) return null; r.abilityState ||= {}; const s = r.abilityState; s.shield ||= {}; s.cooldown ||= {}; s.used ||= {}; s.captured ||= [0, 0]; s.stun ||= {}; s.pending ||= null; s.turnUsed ||= {}; s.charges ||= {}; s.abilityCooldown ||= {}; return s; }
+  function state() { const r = run(); if (!r) return null; r.abilityState ||= {}; const s = r.abilityState; s.shield ||= {}; s.cooldown ||= {}; s.used ||= {}; s.captured ||= [0, 0]; s.stun ||= {}; s.pending ||= null; s.turnUsed ||= {}; s.charges ||= {}; s.abilityCooldown ||= {}; s.blockedTurn ||= false; return s; }
   // Recarga em turnos do próprio jogador. O turno de ativação não conta.
   const ABILITY_LIMITS = Object.freeze({
     escudeiro: { uses: 1, cooldown: 0 },
@@ -146,6 +146,7 @@
   }
 
   function beforeMove(game, mv) {
+    if (run() && run().active) state().blockedTurn = false;
     if (!run() || !run().active || !mv) return true;
     // Não aplicar poderes a uma jogada inexistente no motor original.
     const legal = game.legal();
@@ -196,16 +197,16 @@
     if (piercing) { announce(`⚔️ ${moving.piece.name}: rompeu a proteção inimiga!`); return true; }
     // Escudeiro: o primeiro ataque é absorvido; não perde a peça nem permite combo.
     if (target && target.key === 'escudeiro' && isCapture(mv, board)) {
-      if (consume(target.side, mv.to, 'escudeiro')) { announce('🛡️ Escudeiro absorveu o primeiro impacto.'); state().pending = null; return false; }
+      if (consume(target.side, mv.to, 'escudeiro')) { announce('🛡️ Escudeiro absorveu o primeiro impacto.'); return blockedByProtection(); }
     }
     // Sentinela: bloqueia a entrada do adversário nas casas adjacentes.
     for (const e of allEntries(board)) if (e.key === 'sentinela' && e.side !== mover && mv.to >= 0 && distance(e.i, mv.to) === 1 && available(e.side, e.i, e.key)) {
-      consume(e.side, e.i, e.key); announce('🏰 Sentinela: zona adjacente bloqueada.'); state().pending = null; return false;
+      consume(e.side, e.i, e.key); announce('🏰 Sentinela: zona adjacente bloqueada.'); return blockedByProtection();
     }
     // Bastião/Titã/Baluarte: uma proteção por combate para um aliado adjacente.
     if (isCapture(mv, board) && target && target.side !== mover) {
       for (const e of allEntries(board)) if (['bastiao', 'tita_de_aco', 'baluarte'].includes(e.key) && e.side === target.side && distance(e.i, mv.to) === 1) {
-        if (consume(e.side, e.i, e.key)) { announce(`🧱 ${e.piece.name}: captura aliada bloqueada.`); state().pending = null; return false; }
+        if (consume(e.side, e.i, e.key)) { announce(`🧱 ${e.piece.name}: captura aliada bloqueada.`); return blockedByProtection(); }
       }
     }
     // Suportes oferecem proteção situacional. Só reagem a capturas legais.
@@ -221,7 +222,7 @@
         if (e.side === target.side && e.i !== mv.to && distance(e.i, mv.to) === 1 &&
             supportGuard[e.key] && supportGuard[e.key](e) && consume(e.side, e.i, e.key)) {
           announce(`✨ ${e.piece.name}: protegeu um aliado da captura.`);
-          state().pending = null; return false;
+          return blockedByProtection();
         }
       }
     }
@@ -238,20 +239,38 @@
         if (distance(e.i, mv.to) > (synergy.tier === 3 ? 2 : 1)) continue;
         if (consume(e.side, e.i, e.key)) {
           announce(`🛡️ ${synergy.group.name}: ${synergy.tier} peças protegeram a aliada!`);
-          state().pending = null; return false;
+          return blockedByProtection();
         }
       }
     }
     // Muralha: não pode ser capturada lateralmente na fileira de defesa.
     if (target && target.key === 'muralha' && isCapture(mv, board) && isBackRow(mv.to) && rc(mv.from).r === rc(mv.to).r && consume(target.side, mv.to, 'muralha')) {
-      announce('🏯 Muralha: ataque lateral bloqueado.'); state().pending = null; return false;
+      announce('🏯 Muralha: ataque lateral bloqueado.'); return blockedByProtection();
     }
     // Rebatedor: primeiro ataque diagonal é repelido.
     if (target && target.key === 'rebatedor' && isCapture(mv, board) && isDiagonal(mv.from, mv.to)) {
-      if (consume(target.side, mv.to, 'rebatedor')) { announce('🪞 Rebatedor desviou o ataque diagonal.'); state().pending = null; return false; }
+      if (consume(target.side, mv.to, 'rebatedor')) { announce('🪞 Rebatedor desviou o ataque diagonal.'); return blockedByProtection(); }
     }
     // Guardião Rúnico: uma vez por combate, paralisa o próximo turno inimigo.
     // Nunca alterar o turno durante a validação: isso dessincronizava a interface e o motor.
+    return true;
+  }
+
+  // Proteções reativas consomem a tentativa de ataque: a peça permanece no lugar,
+  // mas o atacante perde a vez. Um lance ilegal não consome turno.
+  function blockedByProtection() {
+    const s = state();
+    s.pending = null;
+    s.blockedTurn = true;
+    return false;
+  }
+  function onBlockedTurn(side) {
+    if (run() && run().active && side >= 0) tickCooldown(side);
+  }
+  function takeBlockedTurn() {
+    const s = state();
+    if (!s || !s.blockedTurn) return false;
+    s.blockedTurn = false;
     return true;
   }
 
@@ -402,6 +421,6 @@
   }
 
   patchLegal();
-  window.RoguelikeRuntime = { cellMarkup, beforeMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
+  window.RoguelikeRuntime = { cellMarkup, beforeMove, takeBlockedTurn, onBlockedTurn, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
   window.addEventListener('DOMContentLoaded', () => { patchLegal(); setInterval(renderBoardState, 700); });
 }());

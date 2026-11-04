@@ -1150,7 +1150,20 @@
     const g = app.game;
     if (app.mode === 'bt' && !remote) btSend({ k: 'move', m: { t: mv.t, from: mv.from, to: mv.to, beyond: mv.beyond } });
     const cap = g.st.b[mv.to]; // peça que estava na casa de destino (para animar a eliminação)
-    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) return;
+    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) {
+      // Proteção reativa: a captura é impedida, mas a tentativa gasta a vez.
+      // Usar Game.pass() mantém o relógio e o turno sincronizados com o motor.
+      if (window.RoguelikeRuntime.takeBlockedTurn && window.RoguelikeRuntime.takeBlockedTurn()) {
+        const side = g.st.turn;
+        g.pass();
+        app.sel = -1; app.purge = false; app.choice = null;
+        if (window.RoguelikeRuntime.onBlockedTurn) window.RoguelikeRuntime.onBlockedTurn(side);
+        updateFlip();
+        render();
+        afterMove(false);
+      }
+      return;
+    }
     g.play(mv);
     if (window.RoguelikeRuntime && window.RoguelikeRuntime.afterMove) window.RoguelikeRuntime.afterMove(g, mv, cap);
     app.sel = -1; app.purge = false; app.choice = null;
