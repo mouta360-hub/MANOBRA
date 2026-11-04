@@ -39,7 +39,7 @@ const crash = P => link(P).leave(); // celular some (app fechado / sem internet)
     assert.strictEqual(snap.judge.id, 1); assert(snap.judge.epoch >= 2);
     assert(!snap.players.some(p => p.id === 0), 'o juiz que saiu some da lista do saguão');
     await waitFor(() => [ph[2], ph[3]].every(P => P.app.tour.snap && P.app.tour.snap.judge && P.app.tour.snap.judge.id === 1), 'os outros verem o novo juiz');
-    J.click({ act: 'tourFmt', v: 'knockout' }); await sleep(60);
+    J.click({ act: 'tourFmt', v: 'knockout' }); await waitFor(() => link(J).snapshot().format === 'knockout', 'formato atualizado');
     assert.strictEqual(link(J).snapshot().format, 'knockout', 'o novo juiz escolhe o formato');
     assert(J.html().includes('data-act="tourStart"'), 'o novo juiz vê o botão Iniciar');
     J.click({ act: 'tourStart' }); await waitFor(() => link(J).snapshot().status === 'running', 'o novo juiz iniciar o campeonato');
@@ -86,7 +86,7 @@ const crash = P => link(P).leave(); // celular some (app fechado / sem internet)
     // 4) segunda queda: o novo juiz cai e o seguinte assume
     crash(ph[2]);
     await waitFor(() => ph[3].app.tour.role === 'host', 'o 4º jogador assumir na segunda queda', 12000);
-    assert(link(ph[3]).snapshot().judge.epoch >= 3);
+    assert(ph[3].app.tour.snap.judge.epoch >= 3);
     console.log('ok - segunda queda: o seguinte da fila assume de novo');
     ph.forEach(P => { try { crash(P); } catch (e) {} });
   }

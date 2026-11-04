@@ -1,7 +1,7 @@
 // Integration of map, shops, rewards, bosses and progression. Combat results are simulated,
 // so this is NOT a balance or AI win-rate test.
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const store=new Map(), modal={innerHTML:'',remove(){}};
+const store=new Map(), modal={innerHTML:'',style:{},remove(){}};
 const window={addEventListener(){},localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)}};
 const ctx={window,Math,Date,console,setTimeout:fn=>fn(),setInterval:()=>0,clearInterval:()=>{},document:{getElementById:()=>modal,createElement:()=>modal,body:{appendChild(){}}},SPECIAL_PIECES_CATALOG:Object.fromEntries(Array.from({length:30},(_,i)=>['piece'+i,{name:'Piece '+i,symbol:'★'}]))};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync('www/roguelike_adventure.js','utf8'),ctx);

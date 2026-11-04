@@ -3,7 +3,7 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../www/roguelike_adventure.js'),'utf8');
-const store=new Map();const modal={innerHTML:'',remove(){}};
+const store=new Map();const modal={innerHTML:'',style:{},remove(){}};
 const window={addEventListener(){},localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)}};
 const ctx={window,document:{getElementById:()=>modal,createElement:()=>modal,body:{appendChild(){}}},console,Math,Date,setTimeout:()=>{},showRoguelikeToast:()=>{}};
 vm.createContext(ctx);vm.runInContext(source,ctx);

@@ -9,7 +9,7 @@ const playerLevel=process.env.CAMPAIGN_PLAYER_LEVEL||'hard';
 const searchDepth=Number(process.env.CAMPAIGN_DEPTH||2), searchMs=Number(process.env.CAMPAIGN_SEARCH_MS||12);
 const avoidCycles=process.env.CAMPAIGN_AVOID_CYCLES!=='0';
 let catalog={};
-const context={window:null,console,Math,Date,setTimeout:()=>0,setInterval:()=>0,clearInterval:()=>{},document:{getElementById:()=>({innerHTML:'',remove(){}}),createElement:()=>({}),querySelectorAll:()=>[],body:{appendChild(){}}},SPECIAL_PIECES_CATALOG:catalog};
+const context={window:null,console,Math,Date,setTimeout:()=>0,setInterval:()=>0,clearInterval:()=>{},document:{getElementById:()=>({innerHTML:'',style:{},remove(){}}),createElement:()=>({}),querySelectorAll:()=>[],body:{appendChild(){}}},SPECIAL_PIECES_CATALOG:catalog};
 const storage=new Map();
 context.window={ManobraEngine:E,addEventListener(){},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},__manobraApp:{humanSide:E.WHITE},showRoguelikeToast(){}};
 vm.createContext(context);
