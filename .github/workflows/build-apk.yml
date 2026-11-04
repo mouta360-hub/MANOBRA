@@ -23,7 +23,7 @@ jobs:
       - name: Instalar dependências
         run: npm install
 
-      - name: Testar regras, sons e Bluetooth simulado
+      - name: Testar regras e jogo online
         run: npm test
 
       - name: Verificar visual Android antes de empacotar
@@ -35,8 +35,8 @@ jobs:
           npx cap add android
           npx cap sync android
           python3 tools/check_android_layout.py android/app/src/main/assets/public
-          # retrato + plugin de Bluetooth + permissões
-          python3 tools/patch_android.py android --bluetooth
+          # Android sem plugin nem permissões de Bluetooth
+          python3 tools/patch_android.py android --no-bluetooth
           pip install pillow
           python3 tools/make_icons.py android/app/src/main/res
           python3 - <<'PY'
@@ -53,47 +53,11 @@ jobs:
           print('Launcher Manobra verificado:', folder, '+ adaptive icon')
           PY
 
-      - name: Compilar APK (com Bluetooth)
-        id: build_bt
-        continue-on-error: true
-        shell: bash
+      - name: Compilar APK (somente internet)
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug 2>&1 | tee ../build-bluetooth.log
-
-      # Plano B: se o módulo de Bluetooth não compilar, gera o APK sem ele (o resto do jogo funciona igual)
-      - name: Compilar APK sem Bluetooth (plano B)
-        if: steps.build_bt.outcome == 'failure'
-        run: |
-          python3 tools/patch_android.py android --no-bluetooth
-          npx cap sync android
-          python3 tools/check_android_layout.py android/app/src/main/assets/public
-          pip install pillow
-          python3 tools/make_icons.py android/app/src/main/res
-          python3 - <<'PY'
-          from pathlib import Path
-          from PIL import Image, ImageChops, ImageOps
-          base = Image.open('assets/manobra-icon-base.png').convert('RGBA')
-          expected = ImageOps.contain(base, (192, 192), Image.Resampling.LANCZOS)
-          res = Path('android/app/src/main/res')
-          folder = res / ('mipmap-xxxhdpi-v4' if (res / 'mipmap-xxxhdpi-v4').exists() else 'mipmap-xxxhdpi')
-          actual = Image.open(folder / 'ic_launcher.png').convert('RGBA')
-          assert ImageChops.difference(actual, expected).getbbox() is None, 'launcher icon was not applied'
-          assert '@mipmap/ic_launcher_foreground' in Path('android/app/src/main/res/drawable-anydpi-v24/ic_launcher_foreground.xml').read_text()
-          print('Launcher Manobra verificado:', folder, '+ adaptive icon')
-          PY
-          cd android
           ./gradlew assembleDebug
-
-      - name: Resumo
-        if: always()
-        run: |
-          if [ "${{ steps.build_bt.outcome }}" = "success" ]; then
-            echo "APK gerado COM Bluetooth." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "O módulo de Bluetooth não compilou. APK gerado SEM Bluetooth. Baixe o artefato manobra-bluetooth-erro e envie o arquivo para quem estiver ajudando." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       - name: Guardar APK
         uses: actions/upload-artifact@v4
