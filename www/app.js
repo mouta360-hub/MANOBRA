@@ -468,7 +468,8 @@
   // Zera e reinicia o relógio a cada vez; sem relógio na vez do robô
   function startMoveClock() {
     const g = app.game;
-    const humanToMove = g && !g.over && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
+    // Contra a IA (incluindo a Aventura), o jogador pode pensar sem limite de tempo.
+    const humanToMove = g && !g.over && app.mode !== 'ai' && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
     app.moveDeadline = humanToMove ? Date.now() + moveMs() : 0;
   }
   const moveExpired = () => !!app.moveDeadline && Date.now() >= app.moveDeadline;

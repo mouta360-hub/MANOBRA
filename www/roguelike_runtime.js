@@ -183,12 +183,12 @@
         ['bastiao','tita_de_aco','baluarte','sentinela','ima_tatico','xama_dos_ventos','manipulador','oraculo','sacerdote_da_luz'].includes(e.key))
     );
     // Combinação ofensiva: a dupla pode romper uma proteção reativa
-    // ao capturar legalmente; o trio permite parceiro a até 2 casas.
+    // ao capturar legalmente; dupla e trio exigem parceiro a até 2 casas.
     const offensiveSynergy = moving && synergyFor(board, mover, mv.from, 'pierce');
     const synergyPartner = offensiveSynergy && allEntries(board).some(e =>
       e.side === mover && e.i !== mv.from && e.key !== moving.key &&
       offensiveSynergy.group.keys.includes(e.key) &&
-      distance(e.i, mv.from) <= (offensiveSynergy.tier === 3 ? 2 : 1));
+      distance(e.i, mv.from) <= 2);
     const synergyPierce = protectedTarget && offensiveSynergy && synergyPartner &&
       consume(mover, mv.from, moving.key);
     if (synergyPierce) { announce(`⚔️ ${offensiveSynergy.group.name}: combinação de ${offensiveSynergy.tier} peças rompeu a proteção!`); return true; }

@@ -2,43 +2,8 @@
  * MANOBRA ROGUELIKE - INTERFACE VISUAL DO CODEX (PERSISTENTE)
  * ========================================================================== */
 
-const SPECIAL_PIECES_PT_BR = {
-    // --- GUARDIÕES / TANQUES ---
-    "escudeiro": { name: "Escudeiro", passive: "Absorve o primeiro impacto de dano recebido por rodada.", active: "Levanta uma barricada temporária bloqueando casas adjacentes." },
-    "general": { name: "General", passive: "Concede bônus de moral para peças aliadas próximas.", active: "Ordem de marcha: move uma peça aliada adjacente." },
-    "sentinela": { name: "Sentinela", passive: "Imune a ataques surpresa vindos de diagonais.", active: "Modo vigília: intercepta qualquer inimigo que passe por perto." },
-    "baluarte": { name: "Baluarte", passive: "Reduz o dano de investidas frontais pela metade.", active: "Postura firme: recusa-se a ser empurrado ou movido." },
-    "guardiao": { name: "Guardião", passive: "Divide o dano sofrido com a peça principal.", active: "Intercepção heroica: troca de lugar com um aliado em perigo." },
-    "tartaruga": { name: "Tartaruga", passive: "Defesa dobrada quando permanece imóvel por um turno.", active: "Casco blindado: anula o próximo ataque recebido." },
-    "colosso": { name: "Colosso", passive: "Peso pesado: imune a efeitos de empurrão.", active: "Pisada sísmica: desacelera inimigos próximos." },
-    "muralha": { name: "Muralha", passive: "Cria uma zona de bloqueio intransponível ao redor.", active: "Fortificação: aumenta a própria armadura temporariamente." },
-    "bastiao": { name: "Bastião", passive: "Recupera pequena quantidade de escudo a cada turno.", active: "Pulso defensivo: empurra inimigos adjacentes para trás." },
-    "titan": { name: "Titã", passive: "Resistência massiva contra múltiplos atacantes.", active: "Investida do Titã: avança esmagando obstáculos." },
-
-    // --- ATACANTES / BERSERKERS ---
-    "lancer": { name: "Lançer", passive: "Ganho de alcance bônus ao avançar em linha reta.", active: "Investida relâmpago: perfura a defesa do oponente." },
-    "berserker": { name: "Berserker", passive: "Causa mais dano quanto menor for a sua vida/resistência.", active: "Fúria cega: executa dois ataques consecutivos." },
-    "assassino": { name: "Assassino", passive: "Ataques pelas costas causam dano crítico garantido.", active: "Passo sombrio: teleporta para uma casa vazia próxima." },
-    "duelista": { name: "Duelista", passive: "Excelente no mano a mano contra peças isoladas.", active: "Desafio: força o inimigo adjacente a focar seus ataques nele." },
-    "carrasco": { name: "Carrasco", passive: "Executa inimigos com menos de 20% de integridade.", active: "Golpe brutal: causa dano massivo com alto recuo." },
-    "cacador": { name: "Caçador", passive: "Rastreia o último movimento do oponente marcado.", active: "Disparo certeiro: atinge inimigos à distância." },
-    "gladiador": { name: "Gladiador", passive: "Ganho de poder progressivo a cada combate travado.", active: "Redemoinho de lâminas: atinge todos os adjacentes." },
-    "fanatico": { name: "Fanático", passive: "Move-se mais rápido em direção ao inimigo mais próximo.", active: "Sacrifício tático: causa dano em área ao custo de vida." },
-    "destruidor": { name: "Destruidor", passive: "Ignora parte da armadura ou bônus defensivo do alvo.", active: "Golpe sísmico: racha o piso da casa alvo." },
-    "viper": { name: "Viper", passive: "Aplica efeito de veneno corrosivo nos alvos atingidos.", active: "Bote rápido: envenena e recua para posição segura." },
-
-    // --- MAGOS / SUPORTES ---
-    "cronomago": { name: "Cronomago", passive: "Manipula o tempo, reduzindo o tempo de recarga das habilidades.", active: "Distorção temporal: repete o último turno ou ação." },
-    "oraculo": { name: "Oráculo", passive: "Revela jogadas futuras ou intenções do oponente.", active: "Visão mística: expõe peças ocultas no tabuleiro." },
-    "xama": { name: "Xamã", passive: "Aura de regeneração passiva para aliados adjacentes.", active: "Totem ancestral: invoca um marco de cura em campo." },
-    "arquimago": { name: "Arquimago", passive: "Magias custam menos energia ou turnos de recarga.", active: "Explosão arcana: dispara um feixe de pura energia." },
-    "curandeiro": { name: "Curandeiro", passive: "Restaura a integridade das peças aliadas feridas.", active: "Bênção da cura: recupera totalmente uma peça aliada." },
-    "alquimista": { name: "Alquimista", passive: "Transmuta o terreno ao redor em zonas de vantagem.", active: "Poção volátil: lança um frasco que altera o piso." },
-    "ilusionista": { name: "Ilusionista", passive: "Cria cópias falsas para confundir o oponente.", active: "Troca de ilusão: troca de posição com um holograma." },
-    "invocador": { name: "Invocador", passive: "Canaliza energia para fortalecer unidades menores.", active: "Invocar construto: coloca uma peça fantasma de suporte." },
-    "bardo": { name: "Bardo", passive: "Inspira aliados próximos com notas motivadoras.", active: "Melodia revigorante: concede um movimento extra a um aliado." },
-    "elementalista": { name: "Elementalista", passive: "Alterna entre afinidades de fogo, gelo e raio.", active: "Tempestade elemental: afeta o tabuleiro com dano mágico." }
-};
+// O catálogo real (special_pieces.js) é a fonte das regras do Codex.
+// Não manter aqui descrições alternativas de poderes não implementados.
 
 function showRoguelikeToast(message, duration = 4000) {
     const toast = document.getElementById('toast');
@@ -57,10 +22,45 @@ function showRoguelikeToast(message, duration = 4000) {
 function codexEscape(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
+const CODEX_COMBAT_EXAMPLES = Object.freeze({
+    escudeiro: 'Se o inimigo tentar capturá-lo pela primeira vez, o escudo absorve o golpe. Uma segunda captura válida pode eliminá-lo.',
+    sentinela: 'Se um inimigo tentar entrar numa casa adjacente protegida, a Sentinela pode barrar a entrada; após gastar as cargas, não bloqueia novamente.',
+    colosso: 'Quando você consegue empurrar uma peça pelas regras normais, ganha 10 moedas uma vez nesta batalha. Não empurra sozinho.',
+    bastiao: 'Coloque o Bastião ao lado de um aliado. Quando esse aliado sofrer uma captura legal, o Bastião pode impedir a primeira tentativa.',
+    muralha: 'Na última fileira, uma tentativa de ataque lateral pode ser bloqueada. Fora dessa condição, a proteção não é ativada.',
+    javali_de_ferro: 'Se o Javali capturar uma peça normalmente, você recebe 10 moedas uma vez. Ele não elimina automaticamente quem o atacar.',
+    guardiao_runico: 'Faça um movimento permitido com o Guardião Rúnico: você recebe 8 moedas uma vez. O movimento não paralisa o adversário.',
+    rebatedor: 'Quando tentam capturá-lo na diagonal, o primeiro golpe é repelido; depois disso, ele fica vulnerável.',
+    tita_de_aco: 'Mantenha um aliado na casa vizinha. O Titã de Aço pode impedir uma tentativa de captura contra esse aliado.',
+    baluarte: 'Posicione o Baluarte perto de um aliado. Ele bloqueia a primeira captura válida desse aliado, consumindo sua proteção.',
+    lancer: 'Se o Lancer fizer uma captura legal em linha reta contra um alvo protegido, sua investida pode atravessar a proteção.',
+    assassino_sombras: 'Se capturar legalmente pela diagonal uma peça protegida, o ataque furtivo pode ignorar a proteção.',
+    berserker: 'Ao fazer uma captura permitida contra uma peça protegida, a Fúria pode ultrapassar a defesa; não concede ataque extra.',
+    executor: 'Uma captura legal pode ignorar a defesa especial do alvo uma vez na batalha.',
+    cavaleiro_errante: 'Ao capturar legalmente mudando de fileira, a Carga pode atravessar a proteção do inimigo.',
+    ceifador: 'Se o alvo estiver na última fileira e a captura for legal, a Colheita pode superar a proteção.',
+    predador: 'Ao capturar uma peça adjacente por um movimento permitido, a Caçada pode ignorar sua defesa.',
+    duelista: 'Se não houver aliado adjacente ao Duelista, uma captura legal pode romper a proteção do alvo.',
+    vento_cortante: 'Se a captura legal ocorrer na mesma fileira, o Corte Horizontal pode atravessar a proteção.',
+    cacador_cabecas: 'Se o Caçador capturar legalmente uma peça especial protegida, pode ignorar a proteção. Não elimina o protetor automaticamente.',
+    cronomante: 'Movimente o Cronomante legalmente sem capturar ninguém para ganhar 5 moedas uma vez. Ele não repete turnos.',
+    ilusionista: 'Após uma troca de posições permitida pelas regras do tabuleiro, o Ilusionista pode ganhar 6 moedas. Não cria clones.',
+    teleportador: 'Uma troca de posições legal rende 8 moedas. A habilidade não permite teletransportar para qualquer casa.',
+    ima_tatico: 'Se um aliado adjacente ao Ímã sofrer uma captura e o atacante também estiver junto ao Ímã, o campo magnético pode bloquear a captura.',
+    xama_dos_ventos: 'Se um aliado na diagonal adjacente sofrer uma captura legal, o Xamã pode protegê-lo uma vez.',
+    manipulador: 'Se um aliado adjacente na mesma fileira for atacado, o Manipulador pode impedir uma captura. Não controla a peça inimiga.',
+    oraculo: 'Um aliado adjacente na mesma coluna pode ser salvo de uma captura. A habilidade não prevê jogadas futuras.',
+    alquimista: 'Quando o Alquimista captura legalmente um inimigo, recebe 20 moedas extras uma vez na batalha.',
+    sacerdote_da_luz: 'Um aliado adjacente que seria capturado pode receber Amparo e permanecer no tabuleiro, gastando uma carga.',
+    mestre_de_manobras: 'Quando o Mestre faz uma captura legal com apoio aliado, ganha 15 moedas uma vez. Não copia habilidades de outras peças.',
+});
 function codexExplanation(key, piece) {
-    if (key === 'escudeiro') return 'A primeira tentativa de captura válida é bloqueada: o escudo é consumido, mas nenhuma peça ocupa a casa do Escudeiro. Uma nova captura válida pode eliminá-lo.';
-    return piece.description || 'Consulte as regras desta habilidade no jogo.';
+    return piece.description || 'Habilidade sem descrição no catálogo.';
 }
+function codexCombatExample(key) {
+    return CODEX_COMBAT_EXAMPLES[key] || 'A habilidade respeita o movimento e a captura normais.';
+}
+
 function inspectSpecialPiece(pieceKey) {
     const piece = SPECIAL_PIECES_CATALOG[pieceKey];
     if (!piece) return;
@@ -81,7 +81,7 @@ function openRoguelikeCodex() {
         { key: 'attacker', title: '⚔️ Atacantes' },
         { key: 'support', title: '🔮 Magos e suportes' }
     ];
-    let html = `<div class="roguelike-modal-content"><div class="roguelike-header"><h2>📜 Codex — Peças e Sinergias</h2><button type="button" class="roguelike-close-btn" onclick="closeRoguelikeCodex()" aria-label="Fechar Codex">×</button></div><div class="roguelike-body"><p class="codex-intro">Descrições baseadas nas habilidades implementadas. As peças continuam obedecendo às regras normais de movimento e captura. Recargas contam turnos do próprio jogador; bônus do comandante podem alterar os valores.</p>`;
+    let html = `<div class="roguelike-modal-content"><div class="roguelike-header"><h2>📜 Codex — Peças e Sinergias</h2><button type="button" class="roguelike-close-btn" onclick="closeRoguelikeCodex()" aria-label="Fechar Codex">×</button></div><div class="roguelike-body"><p class="codex-intro">Descrições baseadas nas habilidades implementadas. Contra a IA, inclusive na Aventura, não há limite de tempo para sua jogada. As peças continuam obedecendo às regras normais de movimento e captura. Recargas contam turnos do próprio jogador; bônus do comandante podem alterar os valores.</p>`;
     const synergySets = (window.RoguelikeRuntime && window.RoguelikeRuntime.synergySets) || [];
     html += `<section class="roguelike-category-section" id="codex-synergies"><h3>🔗 Sinergias — duplas e trios</h3><p class="codex-intro">As habilidades individuais continuam funcionando sozinhas. A sinergia é um bônus adicional, válido para você e para os inimigos. É preciso ter duas peças diferentes do mesmo conjunto vivas e próximas no tabuleiro; comprar as peças não basta. O trio amplia o alcance, mas não substitui as habilidades individuais. Os bônus consomem usos da peça que os ativa e respeitam a recarga.</p><div class="roguelike-grid">`;
     for (const group of synergySets) {
@@ -91,12 +91,12 @@ function openRoguelikeCodex() {
             ? 'Uma peça do conjunto pode gastar 1 uso para impedir a captura de QUALQUER aliado na mesma linha ou coluna, a até 1 casa dela. Precisa ter outra peça diferente da Falange próxima.'
             : group.id === 'juramento'
             ? 'Uma peça do conjunto pode gastar 1 uso para impedir a captura de OUTRA integrante do Juramento a até 1 casa. Não protege peças de fora do conjunto.'
-            : 'Uma peça do conjunto que faz uma captura legal pode gastar 1 uso para ignorar a proteção especial do alvo se outra integrante diferente estiver a até 1 casa da atacante.';
+            : 'Uma peça do conjunto que faz uma captura legal pode gastar 1 uso para ignorar a proteção especial do alvo se outra integrante diferente estiver a até 2 casas da atacante.';
         const trio = group.id === 'falange'
             ? 'Com as três integrantes diferentes próximas no tabuleiro, a Falange protege aliados na mesma linha ou coluna a até 2 casas da protetora.'
             : group.id === 'juramento'
             ? 'Com as três integrantes diferentes próximas no tabuleiro, uma peça do Juramento protege outra integrante a até 2 casas.'
-            : 'Com as três integrantes diferentes próximas no tabuleiro, a parceira que apoia a atacante pode ficar a até 2 casas. Continua exigindo captura legal e consumindo 1 uso da atacante.';
+            : 'Com as três integrantes diferentes próximas no tabuleiro, a parceira que apoia a atacante continua podendo ficar a até 2 casas. Continua exigindo captura legal e consumindo 1 uso da atacante.';
         const example = group.id === 'falange'
             ? `Exemplo: ${names[0]} protege um aliado comum na mesma coluna. ${names[1]} precisa estar próxima para ativar a Falange. Com ${names[2]} por perto, o alcance aumenta.`
             : group.id === 'juramento'
@@ -112,7 +112,7 @@ function openRoguelikeCodex() {
             const limit = limits[key];
             const usage = limit ? `${limit.uses} uso${limit.uses !== 1 ? 's' : ''} por combate · ${limit.cooldown ? `recarga de ${limit.cooldown} turno${limit.cooldown !== 1 ? 's' : ''}` : 'sem recarga'}` : 'Consulte os limites no combate';
             const groupNames = synergySets.filter(group => group.keys.includes(key)).map(group => group.name);
-            html += `<article class="roguelike-card"><div class="roguelike-card-header"><span class="roguelike-symbol">${codexEscape(piece.symbol || '🔹')}</span><strong class="roguelike-name">${codexEscape(piece.name || key)}</strong></div><p class="codex-effect">${codexEscape(codexExplanation(key, piece))}</p><p class="codex-usage"><strong>Limites:</strong> ${codexEscape(usage)}</p>${groupNames.length ? `<p class="codex-usage"><strong>Sinergia:</strong> ${groupNames.map(codexEscape).join(', ')} (veja acima)</p>` : ''}</article>`;
+            html += `<article class="roguelike-card"><div class="roguelike-card-header"><span class="roguelike-symbol">${codexEscape(piece.symbol || '🔹')}</span><strong class="roguelike-name">${codexEscape(piece.name || key)}</strong></div><p class="codex-effect"><strong>O que faz:</strong> ${codexEscape(codexExplanation(key, piece))}</p><p class="codex-effect"><strong>Exemplo em combate:</strong> ${codexEscape(codexCombatExample(key))}</p><p class="codex-usage"><strong>Limites:</strong> ${codexEscape(usage)}</p>${groupNames.length ? `<p class="codex-usage"><strong>Sinergia:</strong> ${groupNames.map(codexEscape).join(', ')} (veja acima)</p>` : ''}</article>`;
         }
         html += '</div></section>';
     }
