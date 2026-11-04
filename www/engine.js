@@ -5,10 +5,10 @@
 (function (root) {
   'use strict';
 
-  const COLS = 13, ROWS = 11, N = COLS * ROWS;
+  const COLS = 13, ROWS = 9, N = COLS * ROWS;
   const EMPTY = 0, WA = 1, WD = 2, BA = 3, BD = 4; // A = ataque, D = defesa
   const WHITE = 0, BLACK = 1;
-  const MAX_DEF = 6, PIECES = 20;
+  const MAX_DEF = 6, PIECES = 13;
   const WIN = 100000;
 
   const idx = (r, c) => r * COLS + c;
@@ -246,7 +246,7 @@
 
   /* ---------- Montagem ---------- */
   function territoryCells(side) {
-    const r0 = side === WHITE ? 6 : 0, r1 = side === WHITE ? 10 : 4;
+    const r0 = side === WHITE ? 5 : 0, r1 = side === WHITE ? 8 : 3;
     const out = [];
     for (let r = r0; r <= r1; r++) for (let c = 0; c < COLS; c++) {
       const i = idx(r, c);
@@ -262,11 +262,9 @@
     [1, 3, 1], [1, 5, 1], [1, 7, 1], [1, 9, 1],
     [2, 2, 0], [2, 4, 1], [2, 6, 1], [2, 8, 1], [2, 10, 0],
     [3, 5, 1], [3, 7, 1],
-    [4, 4, 1], [4, 8, 1],
-    [0, 2, 1], [0, 10, 1], [2, 0, 1], [2, 12, 1], [4, 6, 1]
   ];
   function presetSetup(side, rnd) {
-    const out = PRESET.map(([r, c, a]) => ({ i: idx(side === BLACK ? r : 10 - r, c), a: !!a }));
+    const out = PRESET.map(([r, c, a]) => ({ i: idx(side === BLACK ? r : 8 - r, c), a: !!a }));
     if (rnd) { // pequena variação: troca o modo de até 2 peças, respeitando o limite de defesa
       for (let k = 0; k < 2; k++) {
         const x = out[Math.floor(rnd() * out.length)];

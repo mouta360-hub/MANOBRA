@@ -24,7 +24,7 @@
   .menu-redesign .menu-settings-button { width:100%; min-width:0; }
   .options-page .card { max-width:100%; box-sizing:border-box; }
   /* O tabuleiro de 13 colunas cabe na largura útil, inclusive em WebView. */
-  :root { --cs: min(calc((100vw - 24px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)) / 13), calc((100dvh - 175px) / 11)); }
+  :root { --cs: min(calc((100vw - 24px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)) / 13), calc((100dvh - 175px) / 9)); }
   #app > .layout { display:flex; flex-direction:column; align-items:stretch; gap:12px; min-width:0; width:100%; box-sizing:border-box; }
   #app > .layout > .bw { width:100%; max-width:100%; min-width:0; height:auto; min-height:0; display:flex; align-items:flex-start; justify-content:center; padding:0; overflow-x:auto; overscroll-behavior-x:contain; box-sizing:border-box; }
   #app > .layout > .bw > #board { flex:0 0 auto; margin:0 auto; }
@@ -34,7 +34,7 @@
   .roguelike-grid { grid-template-columns:minmax(0,1fr); }
 }
 @media (max-width:899px) and (orientation:landscape) {
-  :root { --cs: min(calc((100vw - 245px) / 13), calc((100dvh - 28px) / 11)); }
+  :root { --cs: min(calc((100vw - 245px) / 13), calc((100dvh - 28px) / 9)); }
   #app > .layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,225px); gap:10px; }
   #app > .layout > .bw { align-items:center; }
   #app > .layout > .side { max-height:calc(100dvh - 12px); overflow-y:auto; }

@@ -1,16 +1,16 @@
-/* Ajuste final: tabuleiro 13x11 sempre dentro da janela disponível. */
-:root { --cs: max(12px, min(calc((100vw - 32px) / 13), calc((100dvh - 190px) / 11))); }
+/* Ajuste final: tabuleiro 13x9 sempre dentro da janela disponível. */
+:root { --cs: max(12px, min(calc((100vw - 32px) / 13), calc((100dvh - 190px) / 9))); }
 #app > .layout > .bw { min-width: 0; box-sizing: border-box; }
 #board { box-sizing: content-box; max-width: none; }
 @media (min-width:900px) {
-  :root { --cs: max(14px, min(calc((100vw - 455px) / 13), calc((100dvh - 85px) / 11), 78px)); }
+  :root { --cs: max(14px, min(calc((100vw - 455px) / 13), calc((100dvh - 85px) / 9), 110px)); }
   #app > .layout > .bw { min-height: 0; height: calc(100dvh - 36px); padding: 0; display: flex; align-items: center; justify-content: center; }
   #app > .layout > .side { max-height: calc(100dvh - 36px); overflow-y: auto; }
 }
 @media (min-width:900px) and (max-height:650px) {
-  :root { --cs: max(12px, min(calc((100vw - 455px) / 13), calc((100dvh - 64px) / 11))); }
+  :root { --cs: max(12px, min(calc((100vw - 455px) / 13), calc((100dvh - 64px) / 9))); }
 }
 @media (max-width:899px) {
-  :root { --cs: max(12px, min(calc((100vw - 32px) / 13), calc((100dvh - 200px) / 11))); }
+  :root { --cs: max(12px, min(calc((100vw - 32px) / 13), calc((100dvh - 200px) / 9))); }
   #app > .layout > .bw { min-height: 0; overflow: visible; }
 }
