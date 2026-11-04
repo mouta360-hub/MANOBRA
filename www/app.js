@@ -467,6 +467,9 @@
   }
   // Zera e reinicia o relógio a cada vez; sem relógio na vez do robô
   function startMoveClock() {
+    // Aventura é offline e sem limite de tempo por jogada.
+    // Mantém o cronômetro dos modos clássicos e campeonatos.
+    if (window._inRoguelikeBattle) { app.moveDeadline = 0; return; }
     const g = app.game;
     const humanToMove = g && !g.over && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
     app.moveDeadline = humanToMove ? Date.now() + moveMs() : 0;
@@ -1150,20 +1153,7 @@
     const g = app.game;
     if (app.mode === 'bt' && !remote) btSend({ k: 'move', m: { t: mv.t, from: mv.from, to: mv.to, beyond: mv.beyond } });
     const cap = g.st.b[mv.to]; // peça que estava na casa de destino (para animar a eliminação)
-    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) {
-      // Proteção reativa: a captura é impedida, mas a tentativa gasta a vez.
-      // Usar Game.pass() mantém o relógio e o turno sincronizados com o motor.
-      if (window.RoguelikeRuntime.takeBlockedTurn && window.RoguelikeRuntime.takeBlockedTurn()) {
-        const side = g.st.turn;
-        g.pass();
-        app.sel = -1; app.purge = false; app.choice = null;
-        if (window.RoguelikeRuntime.onBlockedTurn) window.RoguelikeRuntime.onBlockedTurn(side);
-        updateFlip();
-        render();
-        afterMove(false);
-      }
-      return;
-    }
+    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) return;
     g.play(mv);
     if (window.RoguelikeRuntime && window.RoguelikeRuntime.afterMove) window.RoguelikeRuntime.afterMove(g, mv, cap);
     app.sel = -1; app.purge = false; app.choice = null;
