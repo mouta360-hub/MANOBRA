@@ -11,7 +11,7 @@
   const sideAt = (board, i) => board && Number.isInteger(i) && i >= 0 && i < board.length && board[i] && E() ? E().sideOf(board[i]) : -1;
   const enemyOf = side => side === E().WHITE ? E().BLACK : E().WHITE;
   function announce(text) { if (typeof window.showRoguelikeToast === 'function') window.showRoguelikeToast(text); }
-  function state() { const r = run(); if (!r) return null; r.abilityState ||= {}; const s = r.abilityState; s.shield ||= {}; s.cooldown ||= {}; s.used ||= {}; s.captured ||= [0, 0]; s.stun ||= {}; s.pending ||= null; s.turnUsed ||= {}; s.charges ||= {}; s.abilityCooldown ||= {}; s.deathPacts ||= {}; s.predatorAmbush ||= {}; s.duelistBan ||= {}; s.bounties ||= {}; s.chronoFreeze ||= {}; s.illusions ||= {}; return s; }
+  function state() { const r = run(); if (!r) return null; r.abilityState ||= {}; const s = r.abilityState; s.shield ||= {}; s.cooldown ||= {}; s.used ||= {}; s.captured ||= [0, 0]; s.stun ||= {}; s.pending ||= null; s.turnUsed ||= {}; s.charges ||= {}; s.abilityCooldown ||= {}; s.deathPacts ||= {}; s.predatorAmbush ||= {}; s.duelistBan ||= {}; s.bounties ||= {}; s.chronoFreeze ||= {}; s.illusions ||= {}; s.priestGraves ||= []; s.priestResurrected ||= {}; return s; }
   // Recarga em turnos do próprio jogador. O turno de ativação não conta.
   const ABILITY_LIMITS = Object.freeze({
     escudeiro: { uses: 1, cooldown: 0 },
@@ -23,7 +23,7 @@
     assassino_sombras: { uses: 2, cooldown: 2 },
     ceifador: { uses: 1, cooldown: 0 },
     vento_cortante: { uses: 2, cooldown: 3 },
-    alquimista: { uses: 1, cooldown: 0 },
+    alquimista: { uses: 1, cooldown: 3 },
     sentinela: { uses: 2, cooldown: 2 },
     colosso: { uses: 1, cooldown: 0 },
     muralha: { uses: 1, cooldown: 0 },
@@ -38,13 +38,13 @@
     cacador_cabecas: { uses: 1, cooldown: 0 },
     cronomante: { uses: 1, cooldown: 2 },
     ilusionista: { uses: 1, cooldown: 3 },
-    teleportador: { uses: 2, cooldown: 3 },
-    ima_tatico: { uses: 2, cooldown: 2 },
+    teleportador: { uses: 1, cooldown: 3 },
+    ima_tatico: { uses: 1, cooldown: 3 },
     xama_dos_ventos: { uses: 1, cooldown: 0 },
-    manipulador: { uses: 1, cooldown: 0 },
-    oraculo: { uses: 2, cooldown: 3 },
-    sacerdote_da_luz: { uses: 2, cooldown: 3 },
-    mestre_de_manobras: { uses: 1, cooldown: 0 }
+    manipulador: { uses: 1, cooldown: 3 },
+    oraculo: { uses: 1, cooldown: 3 },
+    sacerdote_da_luz: { uses: 1, cooldown: 4 },
+    mestre_de_manobras: { uses: 1, cooldown: 3 }
   });
   window.MANOBRA_CODEX_ABILITY_LIMITS = ABILITY_LIMITS;
   const DEFENSE_KEYS = new Set(['escudeiro','rebatedor','bastiao','tita_de_aco','baluarte','sentinela','muralha','javali_de_ferro']);
@@ -71,6 +71,13 @@
     // Maestria adquirida nas lojas durante esta campanha, nunca para o inimigo.
     const mastery = typeof window.rogueMasteryLevel === 'function' ? window.rogueMasteryLevel(key) : 1;
     if (key === 'ilusionista') return { uses: mastery, cooldown: mastery >= 3 ? 1 : mastery === 2 ? 2 : 3 };
+    if (key === 'teleportador') return { uses: mastery, cooldown: mastery >= 3 ? 1 : mastery === 2 ? 2 : 3 };
+    if (key === 'oraculo') return { uses: mastery, cooldown: mastery >= 3 ? 2 : 3 };
+    if (key === 'alquimista') return { uses: mastery, cooldown: mastery >= 2 ? 2 : 3 };
+    if (key === 'sacerdote_da_luz') return { uses: mastery, cooldown: mastery >= 2 ? 3 : 4 };
+    if (key === 'mestre_de_manobras') return { uses: mastery, cooldown: mastery >= 2 ? 2 : 3 };
+    if (key === 'manipulador') return { uses: mastery, cooldown: mastery >= 2 ? 2 : 3 };
+    if (key === 'ima_tatico') return { uses: mastery, cooldown: mastery >= 3 ? 1 : mastery === 2 ? 2 : 3 };
     extra += Math.max(0, mastery - 1);
     if (mastery >= 3) reduction += 1;
     return { uses: base.uses + extra, cooldown: ['duelista','muralha_ancora'].includes(key) ? 1 : Math.max(0, base.cooldown - reduction) };
@@ -173,7 +180,7 @@
     delete mv.rogueExecution;
     delete mv.rogueTeleport;
     const legal = game.legal();
-    if (game.over || !legal || !Array.isArray(legal.moves) || !legal.moves.some(x => x.t === mv.t && x.from === mv.from && x.to === mv.to && (x.beyond ?? -1) === (mv.beyond ?? -1))) return false;
+    if (game.over || !legal || !Array.isArray(legal.moves) || !(mv.rogueAlchemy && alchemistOptions(game).some(o => o.caster === mv.rogueAlchemyCast && o.move.from === mv.from && o.move.to === mv.to && o.move.t === mv.t && o.move.rogueAlchemy?.mid === mv.rogueAlchemy.mid)) && !legal.moves.some(x => x.t === mv.t && x.from === mv.from && x.to === mv.to && (x.beyond ?? -1) === (mv.beyond ?? -1))) return false;
     const board = game.st.b, mover = sideAt(board, mv.from), target = mv.to >= 0 ? specialEntry(board, mv.to) : null;
     // A isca é representada por uma peça normal para a IA; sua identidade
     // verdadeira só é revelada quando o adversário tenta interagir com ela.
@@ -219,6 +226,213 @@
       }
     }
 
+    // Atração Magnética: casa do Ímã = 1, alvo na terceira casa diagonal.
+    // O alvo recua uma casa para o Ímã; a habilidade consome a jogada.
+    if (actor?.key === 'ima_tatico' && available(mover,mv.from,'ima_tatico') &&
+        !state().berserkerBonus) {
+      const choices=[];
+      const a=rc(mv.from);
+      for (const dr of [-1,1]) for (const dc of [-1,1]) {
+        const target=idx(a.r+2*dr,a.c+2*dc);
+        const landing=idx(a.r+dr,a.c+dc);
+        if (target>=0 && landing>=0 && E().isDarkCell(target) && E().isDarkCell(landing) &&
+            !E().isMain(landing) && !board[landing] && sideAt(board,target)===enemyOf(mover))
+          choices.push({target,landing});
+      }
+      if (choices.length) {
+        const human=window.__manobraApp && window.__manobraApp.humanSide===mover;
+        let choice=null;
+        if (human && typeof window.confirm==='function' &&
+            window.confirm('🧲 ATRAÇÃO MAGNÉTICA\n\nPuxar um inimigo uma casa na diagonal? Consome uma carga e sua jogada.')) {
+          if (choices.length===1) choice=choices[0];
+          else if (typeof window.prompt==='function') {
+            const answer=window.prompt('Escolha a casa do inimigo: '+choices.map(x=>x.target).join(', '),String(choices[0].target));
+            if (answer!==null) choice=choices.find(x=>x.target===Number(answer))||null;
+          }
+        } else if (!human) choice=choices[0];
+        if (choice) {
+          const defender=enemyOf(mover);
+          const guards=allEntries(board).filter(e=>e.key==='muralha' && e.side===defender &&
+            distance(e.i,choice.target)<=1 && available(defender,e.i,'muralha_ancora'));
+          let guard=null;
+          if (guards.length && defender===(window.__manobraApp && window.__manobraApp.humanSide)) {
+            if (typeof window.confirm==='function' && window.confirm('🛡️ ÂNCORA DE FERRO\n\nBloquear a atração magnética e gastar uma carga?')) guard=guards[0];
+          } else if (guards.length) guard=guards[0];
+          if (consume(mover,mv.from,'ima_tatico')) {
+            if (guard) {
+              consume(defender,guard.i,'muralha_ancora');
+              announce('🛡️ Âncora de Ferro bloqueou a Atração Magnética!');
+            } else {
+              board[choice.landing]=board[choice.target]; board[choice.target]=0;
+              const bag=defender===(window.__manobraApp && window.__manobraApp.humanSide)
+                ? run().deployed : run().enemyDeployed;
+              const key=bag && bag[String(choice.target)];
+              if (key) {
+                delete bag[String(choice.target)]; bag[String(choice.landing)]=key;
+                for (const field of ['charges','abilityCooldown']) {
+                  const oldId=abilityId(defender,choice.target,key), newId=abilityId(defender,choice.landing,key);
+                  if (Object.prototype.hasOwnProperty.call(state()[field],oldId)) {
+                    state()[field][newId]=state()[field][oldId]; delete state()[field][oldId];
+                  }
+                }
+              }
+              pactRelocate(state(),defender,choice.target,choice.landing);
+              moveFreeze(defender,choice.target,choice.landing);
+              for (const mark of Object.values(state().bounties))
+                if (mark.side===defender && mark.target===choice.target) mark.target=choice.landing;
+              announce('🧲 Atração Magnética: inimigo puxado uma casa!');
+            }
+            if (typeof game.record==='function') game.record();
+            state().blockedMove=true; state().pending=null; state().magnetJustCast=mover;
+            return false;
+          }
+        }
+      }
+    }
+
+    // Controle de Movimento: seleciona inimigo em qualquer diagonal no alcance
+    // (contando a origem como casa 1), e move-o uma diagonal livre à escolha.
+    if (actor?.key === 'manipulador' && available(mover,mv.from,'manipulador') &&
+        !state().berserkerBonus) {
+      const human = window.__manobraApp && window.__manobraApp.humanSide === mover;
+      const mastery = human && typeof window.rogueMasteryLevel === 'function'
+        ? window.rogueMasteryLevel('manipulador') : 1;
+      const reach = mastery >= 3 ? 3 : mastery === 2 ? 2 : 1;
+      const options = [];
+      const origin = rc(mv.from);
+      for (let step=1;step<=reach;step++) for (const dr of [-1,1]) for (const dc of [-1,1]) {
+        const target=idx(origin.r+step*dr,origin.c+step*dc);
+        if (target<0 || !E().isDarkCell(target) || sideAt(board,target)!==enemyOf(mover)) continue;
+        const tr=rc(target);
+        for (const er of [-1,1]) for (const ec of [-1,1]) {
+          const landing=idx(tr.r+er,tr.c+ec);
+          if (landing>=0 && E().isDarkCell(landing) && !E().isMain(landing) && !board[landing])
+            options.push({target,landing});
+        }
+      }
+      if (options.length) {
+        let selected=null;
+        if (human) {
+          if (typeof window.confirm==='function' && window.confirm('🔮 CONTROLE DE MOVIMENTO\n\nMover um inimigo uma casa diagonal? Consome sua jogada e uma carga.')) {
+            const targets=[...new Set(options.map(x=>x.target))];
+            const targetAnswer=typeof window.prompt==='function'
+              ? window.prompt('Escolha a casa do inimigo: '+targets.join(', '),String(targets[0])) : null;
+            const target=targetAnswer===null ? -1 : Number(targetAnswer);
+            const destinations=options.filter(x=>x.target===target).map(x=>x.landing);
+            if (destinations.length) {
+              const landingAnswer=typeof window.prompt==='function'
+                ? window.prompt('Escolha a casa diagonal livre: '+destinations.join(', '),String(destinations[0])) : null;
+              const landing=landingAnswer===null ? -1 : Number(landingAnswer);
+              selected=options.find(x=>x.target===target && x.landing===landing)||null;
+            }
+          }
+        } else {
+          // IA usa somente casas e posições visíveis; prioriza afastar alvo de sua base.
+          selected=options.slice().sort((a,b)=>distance(mv.from,b.landing)-distance(mv.from,a.landing)||a.target-b.target)[0];
+        }
+        if (selected && consume(mover,mv.from,'manipulador')) {
+          const defender=enemyOf(mover), from=selected.target, to=selected.landing;
+          board[to]=board[from]; board[from]=0;
+          const bag=defender===(window.__manobraApp && window.__manobraApp.humanSide)
+            ? run().deployed : run().enemyDeployed;
+          const key=bag && bag[String(from)];
+          if (key) {
+            delete bag[String(from)];bag[String(to)]=key;
+            for (const field of ['charges','abilityCooldown']) {
+              const oldId=abilityId(defender,from,key),newId=abilityId(defender,to,key);
+              if (Object.prototype.hasOwnProperty.call(state()[field],oldId)) {
+                state()[field][newId]=state()[field][oldId];delete state()[field][oldId];
+              }
+            }
+          }
+          pactRelocate(state(),defender,from,to);
+          moveFreeze(defender,from,to);
+          for (const mark of Object.values(state().bounties))
+            if (mark.side===defender && mark.target===from) mark.target=to;
+          if (typeof game.record==='function') game.record();
+          state().blockedMove=true;state().pending=null;state().manipulatorJustCast=mover;
+          announce('🔮 Controle de Movimento: inimigo deslocado uma casa diagonal!');
+          return false;
+        }
+      }
+    }
+
+    // Portal Dimensional: somente aliado em ataque adjacente ao Teleportador.
+    // A origem da contagem é a casa do aliado: Maestria I = 2 passos,
+    // Maestrias II/III = 3 passos, em qualquer uma das 4 diagonais.
+    if (actor?.key === 'teleportador' && available(mover,mv.from,'teleportador') &&
+        !state().berserkerBonus) {
+      const human = window.__manobraApp && window.__manobraApp.humanSide === mover;
+      const mastery = human && typeof window.rogueMasteryLevel === 'function'
+        ? window.rogueMasteryLevel('teleportador') : 1;
+      const steps = mastery >= 2 ? 3 : 2;
+      const choices = [];
+      const enemyMain = mover === E().WHITE ? 6 : 110; // base inimiga: (0,6) / (8,6)
+      for (let origin = 0; origin < board.length; origin++) {
+        if (sideAt(board,origin) !== mover || !E().isAttack(board[origin]) ||
+            !isDiagonal(mv.from,origin)) continue;
+        const a = rc(origin);
+        for (const dr of [-1,1]) for (const dc of [-1,1]) {
+          for (let step = 1; step <= steps; step++) {
+            const dest = idx(a.r+dr*step,a.c+dc*step);
+            if (dest < 0 || !E().isDarkCell(dest) || board[dest] || E().isMain(dest) ||
+                distance(dest,enemyMain) <= 1) continue;
+            choices.push({origin,dest,step});
+          }
+        }
+      }
+      if (choices.length) {
+        let choice = null;
+        if (human && typeof window.confirm === 'function' &&
+            window.confirm('🔄 PORTAL DIMENSIONAL\n\nTransportar uma peça aliada em ATAQUE? Consome a jogada e uma carga. Cancelar = jogar normalmente.')) {
+          if (typeof window.prompt === 'function') {
+            const origins = [...new Set(choices.map(x=>x.origin))];
+            const originText = window.prompt('Escolha a casa da peça aliada: '+origins.join(', '),String(origins[0]));
+            const origin = originText === null ? -1 : Number(originText);
+            const options = choices.filter(x=>x.origin===origin);
+            if (options.length) {
+              const destText = window.prompt('Escolha o destino vazio: '+options.map(x=>x.dest).join(', '),String(options[0].dest));
+              if (destText !== null) choice = options.find(x=>x.dest===Number(destText)) || null;
+            }
+          }
+        } else if (!human) {
+          // A IA avalia somente peças e destinos visíveis; prefere reposicionar
+          // uma peça isolada para perto de aliados, sem entrar na base protegida.
+          const allyCount = pos => [-1,1].reduce((n,dr)=>n+[-1,1].filter(dc=>
+            sideAt(board,idx(rc(pos).r+dr,rc(pos).c+dc))===mover).length,0);
+          choice = choices.slice().sort((a,b)=>
+            (allyCount(b.dest)-allyCount(b.origin))-(allyCount(a.dest)-allyCount(a.origin)) || b.step-a.step)[0];
+        }
+        if (choice && consume(mover,mv.from,'teleportador')) {
+          board[choice.dest] = board[choice.origin];
+          board[choice.origin] = 0;
+          const bag = mover === (window.__manobraApp && window.__manobraApp.humanSide)
+            ? run().deployed : run().enemyDeployed;
+          const movedKey = bag && bag[String(choice.origin)];
+          if (movedKey) {
+            delete bag[String(choice.origin)]; bag[String(choice.dest)] = movedKey;
+            for (const field of ['charges','abilityCooldown']) {
+              const oldId=abilityId(mover,choice.origin,movedKey), newId=abilityId(mover,choice.dest,movedKey);
+              if (Object.prototype.hasOwnProperty.call(state()[field],oldId)) {
+                state()[field][newId]=state()[field][oldId]; delete state()[field][oldId];
+              }
+            }
+          }
+          pactRelocate(state(),mover,choice.origin,choice.dest);
+          moveFreeze(mover,choice.origin,choice.dest);
+          for (const mark of Object.values(state().bounties))
+            if (mark.side===mover && mark.target===choice.origin) mark.target=choice.dest;
+          if (state().illusions[`${mover}:${choice.origin}`]) {
+            state().illusions[`${mover}:${choice.dest}`] = {...state().illusions[`${mover}:${choice.origin}`],ownerPos:choice.dest};
+            delete state().illusions[`${mover}:${choice.origin}`];
+          }
+          if (typeof game.record === 'function') game.record();
+          state().blockedMove=true; state().pending=null; state().teleportJustCast=mover;
+          announce('🔄 Portal Dimensional: aliado transportado!');
+          return false;
+        }
+      }
+    }
     if (mv.t !== 'x' && mover !== game.st.turn) return false;
     // Validação extra para interface e para qualquer chamador direto.
     if (frozenAt(mover, mv.from)) {
@@ -306,7 +520,7 @@
     }
     // Ao iniciar outro turno do Predador, a emboscada antiga expira.
     if (moving && moving.key === 'predador') delete state().predatorAmbush[ambushId];
-    state().pending = { reapersBefore: allEntries(board).filter(x => x.key === 'ceifador').map(x => ({side:x.side,pos:x.i})), victim: target && target.key, victimSide: sideAt(board, mv.to), attacker: moving && moving.key, attackerSide: mv.t === 'x' ? game.st.turn : mover, from: mv.from, to: mv.to };
+    state().pending = { reapersBefore: allEntries(board).filter(x => x.key === 'ceifador').map(x => ({side:x.side,pos:x.i})), victim: target && target.key, victimPiece: board[mv.to] || 0, victimSide: sideAt(board, mv.to), attacker: moving && moving.key, attackerSide: mv.t === 'x' ? game.st.turn : mover, from: mv.from, to: mv.to };
     // A troca precisa guardar a identidade ANTES de game.play alterar o tabuleiro.
     if (mv.t === 's') {
       const other = specialEntry(board, mv.to);
@@ -330,22 +544,29 @@
     }
     // Remoção obrigatória da sétima defesa é regra do motor, não uma captura bloqueável.
     if (mv.t === 'x') return true;
-    // Cavaleiro Errante: captura e avanço opcional de uma casa na mesma diagonal.
-    // Sem espaço livre ou sem aprovação, mantém captura comum e não gasta carga.
+    // Cavaleiro Errante: avanço opcional para QUALQUER diagonal livre após captura.
     if (moving && moving.key === 'cavaleiro_errante' && mv.t === 'k' &&
         E().isAttack(board[mv.from]) && available(mover, mv.from, moving.key)) {
-      const a = rc(mv.from), f = rc(mv.to), dr = f.r - a.r, dc = f.c - a.c;
-      const landing = idx(f.r + dr, f.c + dc);
-      if (Math.abs(dr) === 1 && Math.abs(dc) === 1 && landing >= 0 &&
-          E().isDarkCell(landing) && !E().isMain(landing) && !board[landing]) {
+      const f = rc(mv.to), landings = [];
+      for (const dr of [-1,1]) for (const dc of [-1,1]) {
+        const landing = idx(f.r+dr,f.c+dc);
+        if (landing >= 0 && E().isDarkCell(landing) && !E().isMain(landing) && !board[landing])
+          landings.push(landing);
+      }
+      if (landings.length) {
         const human = window.__manobraApp ? window.__manobraApp.humanSide : E().WHITE;
-        const approved = mover !== human || (typeof window.confirm === 'function' &&
-          window.confirm('♞ CARGA DE CAVALARIA\n\nOK: capturar e avançar mais uma casa na mesma diagonal (gasta 1 carga).\nCancelar: captura normal sem gastar carga.'));
-        if (approved && consume(mover, mv.from, moving.key)) {
-          mv.rogueCavalry = { landing };
-          state().pending.cavalry = { landing };
-          announce('♞ Carga de Cavalaria: captura e avanço extra!');
-          return true;
+        let landing = landings[0];
+        if (mover === human) {
+          const choice = typeof window.prompt === 'function'
+            ? window.prompt('♞ Carga de Cavalaria: escolha uma casa diagonal livre (' +
+              landings.map(i=>i+1).join(', ') + '). Cancelar = captura normal.', String(landing+1))
+            : null;
+          landing = choice === null ? -1 : Number(choice)-1;
+        }
+        if (landings.includes(landing) && consume(mover,mv.from,moving.key)) {
+          mv.rogueCavalry = {landing};
+          state().pending.cavalry = {landing};
+          announce('♞ Carga de Cavalaria: avanço diagonal escolhido!');
         }
       }
     }
@@ -470,7 +691,7 @@
     const protectedTarget = isCapture(mv, board) && target && (
       ['escudeiro', 'rebatedor', 'muralha'].includes(target.key) ||
       allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) <= (e.key === 'baluarte' ? 2 : 1) && e.i !== mv.to &&
-        ['bastiao','tita_de_aco','baluarte','sentinela','ima_tatico','xama_dos_ventos','manipulador','oraculo','sacerdote_da_luz'].includes(e.key))
+        ['bastiao','tita_de_aco','baluarte','sentinela','xama_dos_ventos'].includes(e.key))
     );
     // Combinação ofensiva: a dupla pode romper uma proteção reativa
     // ao capturar legalmente; o trio permite parceiro a até 2 casas.
@@ -535,14 +756,47 @@
         }
       }
     }
+    // Xamã: reação opcional durante a jogada inimiga. A vítima escapa
+    // e o atacante ocupa a antiga casa dela, SEM captura nem bônus por captura.
+    if (mv.t === 'k' && isCapture(mv,board) && sideAt(board,mv.to) === enemyOf(mover)) {
+      const victimSide = sideAt(board,mv.to), target = rc(mv.to);
+      const shamans = allEntries(board).filter(e => e.key === 'xama_dos_ventos' &&
+        e.side === victimSide && e.i !== mv.to && isDiagonal(e.i,mv.to) &&
+        distance(e.i,mv.to) === 1 && available(e.side,e.i,e.key));
+      const escape = [];
+      for (const dr of [-1,1]) for (const dc of [-1,1]) {
+        const dest = idx(target.r+dr,target.c+dc);
+        if (dest >= 0 && E().isDarkCell(dest) && !E().isMain(dest) && !board[dest])
+          escape.push(dest);
+      }
+      if (shamans.length && escape.length) {
+        const human = window.__manobraApp ? window.__manobraApp.humanSide : E().WHITE;
+        let approved = victimSide !== human || (typeof window.confirm === 'function' &&
+          window.confirm('💨 Rajada de Fuga: salvar a peça ameaçada? O atacante avançará para a casa dela sem capturá-la.'));
+        if (approved) {
+          let dest = escape[0];
+          if (victimSide === human) {
+            const chosen = typeof window.prompt === 'function'
+              ? window.prompt('Escolha a casa diagonal de fuga: ' +
+                escape.map(i=>i+1).join(', ') + '. Cancelar = não usar.',String(dest+1))
+              : null;
+            dest = chosen === null ? -1 : Number(chosen)-1;
+          } else {
+            escape.sort((a,b)=>distance(mv.from,b)-distance(mv.from,a)||a-b);
+            dest = escape[0];
+          }
+          if (escape.includes(dest) && consume(shamans[0].side,shamans[0].i,shamans[0].key)) {
+            state().pendingWindEscape = {side:victimSide,from:mv.to,to:dest,
+              attackerSide:mover,attackerFrom:mv.from,attackerTo:mv.to};
+            state().blockedMove = true; state().pending = null;
+            announce('💨 Rajada de Fuga! Aliado escapou; atacante avança sem capturar.');
+            return false;
+          }
+        }
+      }
+    }
     // Suportes oferecem proteção situacional. Só reagem a capturas legais.
-    const supportGuard = {
-      ima_tatico: (e) => distance(e.i, mv.from) === 1,
-      xama_dos_ventos: (e) => isDiagonal(e.i, mv.to),
-      manipulador: (e) => rc(e.i).r === rc(mv.to).r,
-      oraculo: (e) => rc(e.i).c === rc(mv.to).c,
-      sacerdote_da_luz: () => true
-    };
+    const supportGuard = {};
     if (isCapture(mv, board) && sideAt(board, mv.to) >= 0 && sideAt(board, mv.to) !== mover) {
       for (const e of allEntries(board)) {
         if (e.side === sideAt(board, mv.to) && e.i !== mv.to && distance(e.i, mv.to) === 1 &&
@@ -588,6 +842,41 @@
     if (!s || !s.blockedMove || !game || game.over || typeof game.pass !== 'function') return false;
     s.blockedMove = false;
     const attackerSide = game.st.turn;
+    const escape = s.pendingWindEscape;
+    s.pendingWindEscape = null;
+    if (escape && escape.side !== attackerSide &&
+        escape.attackerSide === attackerSide &&
+        sideAt(game.st.b,escape.from) === escape.side &&
+        sideAt(game.st.b,escape.attackerFrom) === attackerSide &&
+        escape.attackerTo === escape.from &&
+        escape.to >= 0 && E().isDarkCell(escape.to) &&
+        !E().isMain(escape.to) && !game.st.b[escape.to]) {
+      const board = game.st.b;
+      board[escape.to] = board[escape.from];
+      board[escape.from] = board[escape.attackerFrom];
+      board[escape.attackerFrom] = 0;
+      const human = window.__manobraApp && window.__manobraApp.humanSide;
+      const relocateEscape = (side,from,to) => {
+        const bag = side === human ? run().deployed : run().enemyDeployed;
+        const key = bag && bag[String(from)];
+        if (key) {
+          delete bag[String(from)]; bag[String(to)] = key;
+          for (const field of ['charges','abilityCooldown']) {
+            const oldId=abilityId(side,from,key), newId=abilityId(side,to,key);
+            if (Object.prototype.hasOwnProperty.call(s[field],oldId)) {
+              s[field][newId]=s[field][oldId]; delete s[field][oldId];
+            }
+          }
+        }
+        pactRelocate(s,side,from,to);
+        moveFreeze(side,from,to);
+        for (const mark of Object.values(s.bounties))
+          if (mark.side === side && mark.target === from) mark.target = to;
+      };
+      relocateEscape(escape.side,escape.from,escape.to);
+      relocateEscape(attackerSide,escape.attackerFrom,escape.attackerTo);
+      if (typeof game.record === 'function') game.record();
+    }
     const duel = s.pendingDuelSwap;
     s.pendingDuelSwap = null;
     if (duel && attackerSide === duel.attackerSide &&
@@ -649,6 +938,9 @@
     game.pass();
     expireFreeze(attackerSide);
     if (s.illusionJustCast === attackerSide) delete s.illusionJustCast;
+    else if (s.teleportJustCast === attackerSide) delete s.teleportJustCast;
+    else if (s.magnetJustCast === attackerSide) delete s.magnetJustCast;
+    else if (s.manipulatorJustCast === attackerSide) delete s.manipulatorJustCast;
     else if (!wasBonus) tickCooldown(attackerSide);
     return true;
   }
@@ -902,6 +1194,14 @@
       delete mv.rogueTeleport;
       finishPact(); return;
     }
+    // Registrar capturas reais para Milagre Divino. Cada morte recebe um ID único;
+    // a mesma identidade nunca pode ser ressuscitada duas vezes na batalha.
+    if ((mv.t === 'k' || mv.t === 'x') && pending.victimSide >= 0 && pending.victimPiece &&
+        (captured || mv.t === 'x') && !s.priestResurrected[`${pending.victimSide}:${mv.to}`]) {
+      s.priestGraves.push({ id: (s.priestGraves.length + 1), side: pending.victimSide,
+        piece: pending.victimPiece, key: pending.victim || null, raised: false });
+    }
+    if ((mv.t === 'k' || mv.t === 'x') && pending.victimSide >= 0) delete s.priestResurrected[`${pending.victimSide}:${mv.to}`];
     // Limpar a vítima antes de mover o atacante: evita apagar a peça vencedora.
     if ((captured || mv.t === 'x') && (mv.t === 'k' || mv.t === 'x') && pending.victimSide >= 0) {
       const victimBag = bagForSide(pending.victimSide);
@@ -919,7 +1219,11 @@
     if ((mv.t === 'm' || mv.t === 'k') && !pending.attacker)
       for (const mark of Object.values(s.bounties))
         if (mark.side === turnSide && mark.target === mv.from) mark.target = mv.to;
-    if (mv.t === 'm' || mv.t === 'k') relocate(turnSide, mv.from, mv.to);
+    if (mv.t === 'm' || mv.t === 'k') {
+      const raisedId=`${turnSide}:${mv.from}`;
+      if (s.priestResurrected[raisedId]) { s.priestResurrected[`${turnSide}:${mv.to}`]=true; delete s.priestResurrected[raisedId]; }
+      relocate(turnSide, mv.from, mv.to);
+    }
     if (mv.t === 'p') {
       // Empurrão original: a peça na casa de destino vai para beyond.
       const pushedSide = sideAt(board, mv.beyond);
@@ -965,9 +1269,8 @@
     // Nenhum destes efeitos modifica peças, turno, apoio ou histórico da partida.
     if (movedSide === humanSide) {
       const supportRewards = {
-        teleportador: { types: ['s'], gold: 8, message: '🔄 Teleportador: +8 moedas.' },
+        // Teleportador usa Portal Dimensional, sem recompensa monetária por troca.
 
-        mestre_de_manobras: { types: ['k', 'x'], gold: 15, message: '👑 Mestre de Manobras: +15 moedas.' },
         colosso: { types: ['p'], gold: 10, message: '🗿 Colosso: empurrão legal (+10 moedas).' },
         guardiao_runico: { types: ['m'], gold: 8, message: '☸️ Guardião Rúnico: avanço estratégico (+8 moedas).' },
         javali_de_ferro: { types: ['k'], gold: 10, message: '🐗 Javali de Ferro: captura legal (+10 moedas).' }
@@ -1000,7 +1303,11 @@
         } else announce('🪓 Fúria Implacável: Berserker ganhou uma ação extra!');
       }
     }
-    if (key === 'alquimista' && movedSide === humanSide && (mv.t === 'k' || mv.t === 'x') && captured && consume(movedSide, destinationAfter, 'alquimista')) { run().gold += 20; announce('🧪 Alquimista: +20 moedas.'); }
+    if (mv.rogueAlchemyCast && turnSide >= 0) {
+      const caster = mv.rogueAlchemyCast;
+      consume(turnSide, caster, 'alquimista');
+      announce('⚗️ Poção de Transmutação: aliado avançou na diagonal.');
+    }
     finishPact();
 
 
@@ -1023,6 +1330,144 @@
   }
 
   patchLegal();
-  window.RoguelikeRuntime = { cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
+  // Visão do Futuro: captura a decisão da IA no estado atual; não gasta a jogada.
+  // A jogada prevista só é substituída quando deixar de ser legal.
+  function oraclePreview(game, aiLevel) {
+    const app = window.__manobraApp, r = run();
+    if (!app || !game || game.over || !r?.active || app.mode !== 'ai' || game.st.turn !== app.humanSide || app.thinking || app.animating) return {ok:false,reason:'Disponível apenas no início do seu turno contra a IA.'};
+    const s = state();
+    if (s.oracleTurnAction === game.plies || s.oraclePreview?.turn === game.plies) return {ok:false,reason:'A previsão já foi usada neste turno.'};
+    const human = app.humanSide, bag = r.deployed || {};
+    const indices = Object.keys(bag).map(Number).filter(i => bag[String(i)] === 'oraculo' && sideAt(game.st.b,i) === human);
+    const at = indices.find(i => available(human,i,'oraculo'));
+    if (at == null) return {ok:false,reason:'Oráculo ausente, sem cargas ou em cooldown.'};
+    // Simular o turno da IA sem alterar o estado real.
+    const virtual = { ...game.st, b: game.st.b.slice(), turn: human ^ 1 };
+    const candidate = E().generate(virtual, virtual.turn, {noSeventh:true});
+    if (!candidate.length) return {ok:false,reason:'A IA não tem jogadas disponíveis para prever.'};
+    const chosen = E().chooseMove(virtual,candidate,aiLevel || app.level,{ms:500,depth:3});
+    if (!chosen) return {ok:false,reason:'Não foi possível calcular a previsão.'};
+    if (!consume(human,at,'oraculo')) return {ok:false,reason:'A habilidade não está disponível.'};
+    s.oraclePreview = {turn:game.plies, move:{...chosen}};
+    announce('🔮 Oráculo: previsão de '+chosen.from+' para '+chosen.to+'.');
+    return {ok:true,move:{...chosen}};
+  }
+  function oracleCommittedMove(game, legalMoves) {
+    const s = state(), predicted = s.oraclePreview;
+    if (!predicted) return null;
+    delete s.oraclePreview;
+    if (!game || !Array.isArray(legalMoves)) return null;
+    const m = predicted.move;
+    return legalMoves.find(x => x.t === m.t && x.from === m.from && x.to === m.to && (x.beyond ?? -1) === (m.beyond ?? -1)) || null;
+  }
+  // Milagre Divino: somente aliados capturados nesta batalha, uma vez por identidade.
+  function priestOptions(game) {
+    const app=window.__manobraApp, r=run();
+    if (!app || !r?.active || !game || game.over || game.st.turn!==app.humanSide || app.animating || app.thinking) return [];
+    const side=app.humanSide, board=game.st.b, opts=[], graves=state().priestGraves;
+    for (const [pos,key] of Object.entries(r.deployed||{})) {
+      const caster=Number(pos);
+      if (key!=='sacerdote_da_luz' || sideAt(board,caster)!==side || !available(side,caster,key)) continue;
+      for (const grave of graves) {
+        if (grave.side!==side || grave.raised) continue;
+        for (const dr of [-1,1]) for (const dc of [-1,1]) {
+          const dest=idx(rc(caster).r+dr,rc(caster).c+dc);
+          if (dest<0 || !E().isDarkCell(dest) || E().isMain(dest) || board[dest]) continue;
+          // Nunca ressuscitar uma sétima peça em defesa.
+          const defs=Array.from(board).filter(x=>x && E().sideOf(x)===side && !E().isAttack(x)).length;
+          if (defs>=6) continue;
+          opts.push({caster,graveId:grave.id,dest,name:grave.key ? (catalog()[grave.key]?.name||grave.key) : 'Peça comum'});
+        }
+      }
+    }
+    return opts;
+  }
+  function priestCast(game, option) {
+    if (!priestOptions(game).some(o=>o.caster===option.caster && o.graveId===option.graveId && o.dest===option.dest)) return false;
+    const app=window.__manobraApp, side=app.humanSide, s=state(), grave=s.priestGraves.find(x=>x.id===option.graveId);
+    if (!grave || !available(side,option.caster,'sacerdote_da_luz')) return false;
+    tickCooldown(side);
+    if (!consume(side,option.caster,'sacerdote_da_luz')) return false;
+    const piece=E().makePiece(side,false);
+    game.st.b[option.dest]=piece;
+    if (grave.key) run().deployed[String(option.dest)]=grave.key;
+    grave.raised=true;
+    s.priestResurrected[`${side}:${option.dest}`]=true;
+    game.st.turn^=1; game.last={t:'r',from:option.caster,to:option.dest};game.plies++;
+    if (typeof game.record==='function') game.record();
+    game.refresh();
+    announce('☀️ Milagre Divino: '+(grave.key ? (catalog()[grave.key]?.name||grave.key) : 'peça comum')+' ressuscitou em defesa!');
+    return true;
+  }
+  // Ordem Estratégica: duas peças diferentes, um passo diagonal legal cada,
+  // sem capturas. A segunda ação é validada sobre o tabuleiro após a primeira.
+  function masterOptions(game) {
+    const app=window.__manobraApp,r=run();
+    if (!app || !r?.active || !game || game.over || game.st.turn!==app.humanSide || app.animating || app.thinking) return [];
+    const side=app.humanSide,board=game.st.b,bag=r.deployed||{},out=[];
+    const mastery=typeof window.rogueMasteryLevel==='function' ? window.rogueMasteryLevel('mestre_de_manobras') : 1;
+    const reach=Math.max(1,Math.min(3,mastery)); // origem conta como casa 1
+    for (const [pos,key] of Object.entries(bag)) {
+      const caster=Number(pos);
+      if (key!=='mestre_de_manobras' || sideAt(board,caster)!==side || !available(side,caster,key)) continue;
+      const first=game.cur.moves.filter(m=>m.t==='m' && m.from!==caster && sideAt(board,m.from)===side && distance(caster,m.from)<=reach && isDiagonal(m.from,m.to));
+      for (const a of first) {
+        const virtual={...game.st,b:board.slice(),turn:side};
+        E().apply(virtual,a); virtual.turn=side;
+        const second=E().generate(virtual,side).filter(m=>m.t==='m' && m.from!==a.from && m.from!==a.to && m.from!==caster && sideAt(virtual.b,m.from)===side && distance(caster,m.from)<=reach && isDiagonal(m.from,m.to));
+        for (const b of second) out.push({caster,first:{t:'m',from:a.from,to:a.to},second:{t:'m',from:b.from,to:b.to}});
+      }
+    }
+    return out;
+  }
+  function masterCast(game,option) {
+    const valid=masterOptions(game).some(o=>o.caster===option?.caster && o.first.from===option?.first?.from && o.first.to===option?.first?.to && o.second.from===option?.second?.from && o.second.to===option?.second?.to);
+    if (!valid) return false;
+    const app=window.__manobraApp,side=app.humanSide,r=run(),bag=r.deployed||{};
+    // A escolha foi validada integralmente antes de gastar a carga.
+    tickCooldown(side);
+    if (!consume(side,option.caster,'mestre_de_manobras')) return false;
+    for (const m of [option.first,option.second]) {
+      E().apply(game.st,m);
+      if (bag[String(m.from)]) {bag[String(m.to)]=bag[String(m.from)];delete bag[String(m.from)];}
+      game.st.turn=side;
+    }
+    game.st.turn=enemyOf(side);
+    game.last={t:'m',from:option.second.from,to:option.second.to};game.plies++;
+    if (typeof game.record==='function') game.record();
+    game.refresh();
+    announce('👑 Ordem Estratégica: duas peças aliadas avançaram sem capturar.');
+    return true;
+  }
+  // Seleciona e valida a poção; a interface executa o lance retornado pelo motor.
+  function alchemistOptions(game) {
+    const app=window.__manobraApp, r=run();
+    if (!app || !game || game.over || !r?.active || game.st.turn!==app.humanSide || app.animating || app.thinking) return [];
+    const side=app.humanSide, board=game.st.b, bag=r.deployed||{}, opts=[];
+    for (const [position,key] of Object.entries(bag)) {
+      const caster=Number(position);
+      if (key!=='alquimista' || sideAt(board,caster)!==side || !available(side,caster,'alquimista')) continue;
+      for (const [allyPos,allyKey] of Object.entries(bag)) {
+        const from=Number(allyPos);
+        if (from===caster || !isDiagonal(caster,from) || sideAt(board,from)!==side) continue;
+        for (const dr of [-1,1]) for (const dc of [-1,1]) {
+          const mid=idx(rc(from).r+dr,rc(from).c+dc),to=idx(rc(from).r+dr*2,rc(from).c+dc*2);
+          if (mid<0 || !E().isDarkCell(mid) || E().isMain(mid)) continue;
+          const first=game.cur.moves.find(x=>x.from===from && x.to===mid && (x.t==='m'||x.t==='k'));
+          if (!first) continue;
+          // Captura na primeira casa: parar imediatamente.
+          if (first.t==='k') {opts.push({caster,ally:from,move:{...first,rogueAlchemyCast:caster},end:mid});continue;}
+          if (to<0 || !E().isDarkCell(to) || E().isMain(to)) continue;
+          const virtual={...game.st,b:board.slice()};
+          E().apply(virtual,first);virtual.turn=side;
+          const second=E().generate(virtual,side).find(x=>x.from===mid && x.to===to && (x.t==='m'||x.t==='k'));
+          if (!second) continue;
+          opts.push({caster,ally:from,end:to,move:{t:second.t,from,to,rogueAlchemy:{mid},rogueAlchemyCast:caster}});
+        }
+      }
+    }
+    return opts;
+  }
+  window.RoguelikeRuntime = { masterOptions, masterCast, priestOptions, priestCast, alchemistOptions, oraclePreview, oracleCommittedMove, cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
   window.addEventListener('DOMContentLoaded', () => { patchLegal(); setInterval(renderBoardState, 700); });
 }());

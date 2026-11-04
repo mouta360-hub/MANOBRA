@@ -363,7 +363,6 @@
 
   function rulesScreen() {
     return '<div class="rules"><div class="topbar"><b>Como jogar</b><button data-act="rulesBack">Voltar</button></div>' +
-      '<h2>🎮 Controles da Aventura — leia primeiro</h2><p><b>Um clique na sua peça:</b> seleciona a peça para jogar e, se for especial, mostra sua habilidade, cargas e recarga. <b>Um clique na peça inimiga sem seleção:</b> consulta a habilidade dela, sem atacar.</p><p><b>Depois de selecionar sua peça:</b> clique na casa de destino ou na peça inimiga para tentar mover, capturar, empurrar ou trocar, conforme as regras. A consulta não interfere nessa tentativa. <b>Para cancelar:</b> clique novamente na peça selecionada.</p><p>Se o destino não for permitido, sua peça permanece selecionada. Esses controles valem para a Aventura contra a IA; os outros modos mantêm seus controles normais.</p>' +
       '<h2>Tabuleiro</h2><p>13 × 9 = 117 casas. Só as casas escuras (azul-escuro) são usadas, sempre em diagonal. Cada jogador tem 13 peças e uma casa principal (o quadrado).</p>' +
       '<h2>Como vencer (qualquer um)</h2><ul><li>Separar todas as peças de ataque do oponente, sem possibilidade de conectá-las.</li><li>Eliminar todas as peças do oponente.</li><li>Alcançar a casa principal do oponente.</li></ul>' +
       '<h2>Montagem</h2><p>Cada jogador distribui as 13 peças no seu terreno (4 linhas). A linha vermelha na montagem é o terreno neutro: ninguém coloca peças nela no início. No máximo 6 peças em modo defesa; pode ter menos. Se um jogador ficar com a 7ª peça em defesa, o adversário pode eliminar uma defesa dele.</p>' +
@@ -469,8 +468,7 @@
   // Zera e reinicia o relógio a cada vez; sem relógio na vez do robô
   function startMoveClock() {
     const g = app.game;
-    // Contra a IA (incluindo a Aventura), o jogador pode pensar sem limite de tempo.
-    const humanToMove = g && !g.over && app.mode !== 'ai' && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
+    const humanToMove = g && !g.over && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
     app.moveDeadline = humanToMove ? Date.now() + moveMs() : 0;
   }
   const moveExpired = () => !!app.moveDeadline && Date.now() >= app.moveDeadline;
@@ -556,7 +554,11 @@
     let h = '<div class="layout"><div class="bw">' + boardHtml(b, marks) + '</div><div class="side">' +
       '<div class="topbar"><b>' + statusText() + '</b><span>jogada ' + (g.plies + 1) + (app.moveDeadline ? ' · <i data-mclock class="mclock">' + clockText() + '</i>' : '') + '</span></div>' +
       '<div class="scoreboard">' + playerScore(WHITE, c, g.st.turn) + playerScore(BLACK, c, g.st.turn) + '</div>' +
-      '<div class="hint">' + hintText() + '</div><div class="bar">' +
+      '<div class="hint">' + hintText() + '</div>' + (app.oracleShown && window.RoguelikeRuntime ? '<div class="hint">🔮 Previsão: '+app.oracleShown.from+' → '+app.oracleShown.to+'</div>' : '') + '<div class="bar">' +
+      '<button data-act="masterCast" ' + (isHumanTurn() && window.RoguelikeRuntime?.masterOptions?.(g).length ? '' : 'disabled') + '>👑 Ordem Estratégica</button>' +
+      '<button data-act="priestCast" ' + (isHumanTurn() && window.RoguelikeRuntime?.priestOptions?.(g).length ? '' : 'disabled') + '>☀️ Milagre Divino</button>' +
+      '<button data-act="alchemistCast" ' + (isHumanTurn() && window.RoguelikeRuntime?.alchemistOptions?.(g).length ? '' : 'disabled') + '>⚗️ Poção de Transmutação</button>' +
+      '<button data-act="oraclePreview" ' + (isHumanTurn() && app.mode === 'ai' && window.RoguelikeRuntime?.oraclePreview ? '' : 'disabled') + '>🔮 Visão do Futuro</button>' +
       '<button data-act="flipMode" ' + (canFlip ? '' : 'disabled') + '>' + flipLabel + '</button>' +
       (canPurge ? '<button class="warn" data-act="purge">' + (app.purge ? 'Cancelar' : 'Eliminar defesa (7ª)') + '</button>' : '') +
       '<button data-act="toggleSound">' + (snd.on ? '🔊 Peças' : '🔇 Peças') + '</button><button data-act="toggleMusic">' + (snd.music ? '🎵 Música' : '🚫 Música') + '</button>' +
@@ -805,7 +807,7 @@
     if (!s) return h + '<div class="hint">Conectando…</div></div>';
     if (t.disconnected) h += '<div class="card"><p class="hint" style="margin:0 0 10px">A conexão com o organizador caiu. O campeonato foi mantido nesta tela.</p><button class="primary" data-act="tourReconnect">Reconectar ao campeonato</button></div>';
     else if (t.handoff) h += '<div class="card"><p class="hint" style="margin:0">Reconectando o juiz… aguarde alguns segundos.</p></div>';
-    const isOrg = !!(s.judge && t.myId === s.judge.id);
+    const isOrg = t.myId === 0;
     h += tourFriendsCard();
     if (s.status === 'lobby') {
       if (t.local) h += '<div class="card"><p style="margin:0;text-align:center"><b>Campeonato offline</b></p><p style="text-align:center;font-size:13px;margin:6px 0 0">Sem internet: só dá para jogar contra robôs. Adicione robôs abaixo. Use o botão Salvar para continuar depois.</p></div>';
@@ -1059,7 +1061,8 @@
       const g = app.game;
       let l = g.legal({ noSeventh: true });
       if (!l.moves.length) l = g.cur;
-      const mv = E.chooseMove(g.st, l.moves, app.level);
+      const predicted = window.RoguelikeRuntime?.oracleCommittedMove?.(g,l.moves);
+      const mv = predicted || E.chooseMove(g.st, l.moves, app.level);
       app.thinking = false;
       doMove(mv);
     }, 80);
@@ -1152,14 +1155,8 @@
     const g = app.game;
     if (app.mode === 'bt' && !remote) btSend({ k: 'move', m: { t: mv.t, from: mv.from, to: mv.to, beyond: mv.beyond } });
     const cap = g.st.b[mv.to]; // peça que estava na casa de destino (para animar a eliminação)
-    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) {
-      // Um ataque repelido é um turno gasto; uma jogada ilegal não é.
-      if (window.RoguelikeRuntime.resolveBlockedMove && window.RoguelikeRuntime.resolveBlockedMove(g)) {
-        app.sel = -1; app.purge = false; app.choice = null;
-        startMoveClock(); updateFlip(); render(); afterMove(true);
-      }
-      return;
-    }
+    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) return;
+    if (app.mode === 'ai' && g.st.turn === app.humanSide) app.oracleShown = null;
     g.play(mv);
     if (window.RoguelikeRuntime && window.RoguelikeRuntime.afterMove) window.RoguelikeRuntime.afterMove(g, mv, cap);
     app.sel = -1; app.purge = false; app.choice = null;
@@ -1195,9 +1192,7 @@
     if (b[i] && E.sideOf(b[i]) === s) {
       app.sel = app.sel === i ? -1 : i;
       if (app.sel >= 0) sfx('sel', 0);
-    } else if (!window._inRoguelikeBattle) app.sel = -1;
-    // Clique em destino sem lance legal nao deve desfazer a selecao atual.
-    // Isso evita obrigar o jogador a reselecionar sua peca a cada tentativa.
+    } else app.sel = -1;
     render();
   }
 
@@ -1733,7 +1728,6 @@
         app.tour.connecting = false;
         if (ev && ev.code) app.tour.code = ev.code;
         app.tour.myId = ev && ev.id != null ? ev.id : app.tour.myId;
-        app.tour.snap = l.snapshot() || app.tour.snap;
         app.tour.msg = 'O juiz principal caiu. Você assumiu como juiz reserva e o campeonato continua.';
         toast(app.tour.msg);
         syncPresenceStatus();
@@ -1944,8 +1938,6 @@
       resetChatCollapse();
     }
   });
-  // Na Aventura, clique simples seleciona a propria peca.
-  // Sem selecao, clicar em inimigo apenas consulta a habilidade.
   document.addEventListener('click', e => {
     actx(); startBgm(); // o navegador só libera o áudio depois de um toque
     const cell = e.target.closest('[data-i]');
@@ -2028,6 +2020,51 @@
       case 'setupRandom': if (!(app.mode === 'bt' && app.btReady)) { placeList(app.setupSide, E.randomSetup(app.setupSide)); sendSetupProgress(); render(); } break;
       case 'setupClear': if (!(app.mode === 'bt' && app.btReady)) { clearSide(app.setupSide); sendSetupProgress(); render(); } break;
       case 'setupDone': setupDone(); break;
+      case 'masterCast': {
+        const options=window.RoguelikeRuntime?.masterOptions?.(app.game)||[];
+        if (!options.length) {toast('Mestre sem duas movimentações diagonais legais.');break;}
+        const msg=options.map((o,i)=>`${i+1}: ${o.first.from+1}→${o.first.to+1}; ${o.second.from+1}→${o.second.to+1}`).join('\n');
+        const selected=window.prompt('👑 Ordem Estratégica: escolha as duas movimentações:\n'+msg+'\nDigite o número:', '1');
+        if (selected===null) break;
+        const n=Number(selected);
+        if (!Number.isInteger(n)||n<1||n>options.length) {toast('Opção inválida.');break;}
+        if (window.RoguelikeRuntime.masterCast(app.game,options[n-1])) {
+          app.sel=-1;app.purge=false;app.choice=null;app.oracleShown=null;
+          render();afterMove(true);
+        }
+        break;
+      }
+      case 'priestCast': {
+        const options=window.RoguelikeRuntime?.priestOptions?.(app.game)||[];
+        if (!options.length) {toast('Nenhum aliado capturado ou casa diagonal livre para ressuscitar.');break;}
+        const msg=options.map((o,i)=>`${i+1}: ${o.name} → casa ${o.dest+1}`).join('\n');
+        const selected=window.prompt('☀️ Milagre Divino: escolha o aliado e a casa de retorno:\n'+msg+'\nDigite o número:', '1');
+        if (selected===null) break;
+        const n=Number(selected);
+        if (!Number.isInteger(n)||n<1||n>options.length) {toast('Opção inválida.');break;}
+        if (window.RoguelikeRuntime.priestCast(app.game,options[n-1])) {
+          app.sel=-1;app.purge=false;app.choice=null;app.oracleShown=null;
+          render();afterMove(true);
+        }
+        break;
+      }
+      case 'alchemistCast': {
+        const options=window.RoguelikeRuntime?.alchemistOptions?.(app.game)||[];
+        if (!options.length) {toast('Alquimista sem aliado diagonal ou destino legal.');break;}
+        const msg=options.map((o,i)=>`${i+1}: Alquimista ${o.caster+1}, aliado ${o.ally+1} → ${o.end+1}`).join('\n');
+        const selected=window.prompt('⚗️ Escolha a movimentação da poção:\n'+msg+'\nDigite o número:', '1');
+        if (selected===null) break;
+        const n=Number(selected);
+        if (!Number.isInteger(n)||n<1||n>options.length) {toast('Opção inválida.');break;}
+        doMove(options[n-1].move);
+        break;
+      }
+      case 'oraclePreview': {
+        const result = window.RoguelikeRuntime?.oraclePreview?.(app.game,app.level);
+        if (result?.ok) { app.oracleShown = result.move; toast('🔮 Previsão: '+result.move.from+' → '+result.move.to+'. Prepare sua armadilha!'); }
+        else toast(result?.reason || 'Visão do Futuro indisponível.');
+        render(); break;
+      }
       case 'flipMode': {
         const m = app.game.cur.moves.find(x => x.t === 'f' && x.from === app.sel);
         if (m) doMove(m);

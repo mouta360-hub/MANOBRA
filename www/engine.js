@@ -234,6 +234,29 @@
     }
     play(mv) {
       const mover = this.st.turn;
+      // Poção de Transmutação: duas etapas diagonais em uma única jogada.
+      // Valida ambas as etapas pelo gerador oficial, sem atravessar peças.
+      if (mv.rogueAlchemy) {
+        const a = mv.rogueAlchemy, b = this.st.b;
+        const mid = a.mid, dest = mv.to, origin = mv.from;
+        const first = this.legal().moves.find(x => x.from === origin && x.to === mid && (x.t === 'm' || x.t === 'k'));
+        if (!first || sideOf(b[origin]) !== mover || !isDarkCell(dest) || isMain(dest)) return;
+        const stepR = rowOf(mid)-rowOf(origin), stepC=colOf(mid)-colOf(origin);
+        if (Math.abs(stepR)!==1 || Math.abs(stepC)!==1 ||
+            rowOf(dest)-rowOf(mid)!==stepR || colOf(dest)-colOf(mid)!==stepC) return;
+        if (first.t === 'k') return; // capturar na primeira casa encerra o avanço
+        const virtual = { ...this.st, b:this.st.b.slice() };
+        apply(virtual, first);
+        virtual.turn = mover;
+        const second = generate(virtual,mover).find(x => x.from===mid && x.to===dest && (x.t==='m'||x.t==='k'));
+        if (!second) return;
+        b[dest]=b[origin]; b[origin]=0;
+        this.st.turn ^= 1;
+        this.record(); this.last=mv; this.plies++;
+        const w=winner(this.st,mover);
+        if (w) {this.over={winner:mover,reason:w};this.cur=null;return;}
+        this.refresh(); return;
+      }
       if (mv.rogueExecution && mv.t === 'k') {
         const back = mv.rogueExecution.back, b = this.st.b;
         const dr = rowOf(mv.to) - rowOf(mv.from), dc = colOf(mv.to) - colOf(mv.from);
@@ -277,7 +300,8 @@
         const landing = mv.rogueCavalry.landing, b = this.st.b;
         const dr = rowOf(mv.to) - rowOf(mv.from), dc = colOf(mv.to) - colOf(mv.from);
         const valid = Math.abs(dr) === 1 && Math.abs(dc) === 1 &&
-          landing === idx(rowOf(mv.to) + dr, colOf(mv.to) + dc) &&
+          Math.abs(rowOf(landing)-rowOf(mv.to)) === 1 &&
+          Math.abs(colOf(landing)-colOf(mv.to)) === 1 &&
           landing >= 0 && landing < N && isDarkCell(landing) && !isMain(landing) && !b[landing] &&
           sideOf(b[mv.from]) === mover && isAttack(b[mv.from]) && sideOf(b[mv.to]) === (mover ^ 1) &&
           this.legal().moves.some(x => x.t === 'k' && x.from === mv.from && x.to === mv.to);
