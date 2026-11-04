@@ -48,11 +48,13 @@ function showRoguelikeToast(message, duration = 4000) {
     toast.innerText = message;
     toast.style.display = 'block';
     toast.style.opacity = '1';
+    toast.classList.add('show');
 
     clearTimeout(window._roguelikeToastTimer);
     window._roguelikeToastTimer = setTimeout(() => {
         toast.style.opacity = '0';
-        setTimeout(() => { toast.style.display = 'none'; }, 300);
+        toast.classList.remove('show');
+        setTimeout(() => { if (!toast.classList.contains('show')) toast.style.display = 'none'; }, 300);
     }, duration);
 }
 

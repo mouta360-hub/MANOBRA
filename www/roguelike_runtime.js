@@ -895,7 +895,7 @@
       // Marcas seguem a presa, mesmo quando ela se move ou é empurrada.
       for (const mark of Object.values(s.bounties)) if (mark.side === side && mark.target === from) mark.target = to;
       const hunterMark = `${side}:${from}`;
-      if (special === 'cacador_cabecas' && s.bounties[hunterMark]) {
+      if (key === 'cacador_cabecas' && s.bounties[hunterMark]) {
         s.bounties[`${side}:${to}`] = s.bounties[hunterMark]; delete s.bounties[hunterMark];
       }
 
@@ -1121,7 +1121,7 @@
       // Marcas seguem a presa, mesmo quando ela se move ou é empurrada.
       for (const mark of Object.values(s.bounties)) if (mark.side === side && mark.target === from) mark.target = to;
       const hunterMark = `${side}:${from}`;
-      if (special === 'cacador_cabecas' && s.bounties[hunterMark]) {
+      if (key === 'cacador_cabecas' && s.bounties[hunterMark]) {
         s.bounties[`${side}:${to}`] = s.bounties[hunterMark]; delete s.bounties[hunterMark];
       }
 

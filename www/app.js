@@ -51,6 +51,8 @@
   function toast(msg) {
     const t = $('#toast');
     t.textContent = msg;
+    t.style.display = 'block';
+    t.style.opacity = '1';
     t.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
@@ -1155,7 +1157,29 @@
     const g = app.game;
     if (app.mode === 'bt' && !remote) btSend({ k: 'move', m: { t: mv.t, from: mv.from, to: mv.to, beyond: mv.beyond } });
     const cap = g.st.b[mv.to]; // peça que estava na casa de destino (para animar a eliminação)
-    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) return;
+    if (window.RoguelikeRuntime && window.RoguelikeRuntime.beforeMove && window.RoguelikeRuntime.beforeMove(g, mv) === false) {
+      // Uma proteção reativa anulou a captura: não executar g.play(mv),
+      // mas consumir a tentativa e entregar a vez ao adversário.
+      const resolved = window.RoguelikeRuntime.resolveBlockedMove?.(g);
+      if (resolved) {
+        app.sel = -1; app.purge = false; app.choice = null;
+        app.thinking = false;
+        if (app.mode === 'ai' && g.st.turn === app.humanSide) app.oracleShown = null;
+        startMoveClock();
+        updateFlip();
+        render();
+        if (g.over) {
+          if (window._inRoguelikeBattle) {
+            if (g.over.winner === app.humanSide && typeof window.onRoguelikeVictory === 'function') window.onRoguelikeVictory();
+            else if (g.over.winner !== app.humanSide && typeof window.onRoguelikeDefeat === 'function') window.onRoguelikeDefeat();
+          }
+        } else {
+          afterMove(false);
+          processBtQueue();
+        }
+      }
+      return;
+    }
     if (app.mode === 'ai' && g.st.turn === app.humanSide) app.oracleShown = null;
     g.play(mv);
     if (window.RoguelikeRuntime && window.RoguelikeRuntime.afterMove) window.RoguelikeRuntime.afterMove(g, mv, cap);
