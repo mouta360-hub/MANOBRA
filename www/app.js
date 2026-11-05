@@ -471,7 +471,7 @@
   function startMoveClock() {
     const g = app.game;
     const humanToMove = g && !g.over && (app.mode === 'pvp' || g.st.turn === app.humanSide || ((app.mode === 'bt') && !oppIsBot()));
-    app.moveDeadline = humanToMove ? Date.now() + moveMs() : 0;
+    app.moveDeadline = (app.mode === 'ai') ? 0 : (humanToMove ? Date.now() + moveMs() : 0);
   }
   const moveExpired = () => !!app.moveDeadline && Date.now() >= app.moveDeadline;
   function clockText() {

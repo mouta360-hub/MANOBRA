@@ -160,57 +160,84 @@ function ensureCodexButton() {
     controls.appendChild(holder);
 }
 
-/* Inspeção por pressão longa: não intercepta o toque rápido de jogar. */
+/* Consulta por pressão longa: toque curto permanece exclusivo da jogada. */
 (function installPieceLongPress() {
     const HOLD_MS = 550;
     let press = null, popup = null, suppressClickUntil = 0;
     const style = document.createElement('style');
-    style.textContent = `#manobra-piece-hint{position:fixed;z-index:100000;max-width:min(310px,80vw);max-height:48vh;overflow:auto;pointer-events:none;background:rgba(15,22,37,.97);color:#fff;border:1px solid #8ca5d1;border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px #0009;font:14px/1.4 system-ui,sans-serif;white-space:normal}#manobra-piece-hint strong{display:block;color:#ffe08b;font-size:16px;margin-bottom:6px}`;
+    style.textContent = `
+    #manobra-piece-hint{position:fixed;z-index:100000;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(5,9,18,.58);opacity:0;transition:opacity .28s ease;box-sizing:border-box}
+    #manobra-piece-hint.open{opacity:1}
+    #manobra-piece-hint .piece-info-card{width:min(420px,94vw);max-height:85dvh;overflow:auto;background:linear-gradient(145deg,#202f4c,#101827);border:1px solid #91a9d4;border-radius:20px;padding:18px;box-shadow:0 16px 55px #000b;color:#f5f7ff;font:14px/1.5 system-ui,sans-serif;transform:translateY(16px) scale(.96);transition:transform .3s ease;box-sizing:border-box}
+    #manobra-piece-hint.open .piece-info-card{transform:translateY(0) scale(1)}
+    #manobra-piece-hint .piece-info-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    #manobra-piece-hint .piece-info-symbol{display:grid;place-items:center;width:62px;height:62px;flex-shrink:0;font-size:36px;border-radius:16px;background:#344c72;border:1px solid #829bc4}
+    #manobra-piece-hint h2{margin:0;font-size:20px;color:#ffe49c}
+    #manobra-piece-hint h3{font-size:14px;color:#ffe49c;margin:12px 0 4px}
+    #manobra-piece-hint p{margin:5px 0 10px;white-space:pre-wrap}
+    #manobra-piece-hint .piece-info-close{margin-left:auto;align-self:flex-start;border:1px solid #b6c7e6;border-radius:12px;background:#3a5178;color:white;padding:8px 12px;font-weight:700;cursor:pointer}
+    #manobra-piece-hint .piece-info-meta{color:#c6d5f1;font-size:12px}
+    @media(prefers-reduced-motion:reduce){#manobra-piece-hint,#manobra-piece-hint .piece-info-card{transition:none}}
+    `;
     function attachStyle() { if (!style.isConnected && document.head) document.head.appendChild(style); }
-    function hide() { if (popup) { popup.remove(); popup = null; } }
-    function cancel() { if (press) { clearTimeout(press.timer); press = null; } hide(); }
-    function show(key, x, y) {
-        const piece = typeof SPECIAL_PIECES_CATALOG !== 'undefined' && SPECIAL_PIECES_CATALOG[key];
+    function close() { if (popup) { popup.remove(); popup = null; } }
+    function cancelPending() { if (press) { clearTimeout(press.timer); press = null; } }
+    function addText(parent, tag, value) { const el = document.createElement(tag); el.textContent = value; parent.appendChild(el); return el; }
+    function show(key) {
+        const catalog = typeof SPECIAL_PIECES_CATALOG !== 'undefined' ? SPECIAL_PIECES_CATALOG : {};
+        const piece = catalog[key];
         if (!piece) return;
-        attachStyle(); hide();
+        attachStyle(); close();
         popup = document.createElement('div'); popup.id = 'manobra-piece-hint';
-        const name = document.createElement('strong'); name.textContent = (piece.symbol || '★') + ' ' + (piece.name || key);
-        const desc = document.createElement('div'); desc.textContent = codexExplanation(key, piece);
-        popup.append(name, desc); document.body.appendChild(popup);
-        const w = popup.offsetWidth, h = popup.offsetHeight;
-        popup.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x - w / 2)) + 'px';
-        popup.style.top = Math.max(8, y - h - 18) + 'px';
+        popup.setAttribute('role', 'dialog'); popup.setAttribute('aria-modal', 'true');
+        popup.setAttribute('aria-label', 'Informações da peça ' + (piece.name || key));
+        const card = document.createElement('section'); card.className = 'piece-info-card';
+        const head = document.createElement('div'); head.className = 'piece-info-head';
+        addText(head, 'span', piece.symbol || '♟').className = 'piece-info-symbol';
+        const title = document.createElement('div'); addText(title, 'h2', piece.name || key);
+        addText(title, 'div', 'Peça especial · ' + (piece.category === 'tank' ? 'Defesa' : piece.category === 'attacker' ? 'Ataque' : 'Suporte')).className = 'piece-info-meta';
+        head.appendChild(title);
+        const button = addText(head, 'button', '✕ Fechar'); button.type = 'button'; button.className = 'piece-info-close'; button.addEventListener('click', close);
+        card.appendChild(head);
+        const detail = (window.MANOBRA_CODEX_DETAILS || {})[key];
+        addText(card, 'h3', 'Habilidade'); addText(card, 'p', codexExplanation(key, piece));
+        if (detail) {
+            if (detail.how) { addText(card, 'h3', 'Como funciona'); addText(card, 'p', detail.how); }
+            if (detail.example) { addText(card, 'h3', 'Exemplo de jogada'); addText(card, 'p', detail.example); }
+            if (detail.note) { addText(card, 'h3', 'Regras e maestrias'); addText(card, 'p', detail.note); }
+        }
+        const limit = (window.MANOBRA_CODEX_ABILITY_LIMITS || {})[key];
+        if (limit) { addText(card, 'h3', 'Usos e recarga'); addText(card, 'p', `${limit.uses} uso(s) por combate · ${limit.cooldown ? `recarga de ${limit.cooldown} turno(s)` : 'sem recarga'} (valores iniciais; maestrias podem alterar)`); }
+        popup.appendChild(card); document.body.appendChild(popup);
+        requestAnimationFrame(() => { if (popup) popup.classList.add('open'); });
+        button.focus({ preventScroll: true });
     }
     document.addEventListener('pointerdown', e => {
-        cancel();
-        if (e.button !== undefined && e.button !== 0) return;
+        cancelPending();
+        if (popup || (e.button !== undefined && e.button !== 0)) return;
         const cell = e.target.closest && e.target.closest('#board [data-special-piece]');
         if (!cell) return;
         const key = cell.dataset.specialPiece;
-        const startX = e.clientX, startY = e.clientY;
-        press = { id:e.pointerId, x:startX, y:startY, fired:false, timer:setTimeout(() => {
+        const x = e.clientX, y = e.clientY;
+        press = { id: e.pointerId, x, y, fired: false, timer: setTimeout(() => {
             if (!press || press.id !== e.pointerId) return;
             press.fired = true;
-            show(key, startX, startY);
+            suppressClickUntil = Date.now() + 850;
+            show(key);
         }, HOLD_MS) };
     }, true);
     document.addEventListener('pointermove', e => {
-        if (press && press.id === e.pointerId && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 12) cancel();
+        if (press && press.id === e.pointerId && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 12) cancelPending();
     }, true);
-    document.addEventListener('pointerup', e => {
-        if (!press || press.id !== e.pointerId) return;
-        if (press.fired) suppressClickUntil = Date.now() + 650;
-        cancel();
-    }, true);
-    document.addEventListener('pointercancel', cancel, true);
-    // Bloqueia apenas o click sintético gerado ao SOLTAR uma pressão longa.
+    document.addEventListener('pointerup', e => { if (press && press.id === e.pointerId) cancelPending(); }, true);
+    document.addEventListener('pointercancel', cancelPending, true);
     document.addEventListener('click', e => {
         if (Date.now() < suppressClickUntil && e.target.closest && e.target.closest('#board')) {
             e.preventDefault(); e.stopImmediatePropagation(); suppressClickUntil = 0;
         }
     }, true);
-    document.addEventListener('scroll', cancel, true);
-    window.addEventListener('blur', cancel);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    window.addEventListener('blur', cancelPending);
 })();
 
 window.addEventListener('DOMContentLoaded', () => {
