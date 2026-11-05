@@ -1,3 +1,5 @@
+> **DOCUMENTO HISTÓRICO — sinergias removidas do jogo em 05/11/2026. Não usar como especificação atual.**
+
 # Sinergias funcionais — atualização
 
 - Falange Tática: uma integrante protege qualquer aliado na mesma linha ou coluna a até 1 casa; com três integrantes próximas, a até 2 casas. Consome uma carga da protetora.

@@ -1,3 +1,5 @@
+> **DOCUMENTO HISTÓRICO — sinergias removidas do jogo em 05/11/2026. Não usar como especificação atual.**
+
 # Sinergias de peças — Manobra Roguelike
 
 Quatro trincas: Falange Tática (Lanceiro, Sentinela, Oráculo), Juramento de Ferro (Escudeiro, Bastião, Sacerdote da Luz), Caçada Coordenada (Assassino das Sombras, Predador, Duelista) e Fúria Disciplinada (Berserker, Cavaleiro Errante, Xamã dos Ventos).
