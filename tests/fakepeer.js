@@ -64,7 +64,7 @@ function makeBroker() {
 }
 
 function makePhone(name, broker, opts) {
-  const els = { app: { innerHTML: '' }, inv: { innerHTML: '' }, toast: { textContent: '', classList: { add() {}, remove() {} } } };
+  const els = { app: { innerHTML: '' }, inv: { innerHTML: '' }, toast: { textContent: '', style: { display: '', opacity: '' }, classList: { add() {}, remove() {} } } };
   const listeners = {};
   const store = {};
   const phone = { name, els, store };
