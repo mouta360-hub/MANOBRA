@@ -532,6 +532,24 @@
     return !g.over && !app.thinking && !app.animating && !(app.net === 'tour' && moveExpired()) && (app.mode === 'pvp' || g.st.turn === app.humanSide);
   }
 
+  function sideAbilityPanel() {
+    if (app.mode !== 'ai') return '';
+    const data = window.RoguelikeRuntime?.sidebarAbilityStatus?.() || [];
+    const sides = [{id:app.humanSide,label:'Suas habilidades'},{id:app.humanSide ^ 1,label:'Habilidades da IA'}];
+    let html = '<section class="ability-status" aria-label="Recarga das habilidades"><strong>⚡ Habilidades e recargas</strong>';
+    for (const side of sides) {
+      html += '<div class="ability-side"><b>' + side.label + '</b>';
+      const pieces = data.filter(x => x.side === side.id);
+      if (!pieces.length) html += '<small>Nenhuma peça especial em campo</small>';
+      for (const x of pieces) {
+        const status = x.remaining === 0 ? 'Esgotada' : x.cooldown > 0 ? 'Recarga: ' + x.cooldown + ' turno(s)' : 'Pronta';
+        html += '<div class="ability-entry"><span>' + esc(x.symbol) + ' ' + esc(x.name) + '</span><small>' + x.remaining + '/' + x.total + ' usos · ' + status + '</small></div>';
+      }
+      html += '</div>';
+    }
+    return html + '<small>Recargas diminuem nos turnos do dono da habilidade.</small></section>';
+  }
+
   function gameScreen() {
     const g = app.game, b = g.st.b;
     const c = counts(b);
@@ -554,17 +572,16 @@
     const flipLabel = sel >= 0 && E.isAttack(b[sel]) ? 'Virar p/ defesa' : 'Virar p/ ataque';
     const canPurge = isHumanTurn() && g.cur.moves.some(m => m.t === 'x');
     let h = '<div class="layout"><div class="bw">' + boardHtml(b, marks) + '</div><div class="side">' +
-      '<div class="topbar"><b>' + statusText() + '</b><span>jogada ' + (g.plies + 1) + (app.moveDeadline ? ' · <i data-mclock class="mclock">' + clockText() + '</i>' : '') + '</span></div>' +
+      '<div class="topbar"><b>' + (app.mode === 'ai' ? (g.st.turn === app.humanSide ? '🟢 Sua vez' : '🔴 Vez da IA') : statusText()) + '</b><span>Turno ' + (g.plies + 1) + (app.moveDeadline ? ' · <i data-mclock class="mclock">' + clockText() + '</i>' : '') + '</span></div>' +
       '<div class="scoreboard">' + playerScore(WHITE, c, g.st.turn) + playerScore(BLACK, c, g.st.turn) + '</div>' +
-      '<div class="hint">' + hintText() + '</div>' + (app.oracleShown && window.RoguelikeRuntime ? '<div class="hint">🔮 Previsão: '+app.oracleShown.from+' → '+app.oracleShown.to+'</div>' : '') + '<div class="bar">' +
+      (app.mode === 'ai' ? sideAbilityPanel() : '<div class="hint">' + hintText() + '</div>') + (app.oracleShown && window.RoguelikeRuntime ? '<div class="hint">🔮 Previsão: '+app.oracleShown.from+' → '+app.oracleShown.to+'</div>' : '') + '<div class="bar">' +
       '<button data-act="masterCast" ' + (isHumanTurn() && window.RoguelikeRuntime?.masterOptions?.(g).length ? '' : 'disabled') + '>👑 Ordem Estratégica</button>' +
       '<button data-act="priestCast" ' + (isHumanTurn() && window.RoguelikeRuntime?.priestOptions?.(g).length ? '' : 'disabled') + '>☀️ Milagre Divino</button>' +
       '<button data-act="alchemistCast" ' + (isHumanTurn() && window.RoguelikeRuntime?.alchemistOptions?.(g).length ? '' : 'disabled') + '>⚗️ Poção de Transmutação</button>' +
       '<button data-act="oraclePreview" ' + (isHumanTurn() && app.mode === 'ai' && window.RoguelikeRuntime?.oraclePreview ? '' : 'disabled') + '>🔮 Visão do Futuro</button>' +
       '<button data-act="flipMode" ' + (canFlip ? '' : 'disabled') + '>' + flipLabel + '</button>' +
       (canPurge ? '<button class="warn" data-act="purge">' + (app.purge ? 'Cancelar' : 'Eliminar defesa (7ª)') + '</button>' : '') +
-      '<button data-act="toggleSound">' + (snd.on ? '🔊 Peças' : '🔇 Peças') + '</button><button data-act="toggleMusic">' + (snd.music ? '🎵 Música' : '🚫 Música') + '</button>' +
-      '<button data-act="turnBoard">Girar</button>' +
+      '<details class="game-secondary-controls"><summary>⚙️ Som, música e opções</summary><div class="secondary-actions"><button data-act="toggleSound">' + (snd.on ? '🔊 Peças' : '🔇 Peças') + '</button><button data-act="toggleMusic">' + (snd.music ? '🎵 Música' : '🚫 Música') + '</button><button data-act="turnBoard">Girar</button></div></details>' +
       (app.net === 'tour' && app.tour.role === 'host' && tourBotOnly(app.tour.snap) ? '<button data-act="tourSave">💾 Salvar</button>' : '') +
       '<button data-act="menu">Menu</button></div></div></div>';
     if (app.choice) {
@@ -937,7 +954,14 @@
     } catch (e) { /* ok */ }
   }
 
+  function ensureBattleSidebarStyle() {
+    if (document.getElementById('manobra-sidebar-style')) return;
+    const el = document.createElement('style'); el.id = 'manobra-sidebar-style';
+    el.textContent = '.side .ability-status{background:#16243b;border:1px solid #526b91;border-radius:12px;padding:10px;margin:7px 0;color:#eef4ff;max-height:35vh;overflow:auto;font-size:12px}.ability-status>strong{display:block;font-size:14px;margin-bottom:6px}.ability-side{margin:6px 0;border-top:1px solid #425674;padding-top:6px}.ability-side>b{display:block;margin-bottom:4px;color:#ffe3a1}.ability-entry{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid #2c3e59}.ability-entry span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ability-entry small{font-size:11px;text-align:right;flex-shrink:0;color:#b8d6ff}.ability-status>small{display:block;color:#b8c9e2;margin-top:5px}.game-secondary-controls{width:100%;border:1px solid #526b91;border-radius:9px;padding:6px}.game-secondary-controls summary{cursor:pointer;font-weight:bold}.secondary-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.rogue-special-badge,.rogue-special-badge *{pointer-events:none!important}';
+    document.head.appendChild(el);
+  }
   function render() {
+    ensureBattleSidebarStyle();
     syncAwake();
     const focusedChat = typeof document !== 'undefined' && document.activeElement && document.activeElement.id === 'chatInput';
     const chatStart = focusedChat ? document.activeElement.selectionStart : null;

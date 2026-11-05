@@ -1319,16 +1319,32 @@
       const key = el.dataset.specialPiece, piece = catalog()[key];
       el.classList.add('special-piece', `category-${piece && piece.category || 'support'}`);
       el.dataset.symbol = piece && piece.symbol || '★';
-      el.title = `${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}`;
+      el.removeAttribute('title'); // evita tooltip nativo durante ataques
       if (!el.querySelector('.rogue-special-badge') && el.querySelector('.pc')) {
         const badge = document.createElement('div'); badge.className = `rogue-special-badge rogue-special-badge-${piece && piece.category || 'support'}`;
-        badge.innerHTML = `<span>${piece && piece.symbol || '★'}</span><small>${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}</small>`;
-        badge.onclick = ev => { ev.stopPropagation(); announce(`${piece && piece.name || key}: ${piece && piece.description || 'Efeito especial'}`); };
+        // O distintivo é apenas visual. O clique deve chegar à casa para atacar.
+        // A descrição detalhada é aberta somente por pressão longa.
+        badge.innerHTML = `<span>${piece && piece.symbol || '★'}</span>`;
+        badge.style.pointerEvents = 'none';
         el.appendChild(badge);
       }
     });
   }
 
+  function sidebarAbilityStatus() {
+    const r = run(), app = window.__manobraApp;
+    if (!r?.active || !app?.game) return [];
+    const b = app.game.st.b, s = state(), result = [];
+    for (let i = 0; i < b.length; i++) {
+      const key = specialAtBoard(b, i), side = sideAt(b, i);
+      if (!key || side < 0) continue;
+      const limit = effectiveAbilityLimit(side, key);
+      if (!limit) continue;
+      const id = abilityId(side, i, key), spent = s.charges[id] || 0, cooldown = s.abilityCooldown[id] || 0;
+      result.push({ side, key, name: catalog()[key]?.name || key, symbol: catalog()[key]?.symbol || '★', spent, total: limit.uses, cooldown, remaining: Math.max(0, limit.uses - spent) });
+    }
+    return result;
+  }
   patchLegal();
   // Visão do Futuro: captura a decisão da IA no estado atual; não gasta a jogada.
   // A jogada prevista só é substituída quando deixar de ser legal.
@@ -1468,6 +1484,6 @@
     }
     return opts;
   }
-  window.RoguelikeRuntime = { masterOptions, masterCast, priestOptions, priestCast, alchemistOptions, oraclePreview, oracleCommittedMove, cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
+  window.RoguelikeRuntime = { masterOptions, masterCast, priestOptions, priestCast, alchemistOptions, oraclePreview, oracleCommittedMove, cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, sidebarAbilityStatus, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
   window.addEventListener('DOMContentLoaded', () => { patchLegal(); setInterval(renderBoardState, 700); });
 }());
