@@ -160,6 +160,59 @@ function ensureCodexButton() {
     controls.appendChild(holder);
 }
 
+/* Inspeção por pressão longa: não intercepta o toque rápido de jogar. */
+(function installPieceLongPress() {
+    const HOLD_MS = 550;
+    let press = null, popup = null, suppressClickUntil = 0;
+    const style = document.createElement('style');
+    style.textContent = `#manobra-piece-hint{position:fixed;z-index:100000;max-width:min(310px,80vw);max-height:48vh;overflow:auto;pointer-events:none;background:rgba(15,22,37,.97);color:#fff;border:1px solid #8ca5d1;border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px #0009;font:14px/1.4 system-ui,sans-serif;white-space:normal}#manobra-piece-hint strong{display:block;color:#ffe08b;font-size:16px;margin-bottom:6px}`;
+    function attachStyle() { if (!style.isConnected && document.head) document.head.appendChild(style); }
+    function hide() { if (popup) { popup.remove(); popup = null; } }
+    function cancel() { if (press) { clearTimeout(press.timer); press = null; } hide(); }
+    function show(key, x, y) {
+        const piece = typeof SPECIAL_PIECES_CATALOG !== 'undefined' && SPECIAL_PIECES_CATALOG[key];
+        if (!piece) return;
+        attachStyle(); hide();
+        popup = document.createElement('div'); popup.id = 'manobra-piece-hint';
+        const name = document.createElement('strong'); name.textContent = (piece.symbol || '★') + ' ' + (piece.name || key);
+        const desc = document.createElement('div'); desc.textContent = codexExplanation(key, piece);
+        popup.append(name, desc); document.body.appendChild(popup);
+        const w = popup.offsetWidth, h = popup.offsetHeight;
+        popup.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x - w / 2)) + 'px';
+        popup.style.top = Math.max(8, y - h - 18) + 'px';
+    }
+    document.addEventListener('pointerdown', e => {
+        cancel();
+        if (e.button !== undefined && e.button !== 0) return;
+        const cell = e.target.closest && e.target.closest('#board [data-special-piece]');
+        if (!cell) return;
+        const key = cell.dataset.specialPiece;
+        const startX = e.clientX, startY = e.clientY;
+        press = { id:e.pointerId, x:startX, y:startY, fired:false, timer:setTimeout(() => {
+            if (!press || press.id !== e.pointerId) return;
+            press.fired = true;
+            show(key, startX, startY);
+        }, HOLD_MS) };
+    }, true);
+    document.addEventListener('pointermove', e => {
+        if (press && press.id === e.pointerId && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 12) cancel();
+    }, true);
+    document.addEventListener('pointerup', e => {
+        if (!press || press.id !== e.pointerId) return;
+        if (press.fired) suppressClickUntil = Date.now() + 650;
+        cancel();
+    }, true);
+    document.addEventListener('pointercancel', cancel, true);
+    // Bloqueia apenas o click sintético gerado ao SOLTAR uma pressão longa.
+    document.addEventListener('click', e => {
+        if (Date.now() < suppressClickUntil && e.target.closest && e.target.closest('#board')) {
+            e.preventDefault(); e.stopImmediatePropagation(); suppressClickUntil = 0;
+        }
+    }, true);
+    document.addEventListener('scroll', cancel, true);
+    window.addEventListener('blur', cancel);
+})();
+
 window.addEventListener('DOMContentLoaded', () => {
     // Monitoriza alterações no app para garantir persistência do botão
     const observer = new MutationObserver(() => {
@@ -173,16 +226,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     setTimeout(ensureCodexButton, 500);
 
-    // Intercepta cliques no tabuleiro para disparar o toast descritivo
-    document.addEventListener('click', (e) => {
-        const target = e.target.closest('[data-piece], .piece, td, div');
-        if (!target) return;
+    // A inspeção de peças é feita somente pelo Codex (inspectSpecialPiece).
+    // Não interceptar cliques no tabuleiro: toques em peças inimigas devem
+    // ser processados exclusivamente pelo controlador de jogadas em app.js.
 
-        for (const key of Object.keys(SPECIAL_PIECES_CATALOG)) {
-            if (target.innerHTML?.toLowerCase().includes(key) || target.className?.toLowerCase().includes(key)) {
-                inspectSpecialPiece(key);
-                break;
-            }
-        }
-    });
 });
