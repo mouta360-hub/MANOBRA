@@ -66,7 +66,7 @@ function makeBroker() {
 }
 
 function makePhone(name, broker) {
-  const els = { app: { innerHTML: '' }, toast: { textContent: '', classList: { add() {}, remove() {} } } };
+  const els = { app: { innerHTML: '' }, toast: { textContent: '', style: { display: '', opacity: '' }, classList: { add() {}, remove() {} } } };
   const listeners = {};
   const phone = { name, els, toasts: [] };
   const sandbox = {
@@ -175,15 +175,15 @@ const boardOf = p => Array.prototype.join.call(p.app.game.st.b, '');
   }
   console.log('ok - saída de um lado leva o outro ao menu');
 
-  // 7) depois de sair dá para criar outra partida online e para o Bluetooth continuar separado
+  // 7) depois de sair dá para criar outra partida online sem Bluetooth
   A.click({ act: 'menu' }); A.click({ act: 'onOpen' }); A.click({ act: 'onHost' }); await sleep(20);
   assert(/^[A-HJ-NP-Z2-9]{4}$/.test(A.app.bt.code), 'nova partida criada: ' + A.app.bt.code);
   A.click({ act: 'btCancel' }); await sleep(10);
   assert.strictEqual(A.app.screen, 'online'); assert.strictEqual(A.app.bt.stage, 'idle');
   A.click({ act: 'btBack' });
   A.click({ act: 'btOpen' });
-  assert(/só funciona no app Android/.test(A.html()), 'a tela de Bluetooth continua separada');
-  console.log('ok - cancelar volta à tela online; Bluetooth segue separado');
+  assert(A.html().includes('Jogar online') || A.app.screen === 'online', 'atalho antigo mantém modo online');
+  console.log('ok - cancelar e atalho antigo mantêm o modo online');
 
   // 8) sem internet
   const E = makePhone('E', broker);
