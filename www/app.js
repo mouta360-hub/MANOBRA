@@ -955,6 +955,12 @@
   }
 
   function ensureBattleSidebarStyle() {
+    // Os testes online usam um document simulado sem API DOM completa.
+    // A folha de estilos só é necessária em navegadores reais.
+    if (typeof document === 'undefined' ||
+        typeof document.getElementById !== 'function' ||
+        typeof document.createElement !== 'function' ||
+        !document.head || typeof document.head.appendChild !== 'function') return;
     if (document.getElementById('manobra-sidebar-style')) return;
     const el = document.createElement('style'); el.id = 'manobra-sidebar-style';
     el.textContent = '.side .ability-status{background:#16243b;border:1px solid #526b91;border-radius:12px;padding:10px;margin:7px 0;color:#eef4ff;max-height:35vh;overflow:auto;font-size:12px}.ability-status>strong{display:block;font-size:14px;margin-bottom:6px}.ability-side{margin:6px 0;border-top:1px solid #425674;padding-top:6px}.ability-side>b{display:block;margin-bottom:4px;color:#ffe3a1}.ability-entry{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid #2c3e59}.ability-entry span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ability-entry small{font-size:11px;text-align:right;flex-shrink:0;color:#b8d6ff}.ability-status>small{display:block;color:#b8c9e2;margin-top:5px}.game-secondary-controls{width:100%;border:1px solid #526b91;border-radius:9px;padding:6px}.game-secondary-controls summary{cursor:pointer;font-weight:bold}.secondary-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.rogue-special-badge,.rogue-special-badge *{pointer-events:none!important}';
