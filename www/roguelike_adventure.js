@@ -138,8 +138,7 @@ function rogueDescription(key) {
   const p = rogueCatalogPiece(key);
   const t = typeof SPECIAL_PIECES_PT_BR !== 'undefined' ? SPECIAL_PIECES_PT_BR[key] : {};
   const base = t && t.passive || p.description || 'Efeito especial durante a batalha.';
-  const synergy = window.RoguelikeRuntime && window.RoguelikeRuntime.synergyDescription ? window.RoguelikeRuntime.synergyDescription(key) : '';
-  return base + (synergy ? ' | SINERGIA: ' + synergy : '');
+  return base;
 }
 function rogueToast(text) { if (typeof showRoguelikeToast === 'function') showRoguelikeToast(text); }
 

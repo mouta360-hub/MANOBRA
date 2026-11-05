@@ -85,40 +85,16 @@ function openRoguelikeCodex() {
         { key: 'attacker', title: '⚔️ Atacantes' },
         { key: 'support', title: '🔮 Magos e suportes' }
     ];
-    let html = `<div class="roguelike-modal-content"><div class="roguelike-header"><h2>📜 Codex — Peças e Sinergias</h2><button type="button" class="roguelike-close-btn" onclick="closeRoguelikeCodex()" aria-label="Fechar Codex">×</button></div><div class="roguelike-body"><p class="codex-intro">Descrições baseadas nas habilidades implementadas. As peças continuam obedecendo às regras normais de movimento e captura. Recargas contam turnos do próprio jogador; bônus do comandante podem alterar os valores.</p>`;
-    const synergySets = (window.RoguelikeRuntime && window.RoguelikeRuntime.synergySets) || [];
-    html += `<section class="roguelike-category-section" id="codex-synergies"><h3>🔗 Sinergias — duplas e trios</h3><p class="codex-intro">As habilidades individuais continuam funcionando sozinhas. A sinergia é um bônus adicional, válido para você e para os inimigos. É preciso ter duas peças diferentes do mesmo conjunto vivas e próximas no tabuleiro; comprar as peças não basta. O trio amplia o alcance, mas não substitui as habilidades individuais. Os bônus consomem usos da peça que os ativa e respeitam a recarga.</p><div class="roguelike-grid">`;
-    for (const group of synergySets) {
-        const names = group.keys.map(key => (SPECIAL_PIECES_CATALOG[key] || {}).name || key);
-        const defense = group.type === 'guard';
-        const pair = group.id === 'falange'
-            ? 'Uma peça do conjunto pode gastar 1 uso para impedir a captura de QUALQUER aliado na mesma linha ou coluna, a até 1 casa dela. Precisa ter outra peça diferente da Falange próxima.'
-            : group.id === 'juramento'
-            ? 'Uma peça do conjunto pode gastar 1 uso para impedir a captura de OUTRA integrante do Juramento a até 1 casa. Não protege peças de fora do conjunto.'
-            : 'Uma peça do conjunto que faz uma captura legal pode gastar 1 uso para ignorar a proteção especial do alvo se outra integrante diferente estiver a até 1 casa da atacante.';
-        const trio = group.id === 'falange'
-            ? 'Com as três integrantes diferentes próximas no tabuleiro, a Falange protege aliados na mesma linha ou coluna a até 2 casas da protetora.'
-            : group.id === 'juramento'
-            ? 'Com as três integrantes diferentes próximas no tabuleiro, uma peça do Juramento protege outra integrante a até 2 casas.'
-            : 'Com as três integrantes diferentes próximas no tabuleiro, a parceira que apoia a atacante pode ficar a até 2 casas. Continua exigindo captura legal e consumindo 1 uso da atacante.';
-        const example = group.id === 'falange'
-            ? `Exemplo: ${names[0]} protege um aliado comum na mesma coluna. ${names[1]} precisa estar próxima para ativar a Falange. Com ${names[2]} por perto, o alcance aumenta.`
-            : group.id === 'juramento'
-            ? `Exemplo: ${names[0]} está sendo capturada e ${names[1]} impede o ataque. ${names[2]} amplia o alcance se estiver próxima.`
-            : `Exemplo: ${names[0]} captura legalmente um inimigo com escudo. ${names[1]} dá apoio e permite ignorar a proteção. ${names[2]} amplia o alcance se estiver próxima.`;
-        html += `<article class="roguelike-card"><div class="roguelike-card-header"><strong class="roguelike-name">${defense ? '🛡️' : '⚔️'} ${codexEscape(group.name)}</strong></div><p class="codex-effect"><strong>Peças da combinação:</strong> ${names.map(codexEscape).join(' + ')}</p><p class="codex-effect"><strong>EFEITO COM 2 PEÇAS:</strong> ${codexEscape(pair)}</p><p class="codex-effect"><strong>EFEITO COM 3 PEÇAS:</strong> ${codexEscape(trio)}</p><p class="codex-effect"><strong>Exemplo de combate:</strong> ${codexEscape(example)}</p><p class="codex-usage"><strong>Como ativar:</strong> as peças precisam estar vivas e posicionadas perto umas das outras durante a batalha. A ativação é automática quando acontece a captura adequada e há cargas disponíveis. Comprar as peças, por si só, não ativa nada. Cada peça mantém sua habilidade individual. A combinação não permite movimentos proibidos pelo motor.</p></article>`;
-    }
-    html += '</div></section>';
+    let html = `<div class="roguelike-modal-content"><div class="roguelike-header"><h2>📜 Codex — Peças Especiais</h2><button type="button" class="roguelike-close-btn" onclick="closeRoguelikeCodex()" aria-label="Fechar Codex">×</button></div><div class="roguelike-body"><p class="codex-intro">Descrições baseadas nas habilidades implementadas. As peças continuam obedecendo às regras normais de movimento e captura. Recargas contam turnos do próprio jogador; bônus do comandante podem alterar os valores.</p>`;
     for (const cat of categories) {
         html += `<section class="roguelike-category-section"><h3>${cat.title}</h3><div class="roguelike-grid">`;
         for (const [key, piece] of Object.entries(SPECIAL_PIECES_CATALOG)) {
             if (piece.category !== cat.key) continue;
             const limit = limits[key];
             const usage = limit ? `${limit.uses} uso${limit.uses !== 1 ? 's' : ''} por combate · ${limit.cooldown ? `recarga de ${limit.cooldown} turno${limit.cooldown !== 1 ? 's' : ''}` : 'sem recarga'}` : 'Consulte os limites no combate';
-            const groupNames = synergySets.filter(group => group.keys.includes(key)).map(group => group.name);
             const detail = (window.MANOBRA_CODEX_DETAILS || {})[key];
             const guide = detail ? `<p class="codex-effect"><strong>Como funciona:</strong> ${codexEscape(detail.how)}</p><p class="codex-usage"><strong>Exemplo de jogada:</strong> ${codexEscape(detail.example)}</p><p class="codex-usage"><strong>Regras e Maestria:</strong> ${codexEscape(detail.note)}</p>` : `<p class="codex-effect">${codexEscape(codexExplanation(key, piece))}</p>`;
-            html += `<article class="roguelike-card"><div class="roguelike-card-header"><span class="roguelike-symbol">${codexEscape(piece.symbol || '🔹')}</span><strong class="roguelike-name">${codexEscape(piece.name || key)}</strong></div>${guide}<p class="codex-usage"><strong>Limites iniciais:</strong> ${codexEscape(usage)}</p>${groupNames.length ? `<p class="codex-usage"><strong>Sinergia:</strong> ${groupNames.map(codexEscape).join(', ')} (veja acima)</p>` : ''}</article>`;
+            html += `<article class="roguelike-card"><div class="roguelike-card-header"><span class="roguelike-symbol">${codexEscape(piece.symbol || '🔹')}</span><strong class="roguelike-name">${codexEscape(piece.name || key)}</strong></div>${guide}<p class="codex-usage"><strong>Limites iniciais:</strong> ${codexEscape(usage)}</p></article>`;
         }
         html += '</div></section>';
     }

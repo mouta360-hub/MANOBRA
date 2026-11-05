@@ -124,37 +124,6 @@
   }
   function specialEntry(board, i) { const key = specialAtBoard(board, i); return key ? { key, side: sideAt(board, i), piece: catalog()[key] } : null; }
   function allEntries(board) { const out = []; const r = run(); if (!r || !board) return out; for (let i = 0; i < E().N; i++) { const e = specialEntry(board, i); if (e) out.push({ i, ...e }); } return out; }
-  // Trincas de sinergia: 2 integrantes vivos = combinação básica;
-  // 3 integrantes vivos = combinação ampliada. Funciona para ambos os lados.
-  // Exige proximidade real no tabuleiro, não basta possuir as peças no quartel.
-  const SYNERGY_SETS = Object.freeze([
-    { id: 'falange', name: 'Falange Tática', keys: ['lancer','sentinela','oraculo'], type: 'guard' },
-    { id: 'juramento', name: 'Juramento de Ferro', keys: ['escudeiro','bastiao','sacerdote_da_luz'], type: 'guard' },
-    { id: 'cacada', name: 'Caçada Coordenada', keys: ['assassino_sombras','predador','duelista'], type: 'pierce' },
-    { id: 'furia', name: 'Fúria Disciplinada', keys: ['berserker','cavaleiro_errante','xama_dos_ventos'], type: 'pierce' }
-  ]);
-  function synergyFor(board, side, anchor, type) {
-    const entries = allEntries(board).filter(e => e.side === side);
-    const actor = entries.find(e => e.i === anchor);
-    if (!actor) return null;
-    for (const group of SYNERGY_SETS) {
-      if (group.type !== type || !group.keys.includes(actor.key)) continue;
-      const members = entries.filter(e => group.keys.includes(e.key));
-      // Somente integrantes distintos contam; o terceiro precisa estar próximo
-      // da dupla para elevar a sinergia ao nível 3.
-      const partners = members.filter(e => e.i !== anchor && e.key !== actor.key && distance(e.i, anchor) <= 2);
-      if (!partners.length) continue;
-      const linked = [actor, ...partners];
-      const distinct = new Set(linked.map(e => e.key));
-      if (distinct.size < 2) continue;
-      return { group, tier: distinct.size >= 3 ? 3 : 2 };
-    }
-    return null;
-  }
-  function synergyDescription(key) {
-    const groups = SYNERGY_SETS.filter(g => g.keys.includes(key));
-    return groups.map(g => `${g.name}: ${g.keys.map(k => (catalog()[k] || {}).name || k).join(' + ')}. Dupla próxima: ${g.id === 'falange' ? 'protege qualquer aliado na mesma linha ou coluna' : g.id === 'juramento' ? 'protege outra integrante do conjunto' : 'rompe proteção em captura legal'}; trio próximo: alcance ampliado.`).join(' ');
-  }
   function isDiagonal(a, b) { const x = rc(a), y = rc(b); return Math.abs(x.r - y.r) === 1 && Math.abs(x.c - y.c) === 1; }
   function isBackRow(i) { return rc(i).r === 0 || rc(i).r === E().ROWS - 1; }
   function isCapture(mv, board) { return mv && (mv.t === 'k' || mv.t === 'x' || (mv.t === 'p' && board[mv.to])); }
@@ -693,16 +662,6 @@
       allEntries(board).some(e => e.side === target.side && distance(e.i, mv.to) <= (e.key === 'baluarte' ? 2 : 1) && e.i !== mv.to &&
         ['bastiao','tita_de_aco','baluarte','sentinela','xama_dos_ventos'].includes(e.key))
     );
-    // Combinação ofensiva: a dupla pode romper uma proteção reativa
-    // ao capturar legalmente; o trio permite parceiro a até 2 casas.
-    const offensiveSynergy = moving && synergyFor(board, mover, mv.from, 'pierce');
-    const synergyPartner = offensiveSynergy && allEntries(board).some(e =>
-      e.side === mover && e.i !== mv.from && e.key !== moving.key &&
-      offensiveSynergy.group.keys.includes(e.key) &&
-      distance(e.i, mv.from) <= (offensiveSynergy.tier === 3 ? 2 : 1));
-    const synergyPierce = protectedTarget && offensiveSynergy && synergyPartner &&
-      consume(mover, mv.from, moving.key);
-    if (synergyPierce) { announce(`⚔️ ${offensiveSynergy.group.name}: combinação de ${offensiveSynergy.tier} peças rompeu a proteção!`); return true; }
     const piercing = protectedTarget && moving && pierceConditions[moving.key] &&
       pierceConditions[moving.key]() && consume(mover, mv.from, moving.key);
     if (piercing) {
@@ -802,23 +761,6 @@
         if (e.side === sideAt(board, mv.to) && e.i !== mv.to && distance(e.i, mv.to) === 1 &&
             supportGuard[e.key] && supportGuard[e.key](e) && consume(e.side, e.i, e.key)) {
           announce(`✨ ${e.piece.name}: protegeu um aliado da captura.`);
-          state().blockedMove = true; state().pending = null; return false;
-        }
-      }
-    }
-    // Sinergia defensiva: uma peça do conjunto protege outra integrante.
-    // A dupla precisa estar adjacente à vítima; o trio alcança até 2 casas.
-    if (isCapture(mv, board) && sideAt(board, mv.to) >= 0 && sideAt(board, mv.to) !== mover) {
-      const victimSide = sideAt(board, mv.to);
-      for (const e of allEntries(board)) {
-        if (e.side !== victimSide || e.i === mv.to || (target && e.key === target.key)) continue;
-        const synergy = synergyFor(board, e.side, e.i, 'guard');
-        if (!synergy || (synergy.group.id !== 'falange' && !(target && synergy.group.keys.includes(target.key)))) continue;
-        // Falange pode defender qualquer aliado na mesma linha ou coluna.
-        if (synergy.group.id === 'falange' && rc(e.i).r !== rc(mv.to).r && rc(e.i).c !== rc(mv.to).c) continue;
-        if (distance(e.i, mv.to) > (synergy.tier === 3 ? 2 : 1)) continue;
-        if (consume(e.side, e.i, e.key)) {
-          announce(`🛡️ ${synergy.group.name}: ${synergy.tier} peças protegeram a aliada!`);
           state().blockedMove = true; state().pending = null; return false;
         }
       }
@@ -1484,6 +1426,6 @@
     }
     return opts;
   }
-  window.RoguelikeRuntime = { masterOptions, masterCast, priestOptions, priestCast, alchemistOptions, oraclePreview, oracleCommittedMove, cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, sidebarAbilityStatus, synergySets: SYNERGY_SETS, synergyFor, synergyDescription };
+  window.RoguelikeRuntime = { masterOptions, masterCast, priestOptions, priestCast, alchemistOptions, oraclePreview, oracleCommittedMove, cellMarkup, beforeMove, resolveBlockedMove, afterMove, renderBoardState, patchLegal, abilityLimits: ABILITY_LIMITS, effectiveAbilityLimit, available, sidebarAbilityStatus };
   window.addEventListener('DOMContentLoaded', () => { patchLegal(); setInterval(renderBoardState, 700); });
 }());
