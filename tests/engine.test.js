@@ -19,8 +19,41 @@ test('tabuleiro tem 117 casas, 59 escuras, casas principais escuras', () => {
   for (let i = 0; i < E.N; i++) if (E.isDarkCell(i)) dark++;
   assert.strictEqual(dark, 59);
   assert(E.isDarkCell(E.MAIN[0]) && E.isDarkCell(E.MAIN[1]));
-  assert.strictEqual(E.territoryCells(WHITE).length, 25);
-  assert.strictEqual(E.territoryCells(BLACK).length, 25);
+  assert.strictEqual(E.territoryCells(WHITE).length, 51);
+  assert.strictEqual(E.territoryCells(BLACK).length, 51);
+});
+
+test('territórios permitem casas claras e escuras sem ocupar a casa principal', () => {
+  for (const side of [WHITE, BLACK]) {
+    const cells = E.territoryCells(side);
+    assert.strictEqual(cells.length, 51);
+    assert(cells.some(i => E.isDarkCell(i)));
+    assert(cells.some(i => !E.isDarkCell(i)));
+    assert(!cells.includes(E.MAIN[side]));
+    for (const i of cells) assert(E.inTerritory(i, side));
+  }
+});
+
+test('defesa pode andar nas oito direções, inclusive em casas claras', () => {
+  const st = mk([[4, 4, WD]]);
+  const moves = E.generate(st, WHITE).filter(m => m.t === 'm' && m.from === idx(4, 4));
+  assert.strictEqual(moves.length, 8);
+  assert(moves.some(m => m.to === idx(4, 5)));
+  assert(moves.some(m => m.to === idx(5, 4)));
+});
+
+test('ataque com apoio captura também na horizontal e vertical', () => {
+  const st = mk([[4, 4, WA], [5, 5, WD], [4, 5, BD], [3, 4, BD]]);
+  const moves = E.generate(st, WHITE);
+  assert.strictEqual(find(moves, 'k', [4, 4], [4, 5]).length, 1);
+  assert.strictEqual(find(moves, 'k', [4, 4], [3, 4]).length, 1);
+});
+
+test('defesa empurra também na horizontal e vertical', () => {
+  const st = mk([[4, 4, WD], [4, 5, BD], [3, 4, BD]]);
+  const moves = E.generate(st, WHITE);
+  assert.strictEqual(find(moves, 'p', [4, 4], [4, 5]).length, 1);
+  assert.strictEqual(find(moves, 'p', [4, 4], [3, 4]).length, 1);
 });
 
 test('ataque sozinho não se move; com peça amiga na diagonal volta a se mover', () => {
