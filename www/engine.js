@@ -1,5 +1,5 @@
 /* Manobra 1.0 – motor de regras e IA
- * Tabuleiro 13 colunas x 9 linhas = 117 casas. Só as casas escuras (r+c par) são jogáveis.
+ * Tabuleiro 13 colunas x 9 linhas = 117 casas. Todas as casas claras e escuras são jogáveis.
  * Brancas ficam embaixo (linhas 5..8), Pretas em cima (linhas 0..3), linha 4 = terreno neutro.
  */
 (function (root) {
@@ -26,18 +26,17 @@
   const terrainOwner = r => (r <= 3 ? BLACK : r >= 5 ? WHITE : -1);
 
   // Vizinhos diagonais (NB) e casas a duas diagonais de distância (FAR)
-  const DR = [-1, -1, 1, 1], DC = [-1, 1, -1, 1];
-  const NB = new Int16Array(N * 4).fill(-1);
-  const FAR = new Int16Array(N * 4).fill(-1);
+  const DR = [-1, -1, -1, 0, 0, 1, 1, 1], DC = [-1, 0, 1, -1, 1, -1, 0, 1];
+  const NB = new Int16Array(N * 8).fill(-1);
+  const FAR = new Int16Array(N * 8).fill(-1);
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (((r + c) & 1) !== 0) continue;
       const i = idx(r, c);
-      for (let d = 0; d < 4; d++) {
+      for (let d = 0; d < 8; d++) {
         const r1 = r + DR[d], c1 = c + DC[d];
-        if (r1 >= 0 && r1 < ROWS && c1 >= 0 && c1 < COLS) NB[i * 4 + d] = idx(r1, c1);
+        if (r1 >= 0 && r1 < ROWS && c1 >= 0 && c1 < COLS) NB[i * 8 + d] = idx(r1, c1);
         const r2 = r + 2 * DR[d], c2 = c + 2 * DC[d];
-        if (r2 >= 0 && r2 < ROWS && c2 >= 0 && c2 < COLS) FAR[i * 4 + d] = idx(r2, c2);
+        if (r2 >= 0 && r2 < ROWS && c2 >= 0 && c2 < COLS) FAR[i * 8 + d] = idx(r2, c2);
       }
     }
   }
@@ -47,8 +46,8 @@
   }
 
   function hasFriendAdj(b, i, s) {
-    for (let d = 0; d < 4; d++) {
-      const j = NB[i * 4 + d];
+    for (let d = 0; d < 8; d++) {
+      const j = NB[i * 8 + d];
       if (j >= 0 && sideOf(b[j]) === s) return true;
     }
     return false;
@@ -75,8 +74,8 @@
       const friend = hasFriendAdj(b, i, s);
       if (isAttack(p)) {
         if (!friend) continue; // modo ataque só se move com peça amiga por perto (e só vira defesa com ela)
-        for (let d = 0; d < 4; d++) {
-          const j = NB[i * 4 + d];
+        for (let d = 0; d < 8; d++) {
+          const j = NB[i * 8 + d];
           if (j < 0) continue;
           const q = b[j];
           if (q === 0) out.push({ t: 'm', from: i, to: j });
@@ -84,13 +83,13 @@
         }
         if (!(noSeventh && defCount >= MAX_DEF)) out.push({ t: 'f', from: i, to: i });
       } else {
-        for (let d = 0; d < 4; d++) {
-          const j = NB[i * 4 + d];
+        for (let d = 0; d < 8; d++) {
+          const j = NB[i * 8 + d];
           if (j < 0) continue;
           const q = b[j];
           if (q === 0) out.push({ t: 'm', from: i, to: j });
           else if (sideOf(q) !== s) {
-            const f = FAR[i * 4 + d];
+            const f = FAR[i * 8 + d];
             if (f >= 0 && b[f] === 0 && !isMain(f)) out.push({ t: 'p', from: i, to: j, beyond: f });
             if (!isMain(i)) out.push({ t: 's', from: i, to: j });
           }
@@ -240,9 +239,9 @@
         const a = mv.rogueAlchemy, b = this.st.b;
         const mid = a.mid, dest = mv.to, origin = mv.from;
         const first = this.legal().moves.find(x => x.from === origin && x.to === mid && (x.t === 'm' || x.t === 'k'));
-        if (!first || sideOf(b[origin]) !== mover || !isDarkCell(dest) || isMain(dest)) return;
+        if (!first || sideOf(b[origin]) !== mover || isMain(dest)) return;
         const stepR = rowOf(mid)-rowOf(origin), stepC=colOf(mid)-colOf(origin);
-        if (Math.abs(stepR)!==1 || Math.abs(stepC)!==1 ||
+        if (Math.max(Math.abs(stepR), Math.abs(stepC))!==1 || (stepR===0 && stepC===0) ||
             rowOf(dest)-rowOf(mid)!==stepR || colOf(dest)-colOf(mid)!==stepC) return;
         if (first.t === 'k') return; // capturar na primeira casa encerra o avanço
         const virtual = { ...this.st, b:this.st.b.slice() };
@@ -260,9 +259,9 @@
       if (mv.rogueExecution && mv.t === 'k') {
         const back = mv.rogueExecution.back, b = this.st.b;
         const dr = rowOf(mv.to) - rowOf(mv.from), dc = colOf(mv.to) - colOf(mv.from);
-        const valid = Math.abs(dr) === 1 && Math.abs(dc) === 1 &&
+        const valid = Math.max(Math.abs(dr),Math.abs(dc)) === 1 && (dr!==0 || dc!==0) &&
           back === idx(rowOf(mv.to) + dr, colOf(mv.to) + dc) &&
-          back >= 0 && back < N && isDarkCell(back) &&
+          back >= 0 && back < N &&
           sideOf(b[mv.from]) === mover && isAttack(b[mv.from]) &&
           sideOf(b[mv.to]) === (mover ^ 1) && sideOf(b[back]) === (mover ^ 1) &&
           this.legal().moves.some(x => x.t === 'k' && x.from === mv.from && x.to === mv.to);
@@ -287,7 +286,7 @@
           Math.max(Math.abs(rowOf(w.target)-rowOf(mv.to)),Math.abs(colOf(w.target)-colOf(mv.to))) === 1 &&
           w.landing === idx(rowOf(w.target)+Math.sign(rowOf(w.target)-rowOf(mv.to)),
                             colOf(w.target)+Math.sign(colOf(w.target)-colOf(mv.to))) &&
-          isDarkCell(w.landing) && !isMain(w.landing) && !b[w.landing] && sideOf(b[w.target]) === (mover ^ 1);
+          !isMain(w.landing) && !b[w.landing] && sideOf(b[w.target]) === (mover ^ 1);
         if (!valid) return;
         apply(this.st,mv);
         if (!w.blocked) { b[w.landing] = b[w.target]; b[w.target] = 0; }
@@ -299,10 +298,9 @@
       if (mv.rogueCavalry && mv.t === 'k') {
         const landing = mv.rogueCavalry.landing, b = this.st.b;
         const dr = rowOf(mv.to) - rowOf(mv.from), dc = colOf(mv.to) - colOf(mv.from);
-        const valid = Math.abs(dr) === 1 && Math.abs(dc) === 1 &&
-          Math.abs(rowOf(landing)-rowOf(mv.to)) === 1 &&
-          Math.abs(colOf(landing)-colOf(mv.to)) === 1 &&
-          landing >= 0 && landing < N && isDarkCell(landing) && !isMain(landing) && !b[landing] &&
+        const valid = Math.max(Math.abs(dr),Math.abs(dc)) === 1 && (dr!==0 || dc!==0) &&
+          Math.max(Math.abs(rowOf(landing)-rowOf(mv.to)), Math.abs(colOf(landing)-colOf(mv.to))) === 1 &&
+          landing >= 0 && landing < N && !isMain(landing) && !b[landing] &&
           sideOf(b[mv.from]) === mover && isAttack(b[mv.from]) && sideOf(b[mv.to]) === (mover ^ 1) &&
           this.legal().moves.some(x => x.t === 'k' && x.from === mv.from && x.to === mv.to);
         if (!valid) return;
@@ -326,7 +324,7 @@
     const out = [];
     for (let r = r0; r <= r1; r++) for (let c = 0; c < COLS; c++) {
       const i = idx(r, c);
-      if (isDarkCell(i) && !isMain(i)) out.push(i);
+      if (!isMain(i)) out.push(i);
     }
     return out;
   }
@@ -357,8 +355,8 @@
     const set = new Set([list[Math.floor(rnd() * list.length)]]);
     while (set.size < PIECES) {
       const cand = [];
-      for (const i of set) for (let d = 0; d < 4; d++) {
-        const j = NB[i * 4 + d];
+      for (const i of set) for (let d = 0; d < 8; d++) {
+        const j = NB[i * 8 + d];
         if (j >= 0 && cells.has(j) && !set.has(j)) cand.push(j);
       }
       set.add(cand[Math.floor(rnd() * cand.length)]);

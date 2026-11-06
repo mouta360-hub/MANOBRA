@@ -234,15 +234,17 @@
 
   /* ---------- Peças (como no manual) ---------- */
   function pieceSvg(p) {
-    const o = '<svg class="pc ' + (E.isAttack(p) ? 'piece-attack' : 'piece-defense') + '" viewBox="0 0 100 100">';
     if (!p) return '';
-    switch (p) {
-      case WD: return o + '<circle cx="50" cy="50" r="40" fill="#fff" stroke="#8d96a8" stroke-width="4"/></svg>';
-      case WA: return o + '<circle cx="50" cy="50" r="42" fill="#fff" stroke="#1a2433" stroke-width="5"/><circle cx="50" cy="50" r="22" fill="#111"/></svg>';
-      case BD: return o + '<circle cx="50" cy="50" r="40" fill="#0b0d12" stroke="#aab4c6" stroke-width="5"/></svg>';
-      case BA: return o + '<circle cx="50" cy="50" r="36" fill="#fff" stroke="#0b0d12" stroke-width="16"/><circle cx="50" cy="50" r="46" fill="none" stroke="#aab4c6" stroke-width="3"/></svg>';
-    }
-    return '';
+    const attack = E.isAttack(p);
+    const white = p === WD || p === WA;
+    const bg = white ? '#f7f8fc' : '#10131c';
+    const rim = attack ? '#f0444d' : '#329cff';
+    return '<svg class="pc ' + (attack ? 'piece-attack' : 'piece-defense') +
+      '" viewBox="0 0 100 100" role="img" aria-label="' +
+      (white ? 'Peça branca' : 'Peça preta') + ', ' + (attack ? 'ataque' : 'defesa') +
+      '"><circle cx="50" cy="50" r="45" fill="' + bg +
+      '" stroke="#111827" stroke-width="3"/><circle cx="50" cy="50" r="43" fill="none" stroke="' +
+      rim + '" stroke-width="7"/></svg>';
   }
 
   function counts(arr) {
@@ -268,14 +270,14 @@
         // A linha vermelha (terreno neutro) só aparece na montagem
         let cls = 'cell ' + (dark ? 'dark' : 'light') + (r === Math.floor(ROWS / 2) && app.screen === 'setup' ? ' neutral' : '');
         const specialAttr = (window.RoguelikeRuntime && window.RoguelikeRuntime.cellMarkup) ? window.RoguelikeRuntime.cellMarkup(i) : '';
-        if (dark) {
+        {
           if (marks.terr && marks.terr.has(i)) cls += ' can';
           if (marks.last && marks.last.indexOf(i) >= 0) cls += ' last';
           if (marks.sel === i) cls += ' sel';
           if (marks.dest && marks.dest.has(i)) cls += ' ' + marks.dest.get(i);
         }
         const piece = arr[i];
-        h += '<div class="' + cls + '"' + (dark ? ' data-i="' + i + '"' : '') + specialAttr + '>' +
+        h += '<div class="' + cls + '"' + ' data-i="' + i + '"' + specialAttr + '>' +
           (E.isMain(i) ? '<i class="mainsq"></i>' : '') + pieceSvg(piece) + '</div>';
       }
     }
@@ -365,12 +367,12 @@
 
   function rulesScreen() {
     return '<div class="rules"><div class="topbar"><b>Como jogar</b><button data-act="rulesBack">Voltar</button></div>' +
-      '<h2>Tabuleiro</h2><p>13 × 9 = 117 casas. Só as casas escuras (azul-escuro) são usadas, sempre em diagonal. Cada jogador tem 13 peças e uma casa principal (o quadrado).</p>' +
+      '<h2>Tabuleiro</h2><p>13 × 9 = 117 casas. Casas claras e escuras são usadas; movimentos nas oito direções. Cada jogador tem 13 peças e uma casa principal (o quadrado).</p>' +
       '<h2>Como vencer (qualquer um)</h2><ul><li>Separar todas as peças de ataque do oponente, sem possibilidade de conectá-las.</li><li>Eliminar todas as peças do oponente.</li><li>Alcançar a casa principal do oponente.</li></ul>' +
       '<h2>Montagem</h2><p>Cada jogador distribui as 13 peças no seu terreno (4 linhas). A linha vermelha na montagem é o terreno neutro: ninguém coloca peças nela no início. No máximo 6 peças em modo defesa; pode ter menos. Se um jogador ficar com a 7ª peça em defesa, o adversário pode eliminar uma defesa dele.</p>' +
       '<h2>Modos</h2><ul>' +
-      '<li><b>Defesa</b> (branca lisa / preta lisa): anda sozinha 1 casa em qualquer diagonal. Não elimina: empurra a peça inimiga uma casa para trás dela ou troca de lugar com ela.</li>' +
-      '<li><b>Ataque</b> (branca com bolinha / preta com anel): só se move se houver uma peça sua na diagonal ao lado. Elimina qualquer peça inimiga ocupando a casa dela. Se ficar sozinha, volta a andar quando outra peça sua chegar perto.</li></ul>' +
+      '<li><b>Defesa</b> (branca lisa / preta lisa): anda sozinha 1 casa em qualquer direção. Não elimina: empurra a peça inimiga uma casa para trás dela ou troca de lugar com ela.</li>' +
+      '<li><b>Ataque</b> (branca com bolinha / preta com anel): só se move se houver uma peça sua ao lado em qualquer direção. Elimina qualquer peça inimiga ocupando a casa dela. Se ficar sozinha, volta a andar quando outra peça sua chegar perto.</li></ul>' +
       '<h2>Sua vez</h2><p>Um movimento por turno: andar, ou virar uma peça de modo (conta como o movimento). Virar de ataque para defesa exige uma peça sua por perto. As brancas começam.</p>' +
       '<h2>Efeito looping</h2><p>Se os dois repetem o mesmo movimento, quem tem menos peças leva vantagem; depois quem tem mais peças em ataque; depois o dono do terreno onde acontece. Quem perde o desempate é obrigado a fazer outro movimento.</p>' +
       '<h2>Modo Aventura (Roguelike)</h2><p>Avance pelo mapa escolhendo os destinos disponíveis. A aventura possui três atos, cada um com oito etapas. Você começa com 30 moedas e sem peças especiais: compre peças na loja para formar seu quartel e selecione as que levará para cada combate.</p>' +
@@ -455,7 +457,7 @@
     const p = g.st.b[app.sel];
     const atk = E.isAttack(p);
     const mv = g.cur.moves.filter(m => m.from === app.sel);
-    if (!mv.length) return atk ? 'Ataque isolado: não anda nem vira defesa até outra peça sua chegar na diagonal dele.' : 'Essa peça não tem movimentos.';
+    if (!mv.length) return atk ? 'Ataque isolado: não anda nem vira defesa até outra peça sua chegar ao lado dele.' : 'Essa peça não tem movimentos.';
     return atk ? 'Ataque: elimina o inimigo ao ocupar a casa dele.' : 'Defesa: anda 1 casa, empurra ou troca de lugar com inimigos.';
   }
 
