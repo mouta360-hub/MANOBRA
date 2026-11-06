@@ -1,0 +1,32 @@
+/* Correção isolada do campo no Android: mantém a grade 13 x 9 e não afeta Linux. */
+@media screen and (max-width: 899px) {
+  :root {
+    --cs: min(
+      calc((100vw - 28px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 13),
+      calc((100dvh - 175px) / 9)
+    );
+  }
+  #app > .layout { display:flex; flex-direction:column; width:100%; min-width:0; gap:10px; }
+  #app > .layout > .bw { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; width:100%; min-width:0; max-width:100%; height:auto; padding:0; overflow:visible; }
+  #app > .layout > .bw > #board {
+    display:grid; grid-template-columns:repeat(13, var(--cs)); grid-template-rows:repeat(9, var(--cs));
+    width:calc(13 * var(--cs)); height:calc(9 * var(--cs));
+    min-width:0; max-width:none; flex:0 0 auto; margin:0 auto;
+    box-sizing:content-box; overflow:visible; transform:none;
+  }
+  #app > .layout > .bw > #board > .cell {
+    width:var(--cs); height:var(--cs); min-width:0; min-height:0;
+    box-sizing:border-box; overflow:visible;
+  }
+  #app > .layout > .bw > #board > .cell .pc { max-width:86%; max-height:86%; flex-shrink:0; }
+  #app > .layout > .side { width:100%; max-width:100%; min-width:0; max-height:none; overflow:visible; }
+  .board-caption, .board-legend { max-width:100%; box-sizing:border-box; }
+}
+@media screen and (max-width:899px) and (orientation:landscape) {
+  :root {
+    --cs: min(calc((100vw - 255px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)) / 13), calc((100dvh - 30px) / 9));
+  }
+  #app > .layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(180px,225px); gap:10px; }
+  #app > .layout > .bw { align-items:center; justify-content:center; }
+  #app > .layout > .side { max-height:calc(100dvh - 12px); overflow-y:auto; }
+}
