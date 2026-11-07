@@ -4,10 +4,15 @@
   #app > .layout > .bw { overflow-x: auto; min-width: 0; }
   #app > .layout > .bw > #board { width: max-content; grid-template-columns: repeat(13, var(--cs)); flex-shrink: 0; }
   #board .cell { width: var(--cs); height: var(--cs); min-width: 0; min-height: 0; box-sizing: border-box; }
-  #board .cell.can.dark { background: linear-gradient(145deg,#395471,#203b55) !important; }
-  #board .cell.can.light { background: linear-gradient(145deg,#e7ddc5,#c7b99b) !important; }
-  #board .cell.can:not(.sel) { outline: 1px solid rgba(91,207,146,.32); outline-offset: -2px; }
+  #board .cell.setup-available.dark { background: linear-gradient(145deg,#395471,#203b55) !important; }
+  #board .cell.setup-available.light { background: linear-gradient(145deg,#e7ddc5,#c7b99b) !important; }
+  #board .cell.setup-available:not(.sel) { outline: 1px solid rgba(91,207,146,.32); outline-offset: -2px; }
 }
 @media (max-width: 899px) and (orientation: landscape) {
   :root { --cs: min(calc((100vw - 255px) / 13), calc((100dvh - 28px) / 9)); }
 }
+
+/* All battles, all viewports: setup availability must never repaint the checkerboard. */
+#board .cell.setup-available.dark { background: linear-gradient(145deg,#395471,#203b55) !important; }
+#board .cell.setup-available.light { background: linear-gradient(145deg,#e7ddc5,#c7b99b) !important; }
+#board .cell.setup-available:not(.sel) { outline: 1px solid rgba(91,207,146,.32); outline-offset: -2px; }
