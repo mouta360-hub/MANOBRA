@@ -271,7 +271,7 @@
         let cls = 'cell ' + (dark ? 'dark' : 'light') + (r === Math.floor(ROWS / 2) && app.screen === 'setup' ? ' neutral' : '');
         const specialAttr = (window.RoguelikeRuntime && window.RoguelikeRuntime.cellMarkup) ? window.RoguelikeRuntime.cellMarkup(i) : '';
         {
-          if (marks.terr && marks.terr.has(i)) cls += ' can';
+          if (marks.terr && marks.terr.has(i)) cls += ' setup-available';
           if (marks.last && marks.last.indexOf(i) >= 0) cls += ' last';
           if (marks.sel === i) cls += ' sel';
           if (marks.dest && marks.dest.has(i)) cls += ' ' + marks.dest.get(i);
@@ -1009,7 +1009,7 @@
     btSend({ k: 'setupProgress', p: list });
   }
   function placeAI(s) {
-    placeList(s, app.level === 'easy' ? E.randomSetup(s) : E.presetSetup(s, Math.random));
+    placeList(s, E.randomSetup(s));
   }
 
   function onSetupCell(i) {
