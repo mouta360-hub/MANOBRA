@@ -271,7 +271,7 @@
         let cls = 'cell ' + (dark ? 'dark' : 'light') + (r === Math.floor(ROWS / 2) && app.screen === 'setup' ? ' neutral' : '');
         const specialAttr = (window.RoguelikeRuntime && window.RoguelikeRuntime.cellMarkup) ? window.RoguelikeRuntime.cellMarkup(i) : '';
         {
-          if (marks.terr && marks.terr.has(i)) cls += ' setup-available';
+          if (marks.terr && marks.terr.has(i)) cls += ' can';
           if (marks.last && marks.last.indexOf(i) >= 0) cls += ' last';
           if (marks.sel === i) cls += ' sel';
           if (marks.dest && marks.dest.has(i)) cls += ' ' + marks.dest.get(i);
@@ -429,7 +429,7 @@
     const roguelikeReadyEnabled = app.mode === 'ai' && window._inRoguelikeBattle;
     const readyControl = roguelikeReadyEnabled ? 'onclick="forceRoguelikeSetupReady()"' : 'data-act="setupDone"';
     const hint = lock ? 'Pronto! Aguardando o adversário terminar a montagem…' :
-      'Toque numa casa verde: 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
+      'Toque numa casa do seu território (clara ou escura): 1× ataque, 2× defesa, 3× remove. Coloque as ' + PIECES + ' peças. A linha vermelha (terreno neutro) fica vazia.' +
       (app.mode === 'bt' ? ' Seu adversário não vê suas peças até o jogo começar.' : '') +
       (app.net === 'tour' ? ' Você tem 2 minutos. Quando o tempo acabar, o computador completa as peças que faltam ao acaso e a partida começa — sem perder.' : '');
     return '<div class="layout"><div class="bw">' + boardHtml(app.pieces, { terr: terr }) + '</div><div class="side">' +
@@ -1009,13 +1009,13 @@
     btSend({ k: 'setupProgress', p: list });
   }
   function placeAI(s) {
-    placeList(s, E.randomSetup(s));
+    placeList(s, E.defensiveRandomSetup(s));
   }
 
   function onSetupCell(i) {
     if (app.mode === 'bt' && app.btReady) return;
     const s = app.setupSide;
-    if (!E.inTerritory(i, s)) { toast('Coloque as peças só no seu terreno (casas verdes).'); return; }
+    if (!E.inTerritory(i, s)) { toast('Coloque as peças somente no seu território (casas claras ou escuras).'); return; }
     const p = app.pieces[i];
     const c = counts(app.pieces)[s];
     if (!p) {

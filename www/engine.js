@@ -368,6 +368,40 @@
     return arr.map(i => ({ i, p: makePiece(side, !defs.has(i)) }));
   }
 
+  // Montagem defensiva da IA: protege a casa principal sem repetir uma formação fixa.
+  // Todas as casas (claras e escuras) do território continuam elegíveis.
+  function defensiveRandomSetup(side, rnd) {
+    rnd = rnd || Math.random;
+    const home = MAIN[side], hr = rowOf(home), hc = colOf(home);
+    const pool = territoryCells(side);
+    const dist = i => Math.max(Math.abs(rowOf(i) - hr), Math.abs(colOf(i) - hc));
+    const ring = pool.filter(i => dist(i) === 1);
+    const shuffle = a => {
+      a = a.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rnd() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    // Ocupar 4 ou 5 das cinco casas ao redor da base, com variação a cada partida.
+    const selected = shuffle(ring).slice(0, 4 + Math.floor(rnd() * 2));
+    const selectedSet = new Set(selected);
+    // Restante: priorizar casas próximas, mas deixar margem para formações diferentes.
+    const candidates = shuffle(pool.filter(i => !selectedSet.has(i))).sort((a, b) =>
+      (dist(a) + rnd() * 1.5) - (dist(b) + rnd() * 1.5));
+    for (const i of candidates) {
+      if (selected.length >= PIECES) break;
+      selected.push(i);
+    }
+    // 4 a 6 defensores, preferindo os vizinhos imediatos da casa principal.
+    const defCount = 4 + Math.floor(rnd() * 3);
+    const defenseOrder = shuffle(selected.filter(i => dist(i) === 1))
+      .concat(shuffle(selected.filter(i => dist(i) !== 1)));
+    const defense = new Set(defenseOrder.slice(0, defCount));
+    return shuffle(selected).map(i => ({ i, p: makePiece(side, !defense.has(i)) }));
+  }
+
   /* ---------- IA ---------- */
   function evaluate(st) { // do ponto de vista das brancas
     const b = st.b;
@@ -485,7 +519,7 @@
     COLS, ROWS, N, EMPTY, WA, WD, BA, BD, WHITE, BLACK, MAX_DEF, PIECES, MAIN,
     idx, rowOf, colOf, isDarkCell, sideOf, isAttack, makePiece, isMain, terrainOwner,
     NB, createState, generate, apply, undo, winner, hashOf, loopLoser, Game,
-    territoryCells, inTerritory, presetSetup, randomSetup, evaluate, chooseMove, LEVELS
+    territoryCells, inTerritory, presetSetup, randomSetup, defensiveRandomSetup, evaluate, chooseMove, LEVELS
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.ManobraEngine = api;
