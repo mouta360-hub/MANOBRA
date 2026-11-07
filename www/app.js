@@ -271,7 +271,7 @@
         let cls = 'cell ' + (dark ? 'dark' : 'light') + (r === Math.floor(ROWS / 2) && app.screen === 'setup' ? ' neutral' : '');
         const specialAttr = (window.RoguelikeRuntime && window.RoguelikeRuntime.cellMarkup) ? window.RoguelikeRuntime.cellMarkup(i) : '';
         {
-          if (marks.terr && marks.terr.has(i)) cls += ' can';
+          if (marks.terr && marks.terr.has(i)) cls += ' setup-available';
           if (marks.last && marks.last.indexOf(i) >= 0) cls += ' last';
           if (marks.sel === i) cls += ' sel';
           if (marks.dest && marks.dest.has(i)) cls += ' ' + marks.dest.get(i);
@@ -1096,7 +1096,10 @@
       let l = g.legal({ noSeventh: true });
       if (!l.moves.length) l = g.cur;
       const predicted = window.RoguelikeRuntime?.oracleCommittedMove?.(g,l.moves);
-      const mv = predicted || E.chooseMove(g.st, l.moves, app.level);
+      const adventure = window._inRoguelikeBattle && window.RoguelikeRun?.active ? window.RoguelikeRun : null;
+      const progress = adventure ? Math.max(1, (Number(adventure.act) - 1) * 8 + Number(adventure.floor || 1)) : 0;
+      const aiLevel = !adventure ? app.level : progress <= 2 ? 'easy' : progress <= 5 ? 'medium' : 'hard';
+      const mv = predicted || E.chooseMove(g.st, l.moves, aiLevel);
       app.thinking = false;
       doMove(mv);
     }, 80);

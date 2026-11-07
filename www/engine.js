@@ -403,34 +403,46 @@
   }
 
   /* ---------- IA ---------- */
-  function evaluate(st) { // do ponto de vista das brancas
-    const b = st.b;
-    let total = 0;
-    const best = [99, 99], defN = [0, 0];
-    for (let i = 0; i < N; i++) {
-      const p = b[i];
-      if (!p) continue;
-      const s = p <= 2 ? 0 : 1, atk = (p === 1 || p === 3);
-      const r = (i / COLS) | 0, c = i - r * COLS;
-      const tr = s === 0 ? 0 : 10;
-      const d = Math.max(Math.abs(r - tr), Math.abs(c - 6)); // passos até a casa principal inimiga
-      let v = atk ? 110 : 90;
-      v += (9 - d) * 3;
-      let friend = false;
-      for (let k = 0; k < 4; k++) {
-        const j = NB[i * 4 + k];
-        if (j >= 0 && b[j] && ((b[j] <= 2 ? 0 : 1) === s)) { friend = true; break; }
+  // Avaliação estratégica: base protegida, avanço e isolamento das peças de ataque.
+  function evaluate(st) { // pontuação positiva favorece as brancas
+    const b = st.b, score = [0, 0];
+    const cheb = (i, j) => Math.max(Math.abs(rowOf(i)-rowOf(j)), Math.abs(colOf(i)-colOf(j)));
+    for (let side = WHITE; side <= BLACK; side++) {
+      const ownBase = MAIN[side], enemyBase = MAIN[side ^ 1];
+      let nearBase = 0, closest = 99, supported = 0, isolated = 0, attacking = 0;
+      for (let i = 0; i < N; i++) {
+        const p = b[i];
+        if (!p || sideOf(p) !== side) continue;
+        const atk = isAttack(p), distance = cheb(i, enemyBase), home = cheb(i, ownBase);
+        closest = Math.min(closest, distance);
+        const friend = hasFriendAdj(b, i, side);
+        if (atk) {
+          attacking++;
+          if (friend) { supported++; score[side] += 22; }
+          else { isolated++; score[side] -= 32; }
+        }
+        score[side] += atk ? 110 : 90;
+        // Incentiva aproximação efetiva da casa principal adversária.
+        score[side] += (9 - distance) * (atk ? 8 : 5);
+        if (home <= 2) { nearBase++; score[side] += home <= 1 ? 9 : 5; }
       }
-      if (atk) v += friend ? 8 : -25; else v += friend ? 2 : 0;
-      if (!atk) defN[s]++;
-      if (d < best[s]) best[s] = d;
-      total += s === 0 ? v : -v;
+      // Preserva defesa, mas não recompensa uma guarnição inteira parada na base.
+      score[side] += Math.min(nearBase, 4) * 16;
+      if (nearBase === 0) score[side] -= 85;
+      if (nearBase === 1) score[side] -= 24;
+      if (closest <= 3) score[side] += (4 - closest) * 35;
+      if (attacking > 0 && supported === 0) score[side] -= 30;
+      // Peças adversárias perto da nossa base aumentam a necessidade de proteção.
+      let threat = 0;
+      for (let i = 0; i < N; i++) {
+        if (b[i] && sideOf(b[i]) === (side ^ 1)) {
+          const d = cheb(i, ownBase);
+          if (d <= 2) threat += d === 1 ? 50 : 18;
+        }
+      }
+      score[side] -= Math.max(0, threat - nearBase * 18);
     }
-    for (let s = 0; s < 2; s++) {
-      if (best[s] <= 3) { const bonus = (4 - best[s]) * 40; total += s === 0 ? bonus : -bonus; }
-      if (defN[s] > MAX_DEF) { const pen = (defN[s] - MAX_DEF) * 70; total += s === 0 ? -pen : pen; }
-    }
-    return total;
+    return score[WHITE] - score[BLACK];
   }
 
   function order(moves, s) {
@@ -487,6 +499,21 @@
       undo(st, log);
       if (w) return m;
     }
+    // Evita oferecer uma vitória imediata ao adversário, quando há alternativa.
+    const safeMoves = [];
+    for (const m of moves) {
+      const log = apply(st, m);
+      const replySide = st.turn;
+      const unsafe = generate(st, replySide, { noSeventh: true }).some(reply => {
+        const replyLog = apply(st, reply);
+        const wins = winner(st, replySide) !== null;
+        undo(st, replyLog);
+        return wins;
+      });
+      undo(st, log);
+      if (!unsafe) safeMoves.push(m);
+    }
+    if (safeMoves.length) { moves.length = 0; moves.push(...safeMoves); }
     const ctx = { nodes: 0, abort: false, deadline: Date.now() + cfg.ms, opts: { noSeventh: true } };
     let best = moves[0];
     for (let depth = 1; depth <= cfg.depth; depth++) {
